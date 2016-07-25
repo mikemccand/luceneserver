@@ -400,6 +400,11 @@ def main():
 
       compileLuceneModules(luceneTestDeps)
 
+      for dep in testDeps:
+        destFileName = 'lib/%s-%s.jar' % (dep[1], dep[2])
+        if not os.path.exists(destFileName):
+          fetchMavenJAR(*(dep + (destFileName,)))
+
       testCP = getTestClassPath()
       testCP.append('build/classes/test')
       testCP.append(jarFileName)
@@ -408,11 +413,6 @@ def main():
         if not os.path.exists('build/classes/test/org/apache/lucene/server/%s' % extraFile):
           shutil.copy('src/test/org/apache/lucene/server/%s' % extraFile,
                       'build/classes/test/org/apache/lucene/server/%s' % extraFile)
-
-      for dep in testDeps:
-        destFileName = 'lib/%s-%s.jar' % (dep[1], dep[2])
-        if not os.path.exists(destFileName):
-          fetchMavenJAR(*(dep + (destFileName,)))
 
       if upto == len(sys.argv):
         # Run all tests
@@ -449,9 +449,11 @@ def main():
 
       if len(testClasses) == 0:
         if testSubString is None:
-          raise RuntimeError('no tests found')
+          raise RuntimeError('no tests found (wtf?)')
         else:
           raise RuntimeError('no tests match substring "%s"' % testSubString)
+
+      # TODO: also detect if no tests matched the tests.method!
 
       jvmCount = min(multiprocessing.cpu_count(), len(testClasses))
 
