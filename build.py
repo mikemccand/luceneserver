@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import zipfile
 import json
 import time
 import threading
