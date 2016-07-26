@@ -59,7 +59,7 @@ def unescape(s):
 
 class RunTestsJVM(threading.Thread):
 
-  def __init__(self, id, jobs, classPath, verbose, seed, testMethod=None):
+  def __init__(self, id, jobs, classPath, verbose, seed, doPrintOutput, testMethod):
     threading.Thread.__init__(self)
     self.id = id
     self.jobs = jobs
@@ -70,6 +70,7 @@ class RunTestsJVM(threading.Thread):
     self.testCount = 0
     self.suiteCount = 0
     self.failCount = 0
+    self.doPrintOutput = doPrintOutput
 
   def run(self):
     cmd = ['java']
@@ -139,7 +140,7 @@ class RunTestsJVM(threading.Thread):
             event = json.loads('\n'.join(lines))
             if event[0] in ('APPEND_STDOUT', 'APPEND_STDERR'):
               chunk = unescape(event[1]['chunk'])
-              if testCaseFailed:
+              if testCaseFailed or self.doPrintOutput:
                 message(chunk)
               else:
                 pendingOutput.append(chunk)
@@ -356,10 +357,10 @@ def main():
       print('cleaning...')
       if os.path.exists('build'):
         shutil.rmtree('build')
+    elif what == 'cleanlucene':
       os.chdir('lucene6x')
       run('ant clean')
       os.chdir('..')
-
     elif what == 'package':
       
       jarFileName = compileSourcesAndDeps()
@@ -382,7 +383,7 @@ def main():
             for name in os.listdir(libDir):
               z.write('%s/%s' % (libDir, name), '%s/lib/%s' % (rootDirName, name))
 
-        print('\nWrote %s (%.1f MB)' % (destFileName, os.path.getsize(destFileName)/1024./1024.))
+        print('\nWrote %s (%.1f MB)\n' % (destFileName, os.path.getsize(destFileName)/1024./1024.))
 
     elif what == 'test' or what.startswith('Test'):
 
@@ -455,8 +456,10 @@ def main():
 
       if testSubString is not None:
         print('Running test %s' % testClasses[0])
+        printOutput = True
       else:
         print('Running %d tests in %d JVMs' % (len(testClasses), jvmCount))
+        printOutput = False
 
       if not os.path.exists('build/test'):
         os.makedirs('build/test')
@@ -466,7 +469,7 @@ def main():
 
       jvms = []
       for i in range(jvmCount):
-        jvm = RunTestsJVM(0, jobs, testCP, verbose, None, testMethod=testMethod)
+        jvm = RunTestsJVM(0, jobs, testCP, verbose, None, printOutput, testMethod=testMethod)
         jvm.start()
         jvms.append(jvm)
 
@@ -490,6 +493,8 @@ def main():
       if failCount > 0:
         print('\nFAILURE [%d of %d test cases in %d suites failed in %.1f sec]' % (failCount, testCount, suiteCount, totalSec))
         sys.exit(1)
+      elif testCount == 0:
+        print('\nFAILURE: no tests ran!')
       else:
         print('\nSUCCESS [%d test cases in %d suites in %.1f sec]' % (testCount, suiteCount, totalSec))
         sys.exit(0)
