@@ -92,6 +92,7 @@ public class StartIndexHandler extends Handler {
         if (mode.equals("primary")) {
           state.startPrimary(primaryGen);
         } else if (mode.equals("replica")) {
+          // nocommit can we use "caller ID" instead somehow?  rob says this is much better!
           state.startReplica(new InetSocketAddress(primaryAddress, primaryPort), primaryGen);
         } else {
           state.start();

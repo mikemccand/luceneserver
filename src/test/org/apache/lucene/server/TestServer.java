@@ -18,10 +18,13 @@ package org.apache.lucene.server;
  */
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Locale;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 
@@ -392,6 +395,28 @@ public class TestServer extends ServerBaseTestCase {
     createAndStartIndex("index");
     registerFields();
     commit();
+  }
+
+  public void testBindToTwoIPs() throws Exception {
+    Path dir = createTempDir();
+    rmDir(dir);
+
+    // specify port 0 twice, which tells the OS to pick two free ports:
+    RunServer server = new RunServer("test", dir, Arrays.asList(new String[] {"127.0.0.1:0", "127.0.0.1:0"}));
+    assertEquals(2, server.server.bindIPs.size());
+    assertEquals(2, server.server.actualPorts.size());
+    assertEquals(2, server.server.actualBinaryPorts.size());
+
+    // make sure the two interfaces are talking to the same node:
+    Path indexDir = createTempDir();
+    rmDir(indexDir);
+    
+    server.send("createIndex", "{indexName: index, rootDir: " + indexDir.toAbsolutePath() + "}");
+    server.send("liveSettings", "{indexName: index, minRefreshSec: 0.001}");
+    server.send("startIndex", "{indexName: index}");
+    JSONObject result = server.sendRaw("indexStatus", "{\"indexName\": \"index\"}".getBytes("UTF-8"), server.server.actualPorts.get(1));
+    assertEquals("started", getString(result, "status"));
+    server.shutdown();
   }
 
   // nocommit assert that exact field name w/ error is in

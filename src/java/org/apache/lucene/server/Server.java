@@ -84,13 +84,16 @@ public class Server {
 
   private static final boolean VERBOSE = false;
 
-  final GlobalState globalState;
-  final HttpServer httpServer;
-  final ExecutorService httpThreadPool;
-  final BinaryServer binaryServer;
+  public static final int DEFAULT_PORT = 4000;
 
-  public final int actualPort;
-  public final int actualBinaryPort;
+  final GlobalState globalState;
+  final ExecutorService httpThreadPool;
+  final List<HttpServer> httpServers;
+  final List<BinaryServer> binaryServers;
+  final List<String> bindIPs;
+
+  public final List<Integer> actualPorts;
+  public final List<Integer> actualBinaryPorts;
 
   private static Map<String, List<String>> splitQuery(URI uri) throws UnsupportedEncodingException {
     final Map<String, List<String>> params = new LinkedHashMap<String, List<String>>();
@@ -568,26 +571,16 @@ public class Server {
     System.out.println("\nUsage: java -cp <stuff> org.apache.lucene.server.Server [-port port] [-maxHTTPThreadCount count] [-stateDir /path/to/dir]\n\n");
   }
 
-  public Server(String nodeName, Path globalStateDir, int port, int backlog, int threadCount, String bindHost) throws Exception {
+  public Server(String nodeName, Path globalStateDir, int backlog, int threadCount, List<String> bindIPPorts) throws Exception {
     globalState = new GlobalState(nodeName, globalStateDir);
     globalState.loadIndexNames();
-    
-    httpServer = HttpServer.create(new InetSocketAddress(bindHost, port), backlog);
-
+    httpServers = new ArrayList<>();
+    binaryServers = new ArrayList<>();
     httpThreadPool = Executors.newFixedThreadPool(threadCount);
-    globalState.localAddress = httpServer.getAddress();
-    httpServer.setExecutor(httpThreadPool);
-    actualPort = httpServer.getAddress().getPort();
 
-    int binaryPort;
-    if (port == 0) {
-      binaryPort = 0;
-    } else {
-      binaryPort = port+1;
-    }
-    binaryServer = new BinaryServer(bindHost, binaryPort);
-    actualBinaryPort = binaryServer.actualPort;
-    globalState.localBinaryAddress = (InetSocketAddress) binaryServer.serverSocket.getLocalSocketAddress();
+    bindIPs = new ArrayList<>();
+    actualPorts = new ArrayList<>();
+    actualBinaryPorts = new ArrayList<>();
 
     globalState.addHandler("addDocument", new AddDocumentHandler(globalState));
     globalState.addHandler("addDocuments", new AddDocumentsHandler(globalState));
@@ -642,14 +635,58 @@ public class Server {
     // binary protocol for bulk adding CSV encoded documents
     globalState.addHandler("bulkCSVAddDocument", new BulkCSVAddDocumentHandler(globalState));
 
-    // docs are their own handler:
-    httpServer.createContext("/doc", new DocHandler());
+    for(String bindIPPort : bindIPPorts) {
+      String[] parts = bindIPPort.split(":");
 
-    // static files from plugins are their own handler:
-    httpServer.createContext("/plugins", new PluginsStaticFileHandler());
+      String bindIP;
+      int port;
+      
+      if (parts.length == 1) {
+        bindIP = parts[0];
+        port = DEFAULT_PORT;
+      } else if (parts.length == 2) {
+        bindIP = parts[0];
+        try {
+          port = Integer.parseInt(parts[1]);
+        } catch (NumberFormatException nfe) {
+          throw new IllegalArgumentException("could not parse " + parts[1] + " as an integer port");
+        }
+      } else {
+        throw new IllegalArgumentException("each -ipPort should be ip or ip:port; got: " + bindIPPort);
+      }
+      bindIPs.add(bindIP);
     
-    for(Map.Entry<String,Handler> ent : globalState.getHandlers().entrySet()) {
-      httpServer.createContext("/" + ent.getKey(), new ServerHandler(ent.getValue()));
+      HttpServer httpServer = HttpServer.create(new InetSocketAddress(bindIP, port), backlog);
+
+      httpServer.setExecutor(httpThreadPool);
+      actualPorts.add(httpServer.getAddress().getPort());
+      httpServers.add(httpServer);
+
+      int binaryPort;
+      if (port == 0) {
+        binaryPort = 0;
+      } else {
+        binaryPort = port+1;
+      }
+
+      BinaryServer binaryServer = new BinaryServer(bindIP, binaryPort);
+      actualBinaryPorts.add(binaryServer.actualPort);
+      binaryServers.add(binaryServer);
+
+      // nocommit fixme!  e.g. if i bind to both 127.0.0.1 and a real IP address, we want the real IP address here?
+      globalState.localAddress = httpServer.getAddress();
+      globalState.localBinaryAddress = (InetSocketAddress) binaryServer.serverSocket.getLocalSocketAddress();
+
+      // docs are their own handler:
+      httpServer.createContext("/doc", new DocHandler());
+
+      // static files from plugins are their own handler:
+      // nocommit remove this!  security disaster!
+      httpServer.createContext("/plugins", new PluginsStaticFileHandler());
+    
+      for(Map.Entry<String,Handler> ent : globalState.getHandlers().entrySet()) {
+        httpServer.createContext("/" + ent.getKey(), new ServerHandler(ent.getValue()));
+      }
     }
   }
 
@@ -657,10 +694,17 @@ public class Server {
 
     globalState.loadPlugins();
 
-    System.out.println("SVR " + globalState.nodeName + ": listening on ports " + actualPort + "/" + actualBinaryPort + ".");
+    System.out.println("Server " + globalState.nodeName + ": listening on:");
+    for(int i=0;i<httpServers.size();i++) {
+      System.out.println("  " + bindIPs.get(i) + ":" + actualPorts.get(i) + "/" + actualBinaryPorts.get(i));
+    }
 
-    httpServer.start();
-    binaryServer.start();
+    for(HttpServer httpServer : httpServers) {
+      httpServer.start();
+    }
+    for(BinaryServer binaryServer : binaryServers) {
+      binaryServer.start();
+    }
 
     //System.out.println("SVR: done httpServer.start");
 
@@ -670,9 +714,13 @@ public class Server {
     // Await shutdown:
     globalState.shutdownNow.await();
 
-    httpServer.stop(0);
+    for(HttpServer httpServer : httpServers) {
+      httpServer.stop(0);
+    }
     httpThreadPool.shutdown();
-    binaryServer.close();
+    for(BinaryServer binaryServer : binaryServers) {
+      binaryServer.close();
+    }
 
     globalState.close();
     System.out.println("SVR: done close");
@@ -680,18 +728,11 @@ public class Server {
 
   /** Command-line entry. */
   public static void main(String[] args) throws Exception {
-    int port = 4000;
     int maxHTTPThreadCount = 2*Runtime.getRuntime().availableProcessors();
-    String bindHost = "127.0.0.1";
+    List<String> bindIPPorts = new ArrayList<>();
     Path stateDir = Paths.get(System.getProperty("user.home"), "lucene", "server");
     for(int i=0;i<args.length;i++) {
-      if (args[i].equals("-port")) {
-        if (args.length == i+1) {
-          throw new IllegalArgumentException("no value specified after -port");
-        }
-        port = Integer.parseInt(args[i+1]);
-        i++;
-      } else if (args[i].equals("-maxHTTPThreadCount")) {
+      if (args[i].equals("-maxHTTPThreadCount")) {
         if (args.length == i+1) {
           throw new IllegalArgumentException("no value specified after -maxHTTPThreadCount");
         }
@@ -703,11 +744,11 @@ public class Server {
         }
         stateDir = Paths.get(args[i+1]);
         i++;
-      } else if (args[i].equals("-interface")) {
+      } else if (args[i].equals("-ipPort")) {
         if (args.length == i+1) {
-          throw new IllegalArgumentException("no value specified after -stateDir");
+          throw new IllegalArgumentException("no value specified after -ipPort");
         }
-        bindHost = args[i+1];
+        bindIPPorts.add(args[i+1]);
         i++;
       } else {
         usage();
@@ -715,8 +756,12 @@ public class Server {
       }
     }
 
+    if (bindIPPorts.isEmpty()) {
+      bindIPPorts.add("127.0.0.1:4000");
+    }
+
     // nocommit don't hardwire 50 tcp queue length, 10 threads
-    new Server("main", stateDir, port, 50, 10, bindHost).run(new CountDownLatch(1));
+    new Server("main", stateDir, 50, 10, bindIPPorts).run(new CountDownLatch(1));
   }
 
   private static class BinaryClientHandler implements Runnable {

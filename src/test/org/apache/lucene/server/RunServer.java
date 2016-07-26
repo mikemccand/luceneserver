@@ -29,6 +29,8 @@ import java.net.Socket;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -70,7 +72,13 @@ public class RunServer {
    *  check results. */
   public JSONObject lastResult;
 
-  public RunServer(final String name, final Path globalStateDir) throws Exception {
+  public final Server server;
+
+  public RunServer(String name, Path globalStateDir) throws Exception {
+    this(name, globalStateDir, Arrays.asList(new String[] {"127.0.0.1:0"}));
+  }
+
+  public RunServer(final String name, final Path globalStateDir, List<String> ipPorts) throws Exception {
     final CountDownLatch ready = new CountDownLatch(1);
     final Exception[] exc = new Exception[1];
     final AtomicReference<Server> theServer = new AtomicReference<>();
@@ -78,7 +86,7 @@ public class RunServer {
         @Override
         public void run() {
           try {
-            Server s = new Server(name, globalStateDir, 0, 10, 1, "127.0.0.1");
+            Server s = new Server(name, globalStateDir, 10, 1, ipPorts);
             theServer.set(s);
             s.run(ready);
           } catch (Exception e) {
@@ -94,9 +102,9 @@ public class RunServer {
     if (exc[0] != null) {
       throw exc[0];
     }
-
-    port = theServer.get().actualPort;
-    binaryPort = theServer.get().actualBinaryPort;
+    this.server = theServer.get();
+    port = server.actualPorts.get(0);
+    binaryPort = server.actualBinaryPorts.get(0);
   }
 
   public void shutdown() throws Exception {
@@ -188,6 +196,10 @@ public class RunServer {
   }
 
   public JSONObject sendRaw(String command, byte[] body) throws Exception {
+    return sendRaw(command, body, port);
+  }
+
+  public JSONObject sendRaw(String command, byte[] body, int port) throws Exception {
     HttpURLConnection c = (HttpURLConnection) new URL("http://localhost:" + port + "/" + command).openConnection();
     c.setUseCaches(false);
     c.setDoOutput(true);

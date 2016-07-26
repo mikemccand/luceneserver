@@ -139,7 +139,7 @@ public class GlobalState implements Closeable {
   
   private long lastIndicesGen;
 
-  /** The host/port we are bound to; set by the server */
+  /** The externally accessible host/port we are bound to; set by the server */
   public InetSocketAddress localAddress;
 
   /** The host/port we are bound to for binary communications; set by the server */
