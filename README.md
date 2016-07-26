@@ -5,6 +5,9 @@ Lucene](http://lucene.apache.org) version 6.x snapshot sources,
 exposing many of Lucene's core and modules functionality efficiently
 over a simple REST/JSON HTTP API.
 
+Note that this code is all very new and likely has exciting bugs!  But
+it's also very fast!
+
 This server is running "in production" at [Jira
 search](http://jirasearch.mikemccandless.com), a simple search
 instance for developers to find Lucene, Solr and Tika jira issues
@@ -43,11 +46,12 @@ connection.
 
 Inside the server, the incoming bytes are broken up and parsed into
 documents concurrently based on how many cores are available.  In
-performance tests with the [New York City taxi ride
-data](http://www.nyc.gov/html/tlc/html/about/trip_record_data.shtml)
-as single client sending bulk CSV documents to index gets almost the
-same performance as a raw standalone Lucene tool indexing from the
-same source.
+performance tests indexing 1.2 billion documents in the [New York City
+taxi ride
+data](http://www.nyc.gov/html/tlc/html/about/trip_record_data.shtml),
+a single python client (see below) sending bulk CSV documents to index
+reaches almost the same performance as a raw standalone Lucene tool
+indexing from the same source.
 
 # Near-real-time replication
 
@@ -85,9 +89,11 @@ Unzip that somewhere, `cd luceneserver-0.1.0-SNAPSHOT` and run `java
 double quotes around that `"lib/*"` so java sees that asterisk and not
 your shell!
 
-Once it's running, load `http://localhost:4000/docs` to see minimial
-documentation of all REST commands.
+# Live documentation
 
+Once the server is running, load `http://localhost:4000/docs` to see
+minimial documentation of all REST commands and their accepted
+parameters.
 
 # Example indexing tool
 
