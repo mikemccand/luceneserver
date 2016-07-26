@@ -21,6 +21,7 @@ import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.CompoundFormat;
 import org.apache.lucene.codecs.DocValuesFormat;
 import org.apache.lucene.codecs.FieldInfosFormat;
+import org.apache.lucene.codecs.FilterCodec;
 import org.apache.lucene.codecs.LiveDocsFormat;
 import org.apache.lucene.codecs.NormsFormat;
 import org.apache.lucene.codecs.PointsFormat;
@@ -41,7 +42,7 @@ import org.apache.lucene.codecs.perfield.PerFieldPostingsFormat;
 
 /** Implements per-index {@link Codec}. */
 
-public class ServerCodec extends Codec {
+public class ServerCodec extends FilterCodec {
 
   public final static String DEFAULT_POSTINGS_FORMAT = "Lucene50";
   public final static String DEFAULT_DOC_VALUES_FORMAT = "Lucene54";
@@ -94,13 +95,8 @@ public class ServerCodec extends Codec {
 
   /** Sole constructor. */
   public ServerCodec(IndexState state) {
-    super("ServerCodec");
+    super("Lucene62", Codec.forName("Lucene62"));
     this.state = state;
-  }
-
-  /** Default constructor. */
-  public ServerCodec() {
-    this(null);
   }
 
   @Override

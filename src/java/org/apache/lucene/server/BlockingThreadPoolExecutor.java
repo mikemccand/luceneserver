@@ -44,18 +44,8 @@ class BlockingThreadPoolExecutor extends ThreadPoolExecutor {
 
     try {
       super.execute(task);
-    } catch(RuntimeException e) {
-      // specifically, handle RejectedExecutionException  
+    } finally {
       semaphore.release();
-      throw e;
-    } catch(Error e) {
-      semaphore.release();
-      throw e;
     }
-  }
-
-  @Override
-  protected void afterExecute(Runnable r, Throwable t) {
-    semaphore.release();
   }
 }

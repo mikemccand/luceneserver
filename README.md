@@ -45,7 +45,7 @@ Inside the server, the incoming bytes are broken up and parsed into
 documents concurrently based on how many cores are available.  In
 performance tests with the [New York City taxi ride
 data](http://www.nyc.gov/html/tlc/html/about/trip_record_data.shtml)
-as single client sending bulk CVS documents to index gets almost the
+as single client sending bulk CSV documents to index gets almost the
 same performance as a raw standalone Lucene tool indexing from the
 same source.
 
@@ -69,9 +69,9 @@ But there are downsides as well:
 
   * Merged segments must also be copied
 
-  * Additional latency on the replicas to open a new searcher, since
-    the primary must first write the files, and then each replica must
-    copy them
+  * Additional time when opening a new search to copy the files across
+    the network, since the primary must first write the files, and
+    then each replica must copy them.
 
 # Build and install
 

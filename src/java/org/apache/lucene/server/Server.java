@@ -779,7 +779,7 @@ public class Server {
     public final int actualPort;
 
     private final ExecutorService threadPool;
-    private boolean stop;
+    private volatile boolean stop;
     
     public BinaryServer(String host, int port) throws IOException {
       serverSocket = new ServerSocket();

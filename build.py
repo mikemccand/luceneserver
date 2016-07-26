@@ -340,10 +340,6 @@ def compileSourcesAndDeps():
   l.append('build/classes/java')
   compileChangedSources('src/java', 'build/classes/java', l)
 
-  if not os.path.exists('build/classes/java/META-INF/services'):
-    os.makedirs('build/classes/java/META-INF/services')
-    shutil.copy('src/resources/META-INF/services/org.apache.lucene.codecs.Codec', 'build/classes/java/META-INF/services/org.apache.lucene.codecs.Codec')
-
   if anyChanges('build/classes/java', jarFileName):
     print('build %s' % jarFileName)
     run('jar cf %s -C build/classes/java .' % jarFileName)
