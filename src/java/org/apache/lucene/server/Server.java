@@ -751,6 +751,7 @@ public class Server {
         bindIPPorts.add(args[i+1]);
         i++;
       } else {
+        System.err.println("ERROR: unknown command line option " + args[i]);
         usage();
         System.exit(-1);
       }
