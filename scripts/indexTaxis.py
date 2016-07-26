@@ -22,9 +22,11 @@ host2 = '10.17.4.12'
 DO_REPLICA = False
 DO_SEARCH = False
 
+LOCALHOST = '127.0.0.1'
+
 DEFAULT_PORT = 4000
 
-PACKAGE_FILE = 'build/luceneserver-0.1.0-SNAPSHOT.zip'
+PACKAGE_FILE = os.path.abspath('build/luceneserver-0.1.0-SNAPSHOT.zip')
 
 USER_NAME = getpass.getuser()
 
@@ -48,22 +50,23 @@ class BinarySend:
     self.socket.close()
 
 def launchServer(host, installDir, port):
+  os.makedirs(installDir)
   zipFileName = os.path.split(PACKAGE_FILE)[1]
 
   # copy install bits over
-  if host != '127.0.0.1':
+  if host != LOCALHOST:
     run('scp %s %s@%s:/tmp' % (PACKAGE_FILE, USER_NAME, host))
     # unzip it
     run('ssh %s@%s "mkdir -p %s; cd %s; unzip /tmp/%s"' % (USER_NAME, host, installDir, installDir, zipFileName))
   else:
-    run('cd %s; unzip %s' % (installDir, fullZipPath))
+    run('cd %s; unzip %s' % (installDir, PACKAGE_FILE))
 
   serverDirName = zipFileName[:-4]
 
-  if host != '127.0.0.1':
-    command = r'ssh %s@%s "cd %s/%s; java -Xms4g -Xmx4g -cp lib/\* org.apache.lucene.server.Server -port %s -stateDir %s/state -interface %s"' % (USER_NAME, host, installDir, serverDirName, port, installDir, host)
+  if host != LOCALHOST:
+    command = r'ssh %s@%s "cd %s/%s; java -Xms4g -Xmx4g -cp lib/\* org.apache.lucene.server.Server -stateDir %s/state -ipPort %s:%s"' % (USER_NAME, host, installDir, serverDirName, installDir, host, port)
   else:
-    command = r'cd %s/%s; java -Xms4g -Xmx4g -cp lib/\* org.apache.lucene.server.Server -port %s -stateDir %s/state -interface %s' % (installDir, serverDirName, port, installDir, host)
+    command = r'cd %s/%s; java -Xms4g -Xmx4g -cp lib/\* org.apache.lucene.server.Server -stateDir %s/state -ipPort %s:%s' % (installDir, serverDirName, installDir, host, port)
 
   #print('%s: server command %s' % (host, command))
   p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -74,12 +77,12 @@ def launchServer(host, installDir, port):
     line = line.decode('utf-8')
     if line == '':
       raise RuntimeError('server on %s failed to start' % host)
-    print('%s: %s' % (host, line))
+    #print('%s: %s' % (host, line))
 
-    if 'listening on port' in line:
-      x = line.split()[-1]
-      x = x.replace('.', '')
-      ports = (int(y) for y in x.split('/'))
+    if 'Server main: listening on' in line:
+      line = p.stdout.readline().strip().decode('utf-8')
+      i = line.find(':')
+      ports = list(int(x) for x in line[i+1:].split('/'))
       break
     
   thread = threading.Thread(target=readServerOutput, args=(host, p))
@@ -115,7 +118,7 @@ def run(command, logFile = None):
     raise RuntimeError('command failed with result %s: %s' % (result, command))
 
 def rmDir(host, path):
-  if host == '127.0.0.1':
+  if host == LOCALHOST:
     run('rm -rf %s' % path)
   else:
     run('ssh %s rm -rf %s' % (host, path))
@@ -163,7 +166,7 @@ def main():
       if len(tup) == 2:
         replicas.append((replicaHost, DEFAULT_PORT, replicaInstallPath))
       elif len(tup) == 3:
-        replicas.append((replicaHost, int(tup[1]), replicaInstallPath)))
+        replicas.append((replicaHost, int(tup[1]), replicaInstallPath))
       else:
         raise RuntimeError('-replica should be host:installPath or host:port:installPath')
     else:
@@ -174,22 +177,23 @@ def main():
     if 'no such file or directory' not in s.lower():
       raise RuntimeError('path %s on replica %s already exists; please remove it and rerun' % (installPath, host))
     
-  os.makedirs(installDir)
+  os.makedirs(primaryInstallPath)
   for host, port, path in replicas:
     run('ssh %s@%s mkdir -p %s' % (USER_NAME, host, path))
 
-  primaryPorts = launchServer(host1, '%s/server1' % ROOT_DIR, 4000)
+  primaryPorts = launchServer(LOCALHOST, '%s/server0' % primaryInstallPath, 4000)
 
   replicaPorts = []
   for i, (host, port, installPath) in enumerate(replicas):
     replicaPorts.append((i+1, host, installPath) + launchServer(host, '%s/server%s' % (installPath, i+1), port))
 
   try:
-    send('127.0.0.1', ports[0], 'createIndex', {'indexName': 'index', 'rootDir': '%s/server1/index' % ROOT_DIR})
-    for id, installPath, host, port, binaryPort in replicaPorts:
+    send(LOCALHOST, primaryPorts[0], 'createIndex', {'indexName': 'index', 'rootDir': '%s/server0/index' % primaryInstallPath})
+    for id, host, installPath, port, binaryPort in replicaPorts:
       send(host, port, 'createIndex', {'indexName': 'index', 'rootDir': '%s/server%s/index' % (installPath, id)})
-      
-    send(host1, port1, "liveSettings", {'indexName': 'index', 'index.ramBufferSizeMB': 1024., 'maxRefreshSec': 100000.0})
+
+    # Turn off refreshes to maximize indexing throughput:
+    send(LOCALHOST, primaryPorts[0], "liveSettings", {'indexName': 'index', 'index.ramBufferSizeMB': 1024., 'maxRefreshSec': 100000.0})
 
     fields = {'indexName': 'index',
               'fields':
@@ -219,18 +223,11 @@ def main():
                 'total_amount': {'type': 'double', 'search': True, 'sort': True},
                 'store_and_fwd_flag': {'type': 'atom', 'sort': True}}}
 
-    send(host1, port1, 'registerFields', fields)
-    if DO_REPLICA:
-      send(host2, port2, 'registerFields', fields)
+    send(LOCALHOST, primaryPorts[0], 'registerFields', fields)
+    for id, host, installPath, port, binaryPort in replicaPorts:
+      send(host, port, 'registerFields', fields)
 
-    if DO_REPLICA:
-      send(host2, port2, "settings", {'indexName': 'index',
-                                      'index.verbose': False,
-                                      'directory': 'MMapDirectory',
-                                      'nrtCachingDirectory.maxSizeMB': 0.0,
-                                      #'index.merge.scheduler.auto_throttle': False,
-                                      })
-    send(host1, port1, "settings", {'indexName': 'index',
+    send(LOCALHOST, primaryPorts[0], "settings", {'indexName': 'index',
                                     #'indexSort': [{'field': 'pick_up_lon'}],
                                     'index.verbose': False,
                                     'directory': 'MMapDirectory',
@@ -238,16 +235,23 @@ def main():
                                     #'index.merge.scheduler.auto_throttle': False,
                                     })
 
-    if DO_REPLICA:
-      send(host1, port1, 'startIndex', {'indexName': 'index', 'mode': 'primary', 'primaryGen': 0})
-      send(host2, port2, 'startIndex', {'indexName': 'index', 'mode': 'replica', 'primaryAddress': host1, 'primaryGen': 0, 'primaryPort': binaryPort1})
-    else:
-      send(host1, port1, 'startIndex', {'indexName': 'index'})
+    for id, host, installPath, port, binaryPort in replicaPorts:
+      send(host, port, "settings", {'indexName': 'index',
+                                    'index.verbose': False,
+                                    'directory': 'MMapDirectory',
+                                    'nrtCachingDirectory.maxSizeMB': 0.0,
+                                    #'index.merge.scheduler.auto_throttle': False,
+                                    })
 
-    b1 = BinarySend(host1, binaryPort1, 'bulkCSVAddDocument')
+    if len(replicas) > 0:
+      send(LOCALHOST, primaryPorts[0], 'startIndex', {'indexName': 'index', 'mode': 'primary', 'primaryGen': 0})
+      for id, host, installPath, port, binaryPort in replicaPorts:
+        send(host2, port2, 'startIndex', {'indexName': 'index', 'mode': 'replica', 'primaryAddress': host1, 'primaryGen': 0, 'primaryPort': binaryPort1})
+    else:
+      send(LOCALHOST, primaryPorts[0], 'startIndex', {'indexName': 'index'})
+
+    b1 = BinarySend(LOCALHOST, primaryPorts[1], 'bulkCSVAddDocument')
     b1.add(b'index\n')
-    #b2 = BinarySend(host1, binaryPort1, 'bulkCSVAddDocument')
-    #b2.add(b'index\n')
 
     id = 0
     tStart = time.time()
@@ -255,7 +259,7 @@ def main():
     replicaStarted = False
 
     docSource = '/lucenedata/nyc-taxi-data/alltaxis.csv.blocks'
-    if True or not os.path.exists(docSource):
+    if not os.path.exists(docSource):
       # Not Mike's home computer!
       docSource = 'data/alltaxis.1M.csv.blocks'
       if not os.path.exists(docSource):
@@ -292,15 +296,7 @@ def main():
         byteCount, docCount = (int(x) for x in header.strip().split())
         bytes = f.read(byteCount)
         totBytes += byteCount
-        if True or chunkCount & 1 == 0:
-          b1.add(bytes)
-          if False and chunkCount == 0:
-            # copy the CSV header for b2 as well:
-            s = bytes.decode('utf-8')
-            i = s.find('\n')
-            b2.add(s[:i+1].encode('utf-8'))
-        else:
-          b2.add(bytes)
+        b1.add(bytes)
         chunkCount += 1
         #print('doc: %s' % doc)
         id += docCount
@@ -320,7 +316,6 @@ def main():
             nextPrint += 250000
 
     b1.finish()
-    #b2.finish()
 
     bytes = b1.socket.recv(4)
     size = struct.unpack('>i', bytes)
@@ -339,14 +334,14 @@ def main():
     print('Total: %.1f docs/sec' % dps)
 
     print('Now stop index...')
-    send(host1, port1, 'stopIndex', {'indexName': 'index'})
+    send(LOCALHOST, primaryPorts[0], 'stopIndex', {'indexName': 'index'})
     print('Done stop index...')
 
   finally:
     # nocommit why is this leaving leftover files?  it should close all open indices gracefully?
-    send(host1, port1, 'shutdown', {})
-    if DO_REPLICA:
-      send(host2, port2, 'shutdown', {})
+    send(LOCALHOST, primaryPorts[0], 'shutdown', {})
+    for id, host, installPath, port, binaryPort in replicaPorts:
+      send(host, port, 'shutdown', {})
 
 if __name__ == '__main__':
   if '-help' in sys.argv:
