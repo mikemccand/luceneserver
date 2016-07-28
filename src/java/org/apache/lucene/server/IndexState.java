@@ -515,7 +515,14 @@ public class IndexState implements Closeable {
       long gen = -1;
 
       try {
-        Document idoc = facetsConfig.build(taxoWriter, doc);
+        
+        Document idoc;
+        if (hasFacets()) {
+          idoc = facetsConfig.build(taxoWriter, doc);
+        } else {
+          idoc = doc;
+        }
+        
         if (updateTerm == null) {
           gen = writer.addDocument(idoc);
         } else {
@@ -589,7 +596,12 @@ public class IndexState implements Closeable {
   }
 
   public long indexDocument(Document doc) throws IOException {
-    Document idoc = facetsConfig.build(taxoWriter, doc);
+    Document idoc;
+    if (hasFacets()) {
+      idoc = facetsConfig.build(taxoWriter, doc);
+    } else {
+      idoc = doc;
+    }
     long gen = writer.addDocument(idoc);
 
     if (!liveFieldValues.isEmpty()) {
@@ -694,9 +706,14 @@ public class IndexState implements Closeable {
     }
     assert !fieldsSaveState.containsKey(fd.name);
     fieldsSaveState.put(fd.name, json);
+    // nocommit support sorted set dv facets
     if (fd.faceted != null && fd.faceted.equals("no") == false && fd.faceted.equals("numericRange") == false) {
       internalFacetFieldNames.add(facetsConfig.getDimConfig(fd.name).indexFieldName);
     }
+  }
+
+  public synchronized boolean hasFacets() {
+    return internalFacetFieldNames.isEmpty() == false;
   }
 
   /** Returns JSON representation of all registered fields. */
@@ -740,10 +757,16 @@ public class IndexState implements Closeable {
     public Long call() throws Exception {
       long gen = -1;
       try {
-        List<Document> justDocs = new ArrayList<Document>();
-        for(Document doc : docs) {
-          // Translate any FacetFields:
-          justDocs.add(facetsConfig.build(taxoWriter, doc));
+        Iterable<Document> justDocs;
+        if (hasFacets()) {
+          List<Document> justDocsList = new ArrayList<Document>();
+          for(Document doc : docs) {
+            // Translate any FacetFields:
+            justDocsList.add(facetsConfig.build(taxoWriter, doc));
+          }
+          justDocs = justDocsList;
+        } else {
+          justDocs = docs;
         }
 
         //System.out.println(Thread.currentThread().getName() + ": add; " + docs);

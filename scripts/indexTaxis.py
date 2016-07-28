@@ -125,7 +125,7 @@ def rmDir(host, path):
 
 def getArg(option):
   if option in sys.argv:
-    i = sys.argv.indexOf(option)
+    i = sys.argv.index(option)
     if i + 2 > len(sys.argv):
       raise RuntimeError('command line option %s requires an argument' % option)
     value = sys.argv[i+1]
@@ -237,7 +237,6 @@ def main():
 
     for id, host, installPath, port, binaryPort in replicaPorts:
       send(host, port, "settings", {'indexName': 'index',
-                                    'index.verbose': False,
                                     'directory': 'MMapDirectory',
                                     'nrtCachingDirectory.maxSizeMB': 0.0,
                                     #'index.merge.scheduler.auto_throttle': False,
@@ -258,7 +257,8 @@ def main():
     nextPrint = 250000
     replicaStarted = False
 
-    docSource = '/lucenedata/nyc-taxi-data/alltaxis.csv.blocks'
+    #docSource = '/lucenedata/nyc-taxi-data/alltaxis.csv.blocks'
+    docSource = '/b/alltaxis.csv.blocks'
     if not os.path.exists(docSource):
       # Not Mike's home computer!
       docSource = 'data/alltaxis.1M.csv.blocks'
@@ -286,7 +286,6 @@ def main():
     chunkCount = 0
 
     with open(docSource, 'rb') as f:
-    #with open('/b/alltaxis.csv.blocks', 'rb') as f:
       csvHeader = f.readline()
       b1.add(csvHeader)
       while True:
@@ -308,9 +307,9 @@ def main():
               x = json.loads(send(host2, port2, 'search', {'indexName': 'index', 'queryText': '*:*'}));
             else:
               x = json.loads(send(host1, port1, 'search', {'indexName': 'index', 'queryText': '*:*'}));
-            print('%6.1f sec: %d hits, %.1f M docs... %.1f docs/sec, %.1f MB/sec' % (delay, x['totalHits'], id/1000000., dps, (totBytes/1024./1024.)/delay))
+            print('%6.1f sec: %d hits, %.2f M docs... %.1f docs/sec, %.1f MB/sec' % (delay, x['totalHits'], id/1000000., dps, (totBytes/1024./1024.)/delay))
           else:
-            print('%6.1f sec: %.1f M docs... %.1f docs/sec, %.1f MB/sec' % (delay, id/1000000., dps, (totBytes/1024./1024.)/delay))
+            print('%6.1f sec: %.2f M docs... %.1f docs/sec, %.1f MB/sec' % (delay, id/1000000., dps, (totBytes/1024./1024.)/delay))
 
           while nextPrint <= id:
             nextPrint += 250000
@@ -347,7 +346,7 @@ if __name__ == '__main__':
   if '-help' in sys.argv:
     print('''
 Usage: python3 scripts/indexTaxis.py <options>:
-    [-installDir /path/to/install] install the server and state directory to this path; ./install by default
+    [-installPath /path/to/install] install the server and state directory to this path; ./install by default
     [-rebuild] rebuild luceneserver artifact first; default will do this if it does not already exist
     [-replica hostName:installPath or hostName:serverPort:installPath] remote host name and path to install and launch a replica server; your current user must have passwordless ssh access for this to work.  More than one -replica may be specified.
     [-help] prints this message

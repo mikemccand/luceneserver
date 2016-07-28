@@ -102,18 +102,17 @@ public class GlobalState implements Closeable {
 
   // TODO: make these controllable
   private final static int MAX_INDEXING_THREADS = Runtime.getRuntime().availableProcessors();
+  //private final static int MAX_INDEXING_THREADS = 1;
 
   final DocHandler docHandler = new DocHandler();
 
   private final Map<String,Handler> handlers = new HashMap<String,Handler>();
 
-  // TODO: really this queue should be based on total size
-  // of the queued docs:
-  private final static int MAX_BUFFERED_DOCS = 20*MAX_INDEXING_THREADS;
-
   private final Map<String,Plugin> plugins = new HashMap<String,Plugin>();
 
-  // Seems to be substantially faster than ArrayBlockingQueue at high throughput:
+  private final static int MAX_BUFFERED_DOCS = Math.max(100, 2*MAX_INDEXING_THREADS);
+
+  // Seems to be substantially faster than ArrayBlockingQueue at high throughput:  
   final BlockingQueue<Runnable> docsToIndex = new LinkedBlockingQueue<Runnable>(MAX_BUFFERED_DOCS);
 
   /** Common thread pool to index documents. */

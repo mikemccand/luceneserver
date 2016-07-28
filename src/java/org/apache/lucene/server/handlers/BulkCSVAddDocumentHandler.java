@@ -219,10 +219,12 @@ public class BulkCSVAddDocumentHandler extends Handler {
                       nextDoc = parser.nextDoc();
                       if (nextDoc != null) {
                         ctx.addCount.incrementAndGet();
-                        try {
-                          nextDoc = indexState.facetsConfig.build(indexState.taxoWriter, nextDoc);
-                        } catch (IOException ioe) {
-                          throw new RuntimeException(ioe);
+                        if (indexState.hasFacets()) {
+                          try {
+                            nextDoc = indexState.facetsConfig.build(indexState.taxoWriter, nextDoc);
+                          } catch (IOException ioe) {
+                            throw new RuntimeException(ioe);
+                          }
                         }
                         // nocommit: live field values
                       } else {
@@ -317,6 +319,8 @@ public class BulkCSVAddDocumentHandler extends Handler {
     // nocommit tune this .. core count?
 
     // Use this to limit how many in-flight 256 KB chunks we allow into the JVM at once:
+
+    // nocommit this should be in GlobalState so it's across all incoming indexing:
     Semaphore semaphore = new Semaphore(64);
 
     ParseAndIndexOneChunk prev = null;
