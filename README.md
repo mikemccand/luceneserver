@@ -73,7 +73,7 @@ But there are downsides as well:
 
   * Merged segments must also be copied
 
-  * Additional time when opening a new search to copy the files across
+  * Additional time when opening a new searcher to copy the files across
     the network, since the primary must first write the files, and
     then each replica must copy them.
 
