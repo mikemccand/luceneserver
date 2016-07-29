@@ -50,9 +50,11 @@ TEST_HEAP = '512m'
 
 printLock = threading.Lock()
 
-def message(s):
+def message(s, includeNewline=True):
   with printLock:
-    print(s)
+    if includeNewline:
+      s += '\n'
+    sys.stdout.write(s)
 
 def unescape(s):
   return s.replace('%0A', '\n').replace('%09', '\t')
@@ -141,7 +143,7 @@ class RunTestsJVM(threading.Thread):
             if event[0] in ('APPEND_STDOUT', 'APPEND_STDERR'):
               chunk = unescape(event[1]['chunk'])
               if testCaseFailed or self.doPrintOutput:
-                message(chunk)
+                message(chunk, False)
               else:
                 pendingOutput.append(chunk)
             elif event[0] in ('TEST_FAILURE', 'SUITE_FAILURE'):
@@ -168,6 +170,9 @@ class RunTestsJVM(threading.Thread):
           lines = []
         else:
           lines.append(l)
+
+    # closes stdin, which randomizedrunning detects as the end, then process cleanly shuts down with no zombie:
+    p.communicate()
         
 class ReadEvents:
 
@@ -469,7 +474,7 @@ def main():
 
       jvms = []
       for i in range(jvmCount):
-        jvm = RunTestsJVM(0, jobs, testCP, verbose, None, printOutput, testMethod=testMethod)
+        jvm = RunTestsJVM(i, jobs, testCP, verbose, None, printOutput, testMethod=testMethod)
         jvm.start()
         jvms.append(jvm)
 
