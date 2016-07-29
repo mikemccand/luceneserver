@@ -419,6 +419,20 @@ public class TestServer extends ServerBaseTestCase {
     server.shutdown();
   }
 
+  public void testInvalidNullJSONFieldName() throws Exception {
+    deleteAllDocs();
+
+    // null key
+    expectThrows(IOException.class, () -> {
+        sendRaw("addDocument", "{\"indexName\": \"index\", \"fields\": {\"body\": \"body\", null: \"foobar\"}}");
+      });
+
+    // null value
+    expectThrows(IOException.class, () -> {
+        sendRaw("addDocument", "{\"indexName\": \"index\", \"fields\": {\"body\": \"body\", \"id\": null}}");
+      });
+  }
+
   // nocommit assert that exact field name w/ error is in
   // error message
 
