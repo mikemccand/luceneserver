@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import zipfile
+import re
 import json
 import time
 import threading
@@ -143,6 +144,7 @@ class RunTestsJVM(threading.Thread):
             if event[0] in ('APPEND_STDOUT', 'APPEND_STDERR'):
               chunk = unescape(event[1]['chunk'])
               if testCaseFailed or self.doPrintOutput:
+                chunk = fixupReproLine(chunk)
                 message(chunk, False)
               else:
                 pendingOutput.append(chunk)
@@ -173,7 +175,36 @@ class RunTestsJVM(threading.Thread):
 
     # closes stdin, which randomizedrunning detects as the end, then process cleanly shuts down with no zombie:
     p.communicate()
-        
+
+reReproLine = re.compile('^NOTE: reproduce with: ant test (.*?)$', re.MULTILINE)
+reTestClass = re.compile('-Dtestcase=(.*?)[ $]')
+reTestMethod = re.compile('-Dtests.method=(.*?)[ $]')
+reTestSeed = re.compile('-Dtests.seed=(.*?)[ $]')
+
+def fixupReproLine(s):
+  """
+  Replaces the 'NOTE: reproduce with: ant test -D...' with 'NOTE: reproduce with ./build.py TestFoobar.testFooBaz'
+  """
+  m = reReproLine.search(s)
+  if m is not None:
+    s2 = m.group(1)
+    m2 = reTestClass.search(s2)
+    if m2 is None:
+      # wtf?
+      return s
+    testLine = m2.group(1)
+    m2 = reTestMethod.search(s2)
+    if m2 is not None:
+      testLine += '.' + m2.group(1)
+    m2 = reTestSeed.search(s2)
+    if m2 is not None:
+      testLine += ' -seed %s' % m2.group(1)
+    # TODO: locale, asserts, file encoding
+    return s[:m.start()] + ('**NOTE**: reproduce with: ./build.py %s\n' % testLine) + s[m.end():]
+  else:
+    # No repro line in this fragment
+    return s
+
 class ReadEvents:
 
   def __init__(self, process, fileName):
