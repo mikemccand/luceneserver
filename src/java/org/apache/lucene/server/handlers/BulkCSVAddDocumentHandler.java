@@ -214,6 +214,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
                 // now parse & index whole documents:
 
                 final CSVParser parser = new CSVParser(globalOffset, fields, indexState, bytes, startUpto);
+                final boolean hasFacets = indexState.hasFacets();
 
                 return new Iterator<Document>() {
                   private Document nextDoc;
@@ -225,7 +226,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
                       nextDoc = parser.nextDoc();
                       if (nextDoc != null) {
                         ctx.addCount.incrementAndGet();
-                        if (indexState.hasFacets()) {
+                        if (hasFacets) {
                           try {
                             nextDoc = indexState.facetsConfig.build(indexState.taxoWriter, nextDoc);
                           } catch (IOException ioe) {
