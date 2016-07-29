@@ -814,7 +814,8 @@ public class RegisterFieldHandler extends Handler {
       breakers = null;
     }
 
-    final ICUTokenizerConfig config = new DefaultICUTokenizerConfig(true) {
+    // nocommit make these two booleans controllable!!
+    final ICUTokenizerConfig config = new DefaultICUTokenizerConfig(true, true) {
         
         @Override
         public BreakIterator getBreakIterator(int script) {
