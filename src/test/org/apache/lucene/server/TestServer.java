@@ -419,7 +419,7 @@ public class TestServer extends ServerBaseTestCase {
     server.shutdown();
   }
 
-  public void testInvalidNullJSONFieldName() throws Exception {
+  public void testInvalidNullJSONFields() throws Exception {
     deleteAllDocs();
 
     // null key
