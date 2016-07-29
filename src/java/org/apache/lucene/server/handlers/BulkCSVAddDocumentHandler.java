@@ -28,7 +28,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Semaphore;
 
+import org.apache.lucene.document.BinaryDocValuesField;
+import org.apache.lucene.document.BinaryPoint;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.document.SortedDocValuesField;
+import org.apache.lucene.document.SortedSetDocValuesField;
+import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.TextField;
 import org.apache.lucene.server.FieldDef;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
@@ -99,10 +105,10 @@ public class BulkCSVAddDocumentHandler extends Handler {
       this.semaphore = semaphore;
       this.globalOffset = globalOffset;
       semaphore.acquire();
-      //System.out.println("CHUNK @ " + globalOffset + ": init " + bytes.length + " bytes");
     }
 
-    /** Indexes the one document that spans across the end of our chunk */
+    /** Indexes the one document that spans across the end of our chunk.  This is invoked when the chunk after us first starts, or when we
+     *  finish processing all whole docs in our chunk, whichever comes last. */
     private void indexSplitDoc() {
       int endFragmentLength = bytes.length - endFragmentStartOffset;
       //System.out.println("CHUNK @ " + globalOffset + " indexSplitDoc: endFragmentLength=" + endFragmentLength + " nextStartFragmentLength=" + nextStartFragmentLength);

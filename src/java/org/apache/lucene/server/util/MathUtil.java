@@ -1,7 +1,5 @@
 package org.apache.lucene.server.util;
 
-import java.nio.charset.StandardCharsets;
-
 /*
  * Javolution - Java(TM) Solution for Real-Time and Embedded Systems
  * Copyright (C) 2012 - Javolution (http://javolution.org/)
@@ -10,6 +8,8 @@ import java.nio.charset.StandardCharsets;
  * Permission to use, copy, modify, and distribute this software is
  * freely granted, provided that this notice is preserved.
  */
+
+import java.nio.charset.StandardCharsets;
 
 public class MathUtil {
 

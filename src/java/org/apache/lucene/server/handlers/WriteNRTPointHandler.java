@@ -68,9 +68,7 @@ public class WriteNRTPointHandler extends Handler {
     return new FinishRequest() {
       @Override
       public String finish() throws Exception {
-        System.out.println("WriteNRTPoint: run");
         if (state.nrtPrimaryNode.flushAndRefresh()) {
-          System.out.println("WriteNRTPoint: did write");
           // Something did get flushed (there were indexing ops since the last flush):
 
           // nocommit: we used to notify caller of the version, before trying to push to replicas, in case we crash after flushing but

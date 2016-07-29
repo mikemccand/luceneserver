@@ -66,18 +66,23 @@ def launchServer(host, installDir, port):
   if host != LOCALHOST:
     command = r'ssh %s@%s "cd %s/%s; java -Xms4g -Xmx4g -cp lib/\* org.apache.lucene.server.Server -stateDir %s/state -ipPort %s:%s"' % (USER_NAME, host, installDir, serverDirName, installDir, host, port)
   else:
+    #command = r'cd %s/%s; java -XX:MaxInlineSize=0 -agentlib:yjpagent=sampling -Xms4g -Xmx4g -cp lib/\* org.apache.lucene.server.Server -stateDir %s/state -ipPort %s:%s' % (installDir, serverDirName, installDir, host, port)
     command = r'cd %s/%s; java -Xms4g -Xmx4g -cp lib/\* org.apache.lucene.server.Server -stateDir %s/state -ipPort %s:%s' % (installDir, serverDirName, installDir, host, port)
 
   #print('%s: server command %s' % (host, command))
   p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
   # Read lines until we see the server is started, then launch bg thread to read future lines:
+  pending = []
   while True:
     line = p.stdout.readline()
     line = line.decode('utf-8')
     if line == '':
+      print('ERROR: server on %s fail to start:' % host)
+      print('\n'.join(pending))
       raise RuntimeError('server on %s failed to start' % host)
     #print('%s: %s' % (host, line))
+    pending.append(line)
 
     if 'Server main: listening on' in line:
       line = p.stdout.readline().strip().decode('utf-8')

@@ -1651,9 +1651,7 @@ public class SearchHandler extends Handler {
                 if (((DirectoryReader) current.searcher.getIndexReader()).getVersion() < version) {
                   // still not there yet
                   state.release(current);
-                  System.out.println("SearchHandler: now await new version");
                   cond.await();
-                  System.out.println("SearchHandler: done await new version");
                   current = state.acquire();
                   assert ((DirectoryReader) current.searcher.getIndexReader()).getVersion() >= version;
                 }

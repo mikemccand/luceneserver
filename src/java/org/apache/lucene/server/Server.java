@@ -800,11 +800,10 @@ public class Server {
         if (length > 128) {
           throw new IllegalArgumentException("command length too long: got " + length);
         }
-        System.out.println("LENGTH " + length);
         byte[] bytes = new byte[length];
         dataIn.readBytes(bytes, 0, length);
         String command = new String(bytes, 0, length, StandardCharsets.UTF_8);
-        System.out.println("SVR " + globalState.nodeName + ": binary: command=" + command);
+        //System.out.println("SVR " + globalState.nodeName + ": binary: command=" + command);
 
         Handler handler = globalState.getHandler(command);
         if (handler.binaryRequest() == false) {
