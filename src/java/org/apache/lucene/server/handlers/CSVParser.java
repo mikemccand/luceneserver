@@ -17,13 +17,6 @@ package org.apache.lucene.server.handlers;
  * limitations under the License.
  */
 
-import java.io.EOFException;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import org.apache.lucene.document.BinaryDocValuesField;
 import org.apache.lucene.document.BinaryPoint;
 import org.apache.lucene.document.Document;
@@ -43,10 +36,18 @@ import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.server.FieldDef;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.util.MathUtil;
 import org.apache.lucene.store.DataInput;
 import org.apache.lucene.util.ArrayUtil;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.NumericUtils;
+
+import java.io.EOFException;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 // TODO:
 //   - multi-valued fields?
@@ -64,8 +65,6 @@ class CSVParser {
   final FieldDef[] fields;
   public final IndexState indexState;
   private int lastDocStart;
-  // nocommit
-  public String verbose;
 
   public CSVParser(long globalOffset, FieldDef[] fields, IndexState indexState, byte[] bytes, int startOffset) {
     this.bytes = bytes;
@@ -85,10 +84,6 @@ class CSVParser {
 
   private void addOneField(FieldDef fd, Document doc, int lastFieldStart) {
     int len = bufferUpto - lastFieldStart - 1;
-    String s = new String(bytes, lastFieldStart, len, StandardCharsets.US_ASCII);
-    if (verbose != null) {
-      System.out.println(verbose +": FIELD " + fd.name + " -> " + s);
-    }
     boolean stored = fd.fieldType.stored();
     DocValuesType dvType = fd.fieldType.docValuesType();
     
@@ -97,6 +92,7 @@ class CSVParser {
     switch(fd.valueType) {
     case "atom":
       {
+        String s = new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8);
         if (fd.usePoints) {
           doc.add(new BinaryPoint(fd.name, Arrays.copyOfRange(bytes, lastFieldStart, len)));
         }
@@ -114,18 +110,18 @@ class CSVParser {
       }
     case "text":
       {
+        String s = new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8);
         doc.add(new AddDocumentHandler.MyField(fd.name, fd.fieldTypeNoDV, s));
         break;
       }
     case "int":
       {
-        // TODO: bytes -> int directly
         int value;
         try {
-          value = Integer.parseInt(s);
+          value = MathUtil.parseInt(bytes, lastFieldStart, len);
         } catch (NumberFormatException nfe) {
-          //throw new IllegalArgumentException("doc at offset " + (globalOffset + lastFieldStart) + ": field \"" + fd.name + "\": could not parse " + s + " as an int");
-          System.out.println(("doc at offset " + (globalOffset + lastFieldStart) + ": field \"" + fd.name + "\": could not parse " + s + " as an int"));
+          // nocommit add this to indexing ctx
+          System.out.println("doc at offset " + (globalOffset + lastFieldStart) + ": field \"" + fd.name + "\": " + nfe.getMessage());
           return;
         }
         if (fd.usePoints) {
@@ -143,13 +139,12 @@ class CSVParser {
       }
     case "long":
       {
-        // TODO: bytes -> long directly
         long value;
         try {
-          value = Long.parseLong(s);
+          value = MathUtil.parseLong(bytes, lastFieldStart, len);
         } catch (NumberFormatException nfe) {
-          //throw new IllegalArgumentException("doc at offset " + (globalOffset + lastFieldStart) + ": field \"" + fd.name + "\": could not parse " + s + " as a long");
-          System.out.println("doc at offset " + (globalOffset + lastFieldStart) + ": field \"" + fd.name + "\": could not parse " + s + " as a long");
+          // nocommit add this to indexing ctx
+          System.out.println("doc at offset " + (globalOffset + lastFieldStart) + ": field \"" + fd.name + "\": " + nfe.getMessage());
           return;
         }
         if (fd.usePoints) {
@@ -167,13 +162,12 @@ class CSVParser {
       }
     case "float":
       {
-        // TODO: bytes -> float directly
         float value;
         try {
-          value = Float.parseFloat(s);
+          value = MathUtil.parseFloat(bytes, lastFieldStart, len);
         } catch (NumberFormatException nfe) {
-          //throw new IllegalArgumentException("doc at offset " + (globalOffset + lastFieldStart) + ": field \"" + fd.name + "\": could not parse " + s + " as a float");
-          System.out.println("doc at offset " + (globalOffset + lastFieldStart) + ": field \"" + fd.name + "\": could not parse " + s + " as a float");
+          // nocommit add this to indexing ctx
+          System.out.println("doc at offset " + (globalOffset + lastFieldStart) + ": field \"" + fd.name + "\": " + nfe.getMessage());
           return;
         }
         if (fd.usePoints) {
@@ -191,15 +185,15 @@ class CSVParser {
       }
     case "double":
       {
-        // TODO: bytes -> double directly
         double value;
         try {
-          value = Double.parseDouble(s);
+          value = MathUtil.parseDouble(bytes, lastFieldStart, len);
         } catch (NumberFormatException nfe) {
-          //throw new IllegalArgumentException("doc at offset " + (globalOffset + lastFieldStart) + ": field \"" + fd.name + "\": could not parse " + s + " as a double");
-          System.out.println("doc at offset " + (globalOffset + lastFieldStart) + ": field \"" + fd.name + "\": could not parse " + s + " as a double");
+          // nocommit add this to indexing ctx
+          System.out.println("doc at offset " + (globalOffset + lastFieldStart) + ": field \"" + fd.name + "\": " + nfe.getMessage());
           return;
         }
+
         if (fd.usePoints) {
           doc.add(new DoublePoint(fd.name, value));
         }
@@ -214,6 +208,88 @@ class CSVParser {
         break;
       }
     }
+  }
+
+  private static final long LONG_MAX_DIV10 = Long.MAX_VALUE / 10;
+  
+  private static long parseLong(byte[] bytes, int start, int length) {
+    int i = start;
+    int negMult;
+    if (bytes[i] == (byte) '-') {
+      i++;
+      negMult = -1;
+    } else if (bytes[i] == (byte) '+') {
+      i++;
+      negMult = 1;
+    } else {
+      negMult = 1;
+    }
+
+    int end = start + length;
+    
+    long value = 0;
+    while (i < end) {
+      byte b = bytes[i++];
+      if (b >= (byte) '0' && b <= (byte) '9') {
+        int digit = (int) (b - (byte) '0');
+        long newValue = value * 10 + digit;
+        if (value > LONG_MAX_DIV10 || newValue < value) {
+          // overflow
+          throw new NumberFormatException("too many digits to parse \"" + new String(bytes, start, end-start, StandardCharsets.UTF_8) + "\" as long");
+        }
+        value = newValue;
+      } else {
+        throw new NumberFormatException("could not parse \"" + new String(bytes, start, end-start, StandardCharsets.UTF_8) + "\" as long");
+      }
+    }
+
+    return negMult * value;
+  }
+
+  // inspired by Javolution's double parser:
+  private static double parseDouble(byte[] bytes, int start, int end) {
+    int i = start;
+    if (start == end) {
+      throw new NumberFormatException("empty string");
+    }
+
+    int negMult;
+    if (bytes[i] == (byte) '-') {
+      i++;
+      negMult = -1;
+    } else if (bytes[i] == (byte) '+') {
+      i++;
+      negMult = 1;
+    } else {
+      negMult = 1;
+    }
+       
+    // accumulate all characters into a long, then divide by wherever-decimal-point is
+    long value = 0;
+    int decimalPos = -1;
+    while (i < end) {
+      byte b = bytes[i++];
+      if (b == (byte) '.') {
+        decimalPos = i;
+      } else if (b >= (byte) '0' && b <= (byte) '9') {
+        int digit = (int) (b - (byte) '0');
+        long newValue = value * 10 + digit;
+        if (value > LONG_MAX_DIV10 || newValue < value) {
+          // overflow
+          throw new NumberFormatException("too many digits");
+        }
+        value = newValue;
+      } else {
+        // something more exotic (Infinity, NaN, exponents): let java try
+        return parseDoubleSlowly(bytes, start, end);
+      }
+    }
+
+    return 0.0;
+  }
+
+  private static double parseDoubleSlowly(byte[] bytes, int start, int end) {
+    return Double.parseDouble(new String(bytes, start, end-start, StandardCharsets.UTF_8));
   }
 
   public Document nextDoc() {

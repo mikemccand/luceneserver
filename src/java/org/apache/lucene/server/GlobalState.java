@@ -101,6 +101,7 @@ public class GlobalState implements Closeable {
   private static final String PLUGIN_PROPERTIES_FILE = "lucene-server-plugin.properties";
 
   // TODO: make these controllable
+  // nocommit allow controlling per CSV/json bulk import max concurrency sent into IW?
   private final static int MAX_INDEXING_THREADS = Runtime.getRuntime().availableProcessors();
   //private final static int MAX_INDEXING_THREADS = 1;
 

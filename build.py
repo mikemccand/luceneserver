@@ -253,7 +253,7 @@ def compileChangedSources(srcPath, destPath, classPath):
   changedSources = []
   for root, dirNames, fileNames in os.walk(srcPath):
     for fileName in fileNames:
-      if fileName.endswith('.java'):
+      if fileName.endswith('.java') and not fileName.startswith('.#'):
         classFileName = 'build/classes/%s.class' % ('%s/%s' % (root, fileName))[4:-5]
         if not os.path.exists(classFileName) or os.path.getmtime(classFileName) < os.path.getmtime('%s/%s' % (root, fileName)):
           changedSources.append('%s/%s' % (root, fileName))

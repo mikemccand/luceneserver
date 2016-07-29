@@ -35,6 +35,7 @@ class BlockingThreadPoolExecutor extends ThreadPoolExecutor {
 
   @Override
   public void execute(Runnable task) {
+    // nocommit this is not a great solution, since it means a thread from the fixed pool stalls right here:
     try {
       semaphore.acquire();
     } catch (InterruptedException ie) {
