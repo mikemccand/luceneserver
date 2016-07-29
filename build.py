@@ -334,7 +334,7 @@ def getTestClassPath():
 
 def getArg(option):
   if option in sys.argv:
-    i = sys.argv.indexOf(option)
+    i = sys.argv.index(option)
     if i + 2 > len(sys.argv):
       raise RuntimeError('command line option %s requires an argument' % option)
     value = sys.argv[i+1]
@@ -491,7 +491,10 @@ def main():
       jvmCount = min(multiprocessing.cpu_count(), len(testClasses))
 
       if testSubString is not None:
-        print('Running test %s' % testClasses[0])
+        if testMethod is not None:
+          print('Running test %s, method %s' % (testClasses[0], testMethod))
+        else:
+          print('Running test %s' % testClasses[0])
         printOutput = True
       else:
         print('Running %d tests in %d JVMs' % (len(testClasses), jvmCount))
