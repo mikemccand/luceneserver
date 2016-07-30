@@ -299,9 +299,12 @@ def compileChangedSources(srcPath, destPath, classPath):
     cmd.append('-cp')
     cmd.append(':'.join(classPath))
     cmd.extend(changedSources)
-    print('compile sources:')
-    for fileName in changedSources:
-      print('  %s changed' % fileName)
+    if False:
+      print('compile sources:')
+      for fileName in changedSources:
+        print('  %s' % fileName)
+    else:
+      print('compile %d sources' % len(changedSources))
     run(' '.join(cmd))
 
 def getCompileClassPath():
