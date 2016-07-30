@@ -115,7 +115,7 @@ def send(host, port, command, args):
 def run(command, logFile = None):
   if logFile is not None:
     command += ' > %s 2>&1' % logFile
-  print('RUN: %s' % command)
+  print('\nRUN: %s' % command)
   result = subprocess.call(command, shell=True)
   if result != 0:
     if logFile is not None:
@@ -154,7 +154,7 @@ def main():
 
   if getFlag('-rebuild') or not os.path.exists('build/luceneserver-0.1.0-SNAPSHOT.zip'):
     print('Building server release artifact...')
-    run('python3 -u build.py package', 'package.log')
+    run('python3 -u build.py package')
 
   primaryInstallPath = getArg('-installPath')
   if primaryInstallPath is None:
@@ -282,7 +282,7 @@ def main():
             fOut.write(b)
             netBytes += len(b)
             if netBytes > nextPrint:
-              print('  %.1f MB or 154.0 MB...' % (netBytes/1024./1024.))
+              print('  %.1f MB of 154.0 MB...' % (netBytes/1024./1024.))
               nextPrint += 5*1024*1024
         print('  done: %.1f MB' % (os.path.getsize(docSource)/1024./1024.))
 
