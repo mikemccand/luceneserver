@@ -247,11 +247,21 @@ public class RunServer {
     out.flush();
     s.shutdownOutput();
 
+    byte status = dataIn.readByte();
     int len = dataIn.readInt();
     byte[] responseBytes = new byte[len];
     dataIn.readBytes(responseBytes, 0, len);
     s.close();
-    return responseBytes;
+    if (status == 0) {
+      // good
+      return responseBytes;
+    } else if (status == 1) {
+      // bad!
+      throw new IOException("server error:\n" + new String(responseBytes, StandardCharsets.UTF_8));
+    } else {
+      // horrible!
+      throw new IOException("server prototol error: expected 0 or 1 leading response byte, but got: " + status);
+    }
   }
   
   public String httpLoad(String path) throws Exception {

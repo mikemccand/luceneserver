@@ -28,13 +28,15 @@ import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
 import org.apache.lucene.server.params.*;
+import org.apache.lucene.util.IOUtils;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonParser;
 import org.codehaus.jackson.JsonToken;
+
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 
-import static org.apache.lucene.server.IndexState.AddDocumentContext;
+import static org.apache.lucene.server.IndexState.IndexingContext;
 
 /** Reads more than one { ... } request in a single
  *  connection, but each request must be separated by at
@@ -115,7 +117,7 @@ public class BulkUpdateDocumentsHandler extends Handler {
     }
 
     int count = 0;
-    AddDocumentContext ctx = new AddDocumentContext();
+    IndexingContext ctx = new IndexingContext();
 
     AddDocumentHandler addDocHandler = (AddDocumentHandler) globalState.getHandler("addDocument");
 
@@ -219,19 +221,14 @@ public class BulkUpdateDocumentsHandler extends Handler {
       Thread.sleep(1);
     }
 
+    Throwable t = ctx.getError();
+    if (t != null) {
+      IOUtils.reThrow(t);
+    }
+
     JSONObject o = new JSONObject();
     o.put("indexGen", state.writer.getMaxCompletedSequenceNumber());
     o.put("indexedDocumentBlockCount", count);
-    if (!ctx.errors.isEmpty()) {
-      JSONArray errors = new JSONArray();
-      o.put("errors", errors);
-      for(int i=0;i<ctx.errors.size();i++) {
-        JSONObject err = new JSONObject();
-        errors.add(err);
-        err.put("index", ctx.errorIndex.get(i));
-        err.put("exception", ctx.errors.get(i));
-      }
-    }
 
     return o.toString();
   }

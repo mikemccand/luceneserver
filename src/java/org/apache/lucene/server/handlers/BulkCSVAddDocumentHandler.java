@@ -39,9 +39,11 @@ import org.apache.lucene.server.FieldDef;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.Server;
 import org.apache.lucene.server.params.*;
 import org.apache.lucene.store.DataInput;
 import org.apache.lucene.store.DataOutput;
+import org.apache.lucene.util.IOUtils;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonParser;
 import org.codehaus.jackson.JsonToken;
@@ -49,13 +51,16 @@ import org.codehaus.jackson.JsonToken;
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 
-import static org.apache.lucene.server.IndexState.AddDocumentContext;
+import static org.apache.lucene.server.IndexState.IndexingContext;
 
 /** Bulk addDocument from CSV encoding */
 
 public class BulkCSVAddDocumentHandler extends Handler {
 
   private static StructType TYPE = new StructType();
+
+  /** We break the incoming CSV bytes into chunks of this size and send each chunk off to separate threads for indexing */
+  private static final int CHUNK_SIZE_KB = 512;
 
   /** Sole constructor. */
   public BulkCSVAddDocumentHandler(GlobalState state) {
@@ -72,10 +77,10 @@ public class BulkCSVAddDocumentHandler extends Handler {
     return true;
   }
 
-  /** Parses and indexes documents from one 256 KB chunk of CSV */
+  /** Parses and indexes documents from one chunk of CSV */
   private static class ParseAndIndexOneChunk implements Runnable {
     /** Shared context across all docs being indexed in this one stream */
-    private final IndexState.AddDocumentContext ctx;
+    private final IndexState.IndexingContext ctx;
     
     private final IndexState indexState;
     private final FieldDef[] fields;
@@ -94,7 +99,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
     private int nextStartFragmentOffset;
     private int nextStartFragmentLength;
     
-    public ParseAndIndexOneChunk(long globalOffset, IndexState.AddDocumentContext ctx, ParseAndIndexOneChunk prev, IndexState indexState,
+    public ParseAndIndexOneChunk(long globalOffset, IndexState.IndexingContext ctx, ParseAndIndexOneChunk prev, IndexState indexState,
                                  FieldDef[] fields, byte[] bytes, Semaphore semaphore) throws InterruptedException {
       this.ctx = ctx;
       ctx.inFlightChunkCount.incrementAndGet();
@@ -110,28 +115,41 @@ public class BulkCSVAddDocumentHandler extends Handler {
     /** Indexes the one document that spans across the end of our chunk.  This is invoked when the chunk after us first starts, or when we
      *  finish processing all whole docs in our chunk, whichever comes last. */
     private void indexSplitDoc() {
+      try {
+        _indexSplitDoc();
+      } finally {
+        semaphore.release();
+        ctx.inFlightChunkCount.decrementAndGet();
+      }
+    }
+        
+    private void _indexSplitDoc() {
       int endFragmentLength = bytes.length - endFragmentStartOffset;
-      //System.out.println("CHUNK @ " + globalOffset + " indexSplitDoc: endFragmentLength=" + endFragmentLength + " nextStartFragmentLength=" + nextStartFragmentLength);
       if (endFragmentLength + nextStartFragmentLength > 0) {
         byte[] allBytes = new byte[endFragmentLength + nextStartFragmentLength];
         System.arraycopy(bytes, endFragmentStartOffset, allBytes, 0, endFragmentLength);
         System.arraycopy(nextStartFragment, 0, allBytes, endFragmentLength, nextStartFragmentLength);
-        /*
-          try {
-          System.out.println("CHUNK @ " + globalOffset + " doc: " + new String(allBytes, "UTF-8"));
-          } catch (Exception e) {
-          System.out.println("IGNORE: " +e);
-          }
-        */
         CSVParser parser = new CSVParser(globalOffset + endFragmentStartOffset, fields, indexState, allBytes, 0);
-        //parser.verbose = "CHUNK @ " + globalOffset;
-        Document doc = parser.nextDoc();
-        assert doc != null;
-        indexDocument(globalOffset + endFragmentStartOffset, doc);
+        Document doc;
+        try {
+          doc = parser.nextDoc();
+        } catch (Throwable t) {
+          ctx.setError(t);
+          return;
+        }
+        if (doc == null) {
+          ctx.setError(new IllegalArgumentException("last document starting at offset " + (globalOffset + endFragmentStartOffset) + " is missing the trailing newline"));
+          return;
+        }
+        ctx.addCount.incrementAndGet();
+        try {
+          indexState.indexDocument(doc);
+        } catch (Throwable t) {
+          ctx.setError(new RuntimeException("failed to index document at offset " + (globalOffset + endFragmentStartOffset), t));
+          return;
+        }
         assert parser.getBufferUpto() == allBytes.length;
       }
-      semaphore.release();
-      ctx.inFlightChunkCount.decrementAndGet();
     }
 
     /** The chunk after us calls this with its prefix fragment */
@@ -149,15 +167,6 @@ public class BulkCSVAddDocumentHandler extends Handler {
       endFragmentStartOffset = offset;
       if (nextStartFragment != null) {
         indexSplitDoc();
-      }
-    }
-
-    private void indexDocument(long docOffset, Document doc) {
-      ctx.addCount.incrementAndGet();
-      try {
-        indexState.indexDocument(doc);
-      } catch (Exception e) {
-        ctx.addException(docOffset, e);
       }
     }
 
@@ -223,14 +232,20 @@ public class BulkCSVAddDocumentHandler extends Handler {
                   @Override
                   public boolean hasNext() {
                     if (nextSet == false) {
-                      nextDoc = parser.nextDoc();
+                      try {
+                        nextDoc = parser.nextDoc();
+                      } catch (Throwable t) {
+                        ctx.setError(t);
+                        nextDoc = null;
+                      }
                       if (nextDoc != null) {
                         ctx.addCount.incrementAndGet();
                         if (hasFacets) {
                           try {
                             nextDoc = indexState.facetsConfig.build(indexState.taxoWriter, nextDoc);
                           } catch (IOException ioe) {
-                            throw new RuntimeException(ioe);
+                            ctx.setError(new RuntimeException("document at offset " + (globalOffset + parser.getLastDocStart()) + " hit exception building facets", ioe));
+                            nextDoc = null;
                           }
                         }
                         // nocommit: live field values
@@ -255,8 +270,8 @@ public class BulkCSVAddDocumentHandler extends Handler {
                 };
               }
             });
-        } catch (Exception e) {
-          ctx.addException(globalOffset, e);
+        } catch (Throwable t) {
+          ctx.setError(t);
         }
 
         //System.out.println("CHUNK @ " + globalOffset + ": done parsing; end fragment length=" + (bytes.length-offset));
@@ -320,7 +335,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
 
     FieldDef[] fields = fieldsList.toArray(new FieldDef[fieldsList.size()]);
 
-    IndexState.AddDocumentContext ctx = new IndexState.AddDocumentContext();
+    IndexState.IndexingContext ctx = new IndexState.IndexingContext();
     byte[] bufferOld = buffer;
 
     // nocommit tune this .. core count?
@@ -330,68 +345,49 @@ public class BulkCSVAddDocumentHandler extends Handler {
     // nocommit this should be in GlobalState so it's across all incoming indexing:
     Semaphore semaphore = new Semaphore(64);
 
-    ParseAndIndexOneChunk prev = null;
-
     boolean done = false;
 
-    buffer = new byte[256*1024];
+    // create first chunk buffer, and carry over any leftovers from the header processing:
+    buffer = new byte[CHUNK_SIZE_KB*1024];
     System.arraycopy(bufferOld, bufferUpto, buffer, 0, bufferLimit-bufferUpto);
     bufferUpto = bufferLimit - bufferUpto;
 
     globalOffset += bufferUpto;
     
-    while (bufferUpto < buffer.length) {
+    ParseAndIndexOneChunk prev = null;
+
+    while (done == false && ctx.getError() == null) {
       int count = in.read(buffer, bufferUpto, buffer.length-bufferUpto);
-      if (count == -1) {
+      if (count == -1 || bufferUpto + count == buffer.length) {
         if (bufferUpto < buffer.length) {
           byte[] realloc = new byte[bufferUpto];
           System.arraycopy(buffer, 0, realloc, 0, bufferUpto);
           buffer = realloc;
         }
+        // NOTE: This ctor will stall when it tries to acquire the semaphore if we already have too many in-flight indexing chunks:
         prev = new ParseAndIndexOneChunk(globalOffset, ctx, prev, indexState, fields, buffer, semaphore);
-        prev.setNextStartFragment(new byte[0], 0, 0);
         globalState.indexService.submit(prev);
-        done = true;
-        break;
+        if (count == -1) {
+          // the end
+          prev.setNextStartFragment(new byte[0], 0, 0);
+          done = true;
+          break;
+        } else {
+          globalOffset += buffer.length;
+          // not done yet, make the next buffer:
+          buffer = new byte[CHUNK_SIZE_KB*1024];
+          bufferUpto = 0;
+        }
       } else {
         bufferUpto += count;
       }
     }
 
-    if (done == false) {
-      prev = new ParseAndIndexOneChunk(globalOffset, ctx, prev, indexState, fields, buffer, semaphore);
-      globalOffset += buffer.length;
-      globalState.indexService.submit(prev);
-
-      while (done == false) {
-        buffer = new byte[256*1024];
-        bufferUpto = 0;
-        while (bufferUpto < buffer.length) {
-          int count = in.read(buffer, bufferUpto, buffer.length-bufferUpto);
-          if (count == -1) {
-            if (bufferUpto < buffer.length) {
-              byte[] realloc = new byte[bufferUpto];
-              System.arraycopy(buffer, 0, realloc, 0, bufferUpto);
-              buffer = realloc;
-            }
-            prev = new ParseAndIndexOneChunk(globalOffset, ctx, prev, indexState, fields, buffer, semaphore);
-            prev.setNextStartFragment(new byte[0], 0, 0);
-            globalState.indexService.submit(prev);
-            done = true;
-            break;
-          } else {
-            bufferUpto += count;
-          }
-        }
-
-        if (done == false) {
-          prev = new ParseAndIndexOneChunk(globalOffset, ctx, prev, indexState, fields, buffer, semaphore);
-          globalOffset += buffer.length;
-          globalState.indexService.submit(prev);
-        }
-      }
+    if (ctx.getError() != null) {
+      // force last indexing chunk to finish up:
+      prev.setNextStartFragment(new byte[0], 0, 0);
     }
-    
+
     // nocommit this is ... lameish ... can we just join on these futures?:
     while (true) {
       if (ctx.inFlightChunkCount.get() == 0) {
@@ -400,23 +396,23 @@ public class BulkCSVAddDocumentHandler extends Handler {
       Thread.sleep(1);
     }
 
-    JSONObject o = new JSONObject();
-    o.put("indexGen", indexState.writer.getMaxCompletedSequenceNumber());
-    o.put("indexedDocumentCount", ctx.addCount.get());
-    if (!ctx.errors.isEmpty()) {
-      JSONArray errors = new JSONArray();
-      o.put("errors", errors);
-      for(int i=0;i<ctx.errors.size();i++) {
-        JSONObject err = new JSONObject();
-        errors.add(err);
-        err.put("index", ctx.errorIndex.get(i));
-        err.put("exception", ctx.errors.get(i));
-      }
-    }
+    Throwable t = ctx.getError();
+    if (t != null) {
+      String message = Server.throwableTraceToString(t);
+      byte[] bytes = message.getBytes("UTF-8");
+      out.writeByte((byte) 1);
+      out.writeInt(bytes.length);
+      out.writeBytes(bytes, 0, bytes.length);
+    } else {
+      JSONObject o = new JSONObject();
+      o.put("indexGen", indexState.writer.getMaxCompletedSequenceNumber());
+      o.put("indexedDocumentCount", ctx.addCount.get());
 
-    byte[] bytes = o.toString().getBytes(StandardCharsets.UTF_8);
-    out.writeInt(bytes.length);
-    out.writeBytes(bytes, 0, bytes.length);
+      byte[] bytes = o.toString().getBytes(StandardCharsets.UTF_8);
+      out.writeByte((byte) 0);
+      out.writeInt(bytes.length);
+      out.writeBytes(bytes, 0, bytes.length);
+    }
     streamOut.flush();
   }  
 

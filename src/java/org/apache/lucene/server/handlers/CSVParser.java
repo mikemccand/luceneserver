@@ -72,7 +72,6 @@ class CSVParser {
   private final Field[] reusePoints;
   private final Document reuseDoc;
   
-
   public CSVParser(long globalOffset, FieldDef[] fields, IndexState indexState, byte[] bytes, int startOffset) {
     this.bytes = bytes;
     this.fields = fields;
@@ -202,9 +201,8 @@ class CSVParser {
         BytesRef br;
         if (point != null) {
           br = point.binaryValue();
-          // nocommit is copyOfRange really needed?
-          br.bytes = Arrays.copyOfRange(bytes, lastFieldStart, lastFieldStart+len);
-          br.offset = 0;
+          br.bytes = bytes;
+          br.offset = lastFieldStart;
           br.length = len;
           reuseDoc.add(point);
         } else {
@@ -214,9 +212,8 @@ class CSVParser {
         if (dv != null) {
           if (br == null) {
             br = dv.binaryValue();
-            // nocommit is copyOfRange really needed?
-            br.bytes = Arrays.copyOfRange(bytes, lastFieldStart, lastFieldStart+len);
-            br.offset = 0;
+            br.bytes = bytes;
+            br.offset = lastFieldStart;
             br.length = len;
           }
           dv.setBytesValue(br);
@@ -239,9 +236,7 @@ class CSVParser {
         try {
           value = MathUtil.parseInt(bytes, lastFieldStart, len);
         } catch (NumberFormatException nfe) {
-          // nocommit add this to indexing ctx
-          System.out.println("doc at offset " + (globalOffset + lastFieldStart) + ": field \"" + fields[i].name + "\": " + nfe.getMessage());
-          return;
+          throw new NumberFormatException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\" as int: " + nfe.getMessage());
         }
         if (field != null) {
           field.setIntValue(value);
@@ -267,9 +262,7 @@ class CSVParser {
         try {
           value = MathUtil.parseLong(bytes, lastFieldStart, len);
         } catch (NumberFormatException nfe) {
-          // nocommit add this to indexing ctx
-          System.out.println("doc at offset " + (globalOffset + lastFieldStart) + ": field \"" + fields[i].name + "\": " + nfe.getMessage());
-          return;
+          throw new NumberFormatException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\" as long: " + nfe.getMessage());
         }
         if (field != null) {
           field.setLongValue(value);
@@ -295,9 +288,7 @@ class CSVParser {
         try {
           value = MathUtil.parseFloat(bytes, lastFieldStart, len);
         } catch (NumberFormatException nfe) {
-          // nocommit add this to indexing ctx
-          System.out.println("doc at offset " + (globalOffset + lastFieldStart) + ": field \"" + fields[i].name + "\": " + nfe.getMessage());
-          return;
+          throw new NumberFormatException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\" as float: " + nfe.getMessage());
         }
         if (field != null) {
           field.setFloatValue(value);
@@ -323,9 +314,7 @@ class CSVParser {
         try {
           value = MathUtil.parseDouble(bytes, lastFieldStart, len);
         } catch (NumberFormatException nfe) {
-          // nocommit add this to indexing ctx
-          System.out.println("doc at offset " + (globalOffset + lastFieldStart) + ": field \"" + fields[i].name + "\": " + nfe.getMessage());
-          return;
+          throw new NumberFormatException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\" as double: " + nfe.getMessage());
         }
         if (field != null) {
           field.setDoubleValue(value);
@@ -358,6 +347,11 @@ class CSVParser {
     while (bufferUpto < bytes.length) {
       byte b = bytes[bufferUpto++];
       if (b == COMMA) {
+
+        if (fieldUpto == fields.length) {
+          throw new IllegalArgumentException("doc at offset " + lastDocStart + ": line has too many fields");
+        }
+        
         if (bufferUpto > lastFieldStart+1) {
           addOneField(fieldUpto, lastFieldStart);
         } else {
@@ -365,17 +359,15 @@ class CSVParser {
         }
         lastFieldStart = bufferUpto;
         fieldUpto++;
-        if (fieldUpto > fields.length) {
-          throw new IllegalArgumentException("doc at offset " + (globalOffset + lastFieldStart) + ": line has too many fields");
-        }
 
       } else if (b == NEWLINE) {
+
+        if (fieldUpto != fields.length-1) {
+          throw new IllegalArgumentException("doc at offset " + lastDocStart + ": line has wrong number of fields: expected " + fields.length + " but saw " + (fieldUpto+1));
+        }
+        
         // add last field
         addOneField(fieldUpto, lastFieldStart);
-        fieldUpto++;
-        if (fieldUpto != fields.length) {
-          throw new IllegalArgumentException("doc at offset " + lastDocStart + " has " + fieldUpto + " fields, but expected " + fields.length);
-        }
         return reuseDoc;
       }
     }

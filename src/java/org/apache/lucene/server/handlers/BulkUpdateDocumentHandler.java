@@ -36,7 +36,7 @@ import org.codehaus.jackson.JsonParser;
 import org.codehaus.jackson.JsonToken;
 import net.minidev.json.JSONObject;
 
-import static org.apache.lucene.server.IndexState.AddDocumentContext;
+import static org.apache.lucene.server.IndexState.IndexingContext;
 
 /** Handles {@code bulkUpdateDocument}. */
 public class BulkUpdateDocumentHandler extends Handler {
@@ -114,7 +114,7 @@ public class BulkUpdateDocumentHandler extends Handler {
       throw new IllegalArgumentException("documents should be a list");
     }
 
-    AddDocumentContext ctx = new AddDocumentContext();
+    IndexingContext ctx = new IndexingContext();
 
     AddDocumentHandler addDocHandler = (AddDocumentHandler) globalState.getHandler("addDocument");
 

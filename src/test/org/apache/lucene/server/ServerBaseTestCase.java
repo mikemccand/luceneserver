@@ -243,6 +243,12 @@ public abstract class ServerBaseTestCase extends LuceneTestCase {
     return server.sendRaw(command, body);
   }
 
+  protected static void assertContains(String message, String fragment) throws Exception {
+    if (message.contains(fragment) == false) {
+      throw new AssertionError("fragment=\"" + fragment + "\" is not contained in message:\n" + message);
+    }
+  }
+
   protected static void copyFile(Path source, Path dest) throws IOException {
     InputStream is = null;
     OutputStream os = null;

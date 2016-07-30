@@ -48,6 +48,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
 import org.apache.lucene.analysis.Analyzer;
@@ -463,7 +464,7 @@ public class IndexState implements Closeable {
   // nocommit rename to indexing context
   
   /** Context to hold state for a single indexing request. */
-  public static class AddDocumentContext {
+  public static class IndexingContext {
 
     /** How many chunks are still indexing. */
     public final AtomicInteger inFlightChunkCount = new AtomicInteger();
@@ -472,23 +473,20 @@ public class IndexState implements Closeable {
     public final AtomicInteger addCount = new AtomicInteger();
 
     /** Any indexing errors that occurred. */
-    public final List<String> errors = new ArrayList<String>();
-
-    /** Byte offset of the document that hit each error. */
-    public final List<Long> errorIndex = new ArrayList<Long>();
+    public final AtomicReference<Throwable> error = new AtomicReference<>();
 
     /** Sole constructor. */
-    public AddDocumentContext() {
+    public IndexingContext() {
     }
 
-    /** Record an exception. */
-    public synchronized void addException(long index, Exception e) {
-      StringWriter sw = new StringWriter();
-      PrintWriter pw = new PrintWriter(sw);
-      e.printStackTrace(pw);
-      pw.flush();
-      errors.add(sw.toString());
-      errorIndex.add(index);
+    /** Only keeps the first error seen, and all bulk indexing stops after this. */
+    public void setError(Throwable t) {
+      error.compareAndSet(null, t);
+    }
+
+    /** Returns the first exception hit while indexing, or null */
+    public Throwable getError() {
+      return error.get();
     }
   }
 
@@ -497,13 +495,13 @@ public class IndexState implements Closeable {
   class AddDocumentJob implements Callable<Long> {
     private final Term updateTerm;
     private final Document doc;
-    private final AddDocumentContext ctx;
+    private final IndexingContext ctx;
 
     // Position of this document in the bulk request, referenced if this doc hits an error while indexing:
     private final int index;
 
     /** Sole constructor. */
-    public AddDocumentJob(int index, Term updateTerm, Document doc, AddDocumentContext ctx) {
+    public AddDocumentJob(int index, Term updateTerm, Document doc, IndexingContext ctx) {
       this.updateTerm = updateTerm;
       this.doc = doc;
       this.ctx = ctx;
@@ -543,7 +541,7 @@ public class IndexState implements Closeable {
           }
         }
       } catch (Exception e) {
-        ctx.addException(index, e);
+        ctx.setError(new RuntimeException("error while indexing document " + index, e));
       } finally {
         ctx.addCount.incrementAndGet();
       }
@@ -740,13 +738,13 @@ public class IndexState implements Closeable {
   class AddDocumentsJob implements Callable<Long> {
     private final Term updateTerm;
     private final Iterable<Document> docs;
-    private final AddDocumentContext ctx;
+    private final IndexingContext ctx;
 
     // Position of this document in the bulk request:
     private final int index;
 
     /** Sole constructor. */
-    public AddDocumentsJob(int index, Term updateTerm, Iterable<Document> docs, AddDocumentContext ctx) {
+    public AddDocumentsJob(int index, Term updateTerm, Iterable<Document> docs, IndexingContext ctx) {
       this.updateTerm = updateTerm;
       this.docs = docs;
       this.ctx = ctx;
@@ -793,7 +791,7 @@ public class IndexState implements Closeable {
         }
 
       } catch (Exception e) {
-        ctx.addException(index, e);
+        ctx.setError(new RuntimeException("error while indexing document " + index, e));
       } finally {
         ctx.addCount.incrementAndGet();
       }
@@ -803,12 +801,12 @@ public class IndexState implements Closeable {
   }
 
   /** Create a new {@code AddDocumentJob}. */
-  public Callable<Long> getAddDocumentJob(int index, Term term, Document doc, AddDocumentContext ctx) {
+  public Callable<Long> getAddDocumentJob(int index, Term term, Document doc, IndexingContext ctx) {
     return new AddDocumentJob(index, term, doc, ctx);
   }
 
   /** Create a new {@code AddDocumentsJob}. */
-  public Callable<Long> getAddDocumentsJob(int index, Term term, Iterable<Document> docs, AddDocumentContext ctx) {
+  public Callable<Long> getAddDocumentsJob(int index, Term term, Iterable<Document> docs, IndexingContext ctx) {
     return new AddDocumentsJob(index, term, docs, ctx);
   }
 

@@ -155,6 +155,60 @@ public class Server {
     x.getResponseBody().close();
   }
 
+  public static String throwableTraceToString(Throwable e) {
+    // Just send full stack trace back to client:
+    Writer sw = new StringWriter();
+    PrintWriter pw = new PrintWriter(sw);
+
+    RequestFailedException rfe;
+    if (e instanceof RequestFailedException) {
+      rfe = (RequestFailedException) e;
+    } else if (e.getCause() != null && e.getCause() instanceof RequestFailedException) {
+      rfe = (RequestFailedException) e.getCause();
+    } else {
+      rfe = null;
+    }
+
+    if (rfe != null) {
+      pw.println(rfe.path + ": " + rfe.reason);
+      if (rfe.getCause() != null) {
+        pw.println();
+        rfe.getCause().printStackTrace(pw);
+      }
+        
+      // TODO?
+      //Throwable cause = rfe.getCause();
+      //if (cause != null) {
+      //pw.write("\n\nCaused by:\n\n" + cause);
+      //}
+    } else {
+      e.printStackTrace(pw);
+    }
+
+    // Remove layers of thread pool executors and http servers:
+    String message = sw.toString();
+    String[] lines = message.split("\n");
+    StringBuilder b = new StringBuilder();
+    boolean inHttp = false;
+    for(String line : lines) {
+      if (line.startsWith("\tat com.sun.net.httpserver") || line.startsWith("\tat sun.net.httpserver") || line.startsWith("\tat java.lang.Thread.run") || line.startsWith("\tat java.util.concurrent.ThreadPoolExecutor")) {
+        if (inHttp == false) {
+          inHttp = true;
+          line = "\tat <server>";
+        } else {
+          continue;
+        }
+      } else {
+        inHttp = false;
+      }
+      if (b.length() > 0) {
+        b.append('\n');
+      }
+      b.append(line);
+    }
+    return b.toString();
+  }
+
   class PluginsStaticFileHandler implements HttpHandler {
     private final FileNameMap fileNameMap = URLConnection.getFileNameMap();
       
@@ -215,57 +269,9 @@ public class Server {
 
     private void sendException(HttpExchange x, Throwable e) throws IOException {
       x.getRequestBody().close();
-      // Just send full stack trace back to client:
-      Writer sw = new StringWriter();
-      PrintWriter pw = new PrintWriter(sw);
 
-      RequestFailedException rfe;
-      if (e instanceof RequestFailedException) {
-        rfe = (RequestFailedException) e;
-      } else if (e.getCause() != null && e.getCause() instanceof RequestFailedException) {
-        rfe = (RequestFailedException) e.getCause();
-      } else {
-        rfe = null;
-      }
-
-      if (rfe != null) {
-        pw.println(rfe.path + ": " + rfe.reason);
-        if (rfe.getCause() != null) {
-          pw.println();
-          rfe.getCause().printStackTrace(pw);
-        }
-        
-        // TODO?
-        //Throwable cause = rfe.getCause();
-        //if (cause != null) {
-        //pw.write("\n\nCaused by:\n\n" + cause);
-        //}
-      } else {
-        e.printStackTrace(pw);
-      }
-
-      String message = sw.toString();
-      String[] lines = message.split("\n");
-      StringBuilder b = new StringBuilder();
-      boolean inHttp = false;
-      for(String line : lines) {
-        if (line.startsWith("\tat com.sun.net.httpserver") || line.startsWith("\tat sun.net.httpserver") || line.startsWith("\tat java.lang.Thread.run") || line.startsWith("\tat java.util.concurrent.ThreadPoolExecutor")) {
-          if (inHttp == false) {
-            inHttp = true;
-            line = "\tat <httpserver>";
-          } else {
-            continue;
-          }
-        } else {
-          inHttp = false;
-        }
-        if (b.length() > 0) {
-          b.append('\n');
-        }
-        b.append(line);
-      }
-      message = b.toString();
-
+      // Just send full stack trace back to client with HTTP 500 error code:
+      String message = throwableTraceToString(e);
       Headers headers = x.getResponseHeaders();
       headers.set("Content-Type", "text-plain; charset=utf-8");
       byte[] bytes = message.getBytes("UTF-8");
@@ -789,7 +795,6 @@ public class Server {
 
     private void _run() throws Exception {
       System.out.println("SVR " + globalState.nodeName + ": handle binary client; receive buffer=" + socket.getReceiveBufferSize());
-      // nocommit buffer here:
       try (InputStream in = new BufferedInputStream(socket.getInputStream(), 128 * 1024); OutputStream out = socket.getOutputStream()) {
         DataInput dataIn = new InputStreamDataInput(in);
         int x = dataIn.readInt();
