@@ -278,10 +278,9 @@ public class BulkCSVAddDocumentHandler extends Handler {
         setEndFragment(endOffset[0]);
         
       } else {
-        // exotic case: the entire 256 KB chunk is inside one document
+        // exotic case: the entire chunk is inside one document
         // nocommit handle this corner case too!
-        throw new IllegalArgumentException("entire chunk is a subset of one document");
-
+        ctx.setError(new IllegalArgumentException("entire chunk is a subset of one document bytes.length=" + bytes.length));
         // nocommit also handle the exotic case where the chunk split right at a doc boundary
       }
     }
@@ -359,6 +358,9 @@ public class BulkCSVAddDocumentHandler extends Handler {
     while (done == false && ctx.getError() == null) {
       int count = in.read(buffer, bufferUpto, buffer.length-bufferUpto);
       if (count == -1 || bufferUpto + count == buffer.length) {
+        if (count != -1) {
+          bufferUpto += count;
+        }
         if (bufferUpto < buffer.length) {
           byte[] realloc = new byte[bufferUpto];
           System.arraycopy(buffer, 0, realloc, 0, bufferUpto);

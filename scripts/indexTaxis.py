@@ -321,10 +321,11 @@ def main():
 
     b1.finish()
 
+    status = b1.socket.recv(1)
     bytes = b1.socket.recv(4)
     size = struct.unpack('>i', bytes)
     bytes = b1.socket.recv(size[0])
-    print('Indexing done; result: %s' % bytes.decode('utf-8'))
+    print('Indexing done; status: %s, result: %s' % (status, bytes.decode('utf-8')))
     b1.close()
 
     if False:
