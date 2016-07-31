@@ -283,7 +283,7 @@ def compileLuceneModules(deps):
       os.chdir(dep)
       run('ant jar')
       os.chdir('..')
-  os.chdir('../..')
+  os.chdir(ROOT_DIR)
 
 def compileChangedSources(srcPath, destPath, classPath):
   changedSources = []
@@ -387,6 +387,8 @@ def compileSourcesAndDeps():
   return jarFileName
 
 def main():
+  global ROOT_DIR
+  ROOT_DIR = os.getcwd()
   upto = 1
   while upto < len(sys.argv):
     what = sys.argv[upto]
@@ -399,7 +401,7 @@ def main():
     elif what == 'cleanlucene':
       os.chdir('lucene6x')
       run('ant clean')
-      os.chdir('..')
+      os.chdir(ROOT_DIR)
     elif what == 'package':
       
       jarFileName = compileSourcesAndDeps()
