@@ -17,6 +17,8 @@ package org.apache.lucene.server;
  * limitations under the License.
  */
 
+import java.io.IOException;
+
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
@@ -55,7 +57,7 @@ public class TestLatLonPoint extends ServerBaseTestCase {
     deleteAllDocs();
     send("addDocument", "{fields: {id: 0, spot: [18.313694, -65.227444]}}");
     refresh();
-    JSONObject result = send("search", "{indexName: index, query: {class: LatLonPolygonQuery, field: spot, vertices: [[10.0, -70.0], [10.0, -60.0], [20.0, -60.0], [20.0, -70.0], [10.0, -70.0]], holes: [[[11.0, -69.0], [12.0, -69.0], [11.5, -68.0], [11.0, -69.0]]]}, retrieveFields: [id]}");
+    JSONObject result = send("search", "{indexName: index, query: {class: LatLonPolygonQuery, field: spot, polygons: [{vertices: [[10.0, -70.0], [10.0, -60.0], [20.0, -60.0], [20.0, -70.0], [10.0, -70.0]], holes: [[[11.0, -69.0], [12.0, -69.0], [11.5, -68.0], [11.0, -69.0]]]}]}, retrieveFields: [id]}");
     assertEquals(1, getInt(result, "totalHits"));
   }
 
@@ -93,5 +95,28 @@ public class TestLatLonPoint extends ServerBaseTestCase {
     assertEquals(2, getInt("hits.length"));
     assertEquals(1, getInt("hits[0].doc"));
     assertEquals(0, getInt("hits[1].doc"));
+  }
+
+  public void testGeoJSON() throws Exception {
+    deleteAllDocs();
+    send("addDocument", "{fields: {id: 0, spot: [0.5, 100.5]}}");
+    send("addDocument", "{fields: {id: 1, spot: [0.5, 99.0]}}");
+    refresh();
+    String geoJSON = "{\\\"coordinates\\\": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]], \\\"type\\\": \\\"Polygon\\\",}";
+
+    send("search", "{indexName: index, query: {class: LatLonPolygonQuery, field: spot, geojson: \"" + geoJSON + "\"}}");
+    assertEquals(1, getInt("hits.length"));
+    assertEquals(0, getInt("hits[0].doc"));
+  }
+
+  public void testIllegalGeoJSON() throws Exception {
+    deleteAllDocs();
+    send("addDocument", "{fields: {id: 0, spot: [0.5, 100.5]}}");
+    send("addDocument", "{fields: {id: 1, spot: [0.5, 99.0]}}");
+    refresh();
+    String geoJSON = "{\\\"coordinates\\\": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]], \\\"type\\\": \\\"Polygon\\\",}x";
+
+    Exception e = expectThrows(IOException.class, () -> {send("search", "{indexName: index, query: {class: LatLonPolygonQuery, field: spot, geojson: \"" + geoJSON + "\"}}");});
+    assertContains(e.getMessage(), "java.text.ParseException: unexpected character 'x' after end of GeoJSON object at character offset 109; fragment leading to this");
   }
 }

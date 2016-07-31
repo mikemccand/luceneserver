@@ -269,10 +269,15 @@ public class SearchHandler extends Handler {
                                                        new Param("longitude", "Longitude of the origin", new FloatType()),
                                                        new Param("radiusMeters", "Radius in meters", new FloatType())),
                                          new PolyEntry("LatLonPolygonQuery", "A Query that matches documents containing a LatLonPoint within a specified polygon (see @lucene:sandbox:org.apache.lucene.document.LatLonPoint#newPolygonQuery)",
-                                                       new Param("vertices", "Array of latitude/longitude points",
-                                                                 new ListType(new ListType(new FloatType()))),
-                                                       new Param("holes", "Array of array of latitude/longitude points for the holes to exclude hits within the polygon",
-                                                                 new ListType(new ListType(new ListType(new FloatType()))))),
+                                                       new Param("geojson", "GEOJson string describing the polygon (an alternative to vertices+holes)",
+                                                                 new StringType()),
+                                                       new Param("polygons", "List of polygons to search",
+                                                           new ListType(
+                                                               new StructType(
+                                                                   new Param("vertices", "Array of latitude/longitude points",
+                                                                             new ListType(new ListType(new FloatType()))),
+                                                                   new Param("holes", "Array of array of latitude/longitude points for the holes to exclude hits within the polygon",
+                                                                             new ListType(new ListType(new ListType(new FloatType())))))))),
                                          new PolyEntry("WildcardQuery", "Implements the wildcard search query (see @lucene:core:org.apache.lucene.search.WildcardQuery)",
                                                        new Param("term", "Wildcard text", new StringType())))));
 
@@ -1163,41 +1168,57 @@ public class SearchHandler extends Handler {
                                        pr.r.getDouble("longitude"),
                                        pr.r.getDouble("radiusMeters"));
     } else if (pr.name.equals("LatLonPolygonQuery")) {
-      List<Object> vertices = pr.r.getList("vertices");
-      double[] polyLats = new double[vertices.size()];
-      double[] polyLons = new double[vertices.size()];
-      for(int i=0;i<vertices.size();i++) {
-        Object o = vertices.get(i);
-        if ((o instanceof JSONArray) == false) {
-          pr.r.fail("vertices", "polygon vertices must be array of [latitude, longitude]; got: " + o);
-        }
-        JSONArray latLon = (JSONArray) o;
-        if (latLon.size() != 2) {
-          pr.r.fail("vertices", "polygon vertices must be array of [latitude, longitude]; got: " + o);
-        }
-        polyLats[i] = ((Number) latLon.get(0)).doubleValue();
-        polyLons[i] = ((Number) latLon.get(1)).doubleValue();
-      }
-
-      Polygon[] holes;
-      if (pr.r.hasParam("holes")) {
-        List<Object> o = pr.r.getList("holes");
-        holes = new Polygon[o.size()];
-        for(int i=0;i<o.size();i++) {
-          JSONArray o2 = (JSONArray) o.get(i);
-          double[] holeLats = new double[o2.size()];
-          double[] holeLons = new double[o2.size()];
-          for(int j=0;j<o2.size();j++) {
-            JSONArray o3 = (JSONArray) o2.get(j);
-            holeLats[j] = ((Number) o3.get(0)).doubleValue();
-            holeLons[j] = ((Number) o3.get(1)).doubleValue();
-          }
-          holes[i] = new Polygon(holeLats, holeLons);
+      Polygon[] polygons;
+      if (pr.r.hasParam("geojson")) {
+        try {
+          polygons = Polygon.fromGeoJSON(pr.r.getString("geojson"));
+        } catch (ParseException pe) {
+          pr.r.fail("geojson", "failed to parse geojson string: " + pe.getMessage(), pe);
+          polygons = null;
         }
       } else {
-        holes = new Polygon[0];
+        List<Polygon> polygonsList = new ArrayList<>();
+        for(Object p : pr.r.getList("polygons")) {
+          Request r2 = (Request) p;
+          List<Object> vertices = r2.getList("vertices");
+          double[] polyLats = new double[vertices.size()];
+          double[] polyLons = new double[vertices.size()];
+          for(int i=0;i<vertices.size();i++) {
+            Object o = vertices.get(i);
+            if ((o instanceof JSONArray) == false) {
+              r2.fail("vertices", "polygon vertices must be array of [latitude, longitude]; got: " + o);
+            }
+            JSONArray latLon = (JSONArray) o;
+            if (latLon.size() != 2) {
+              r2.fail("vertices", "polygon vertices must be array of [latitude, longitude]; got: " + o);
+            }
+            polyLats[i] = ((Number) latLon.get(0)).doubleValue();
+            polyLons[i] = ((Number) latLon.get(1)).doubleValue();
+          }
+
+          Polygon[] holes;
+          if (r2.hasParam("holes")) {
+            List<Object> o = r2.getList("holes");
+            holes = new Polygon[o.size()];
+            for(int i=0;i<o.size();i++) {
+              JSONArray o2 = (JSONArray) o.get(i);
+              double[] holeLats = new double[o2.size()];
+              double[] holeLons = new double[o2.size()];
+              for(int j=0;j<o2.size();j++) {
+                JSONArray o3 = (JSONArray) o2.get(j);
+                holeLats[j] = ((Number) o3.get(0)).doubleValue();
+                holeLons[j] = ((Number) o3.get(1)).doubleValue();
+              }
+              holes[i] = new Polygon(holeLats, holeLons);
+            }
+          } else {
+            holes = new Polygon[0];
+          }
+          polygonsList.add(new Polygon(polyLats, polyLons, holes));
+        }
+        polygons = polygonsList.toArray(new Polygon[polygonsList.size()]);
       }
-      q = LatLonPoint.newPolygonQuery(field, new Polygon(polyLats, polyLons, holes));
+      q = LatLonPoint.newPolygonQuery(field, polygons);
 
       // TODO: LatLonPoint.nearest!
 
