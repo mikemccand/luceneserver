@@ -86,6 +86,25 @@ public class Server {
 
   public static final int DEFAULT_PORT = 4000;
 
+  public static final String SERVER_VERSION = computeVersion();
+
+
+  private static String computeVersion() {
+    Package p = Server.class.getPackage();
+    String s;
+    if (p != null) {
+      s = p.getImplementationVersion();
+    } else {
+      s = null;
+    }
+
+    if (s == null) {
+      s = "0.1.0-SNAPSHOT";
+    }
+
+    return s;
+  }
+
   final GlobalState globalState;
   final ExecutorService httpThreadPool;
   final List<HttpServer> httpServers;
@@ -700,7 +719,7 @@ public class Server {
 
     globalState.loadPlugins();
 
-    System.out.println("Server " + globalState.nodeName + ": listening on:");
+    System.out.println("Server version \"" + SERVER_VERSION + "\", node " + globalState.nodeName + ": listening on:");
     for(int i=0;i<httpServers.size();i++) {
       System.out.println("  " + bindIPs.get(i) + ":" + actualPorts.get(i) + "/" + actualBinaryPorts.get(i));
     }
@@ -794,7 +813,7 @@ public class Server {
     }
 
     private void _run() throws Exception {
-      System.out.println("SVR " + globalState.nodeName + ": handle binary client; receive buffer=" + socket.getReceiveBufferSize());
+      //System.out.println("SVR " + globalState.nodeName + ": handle binary client; receive buffer=" + socket.getReceiveBufferSize());
       try (InputStream in = new BufferedInputStream(socket.getInputStream(), 128 * 1024); OutputStream out = socket.getOutputStream()) {
         DataInput dataIn = new InputStreamDataInput(in);
         int x = dataIn.readInt();

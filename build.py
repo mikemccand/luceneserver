@@ -27,7 +27,8 @@ testDeps = [
   ]
   
 LUCENE_VERSION = '6.2.0-SNAPSHOT'
-LUCENE_SERVER_VERSION = '0.1.0-SNAPSHOT'
+LUCENE_SERVER_BASE_VERSION = '0.1.0'
+LUCENE_SERVER_VERSION = '%s-SNAPSHOT' % LUCENE_SERVER_BASE_VERSION
 
 luceneDeps = ('core',
               'analyzers-common',
@@ -353,7 +354,7 @@ def getFlag(option):
   else:
     return False
 
-def compileSourcesAndDeps():
+def compileSourcesAndDeps(jarVersion):
   if not os.path.exists('lib'):
     print('init: create ./lib directory...')
     os.makedirs('lib')
@@ -374,7 +375,7 @@ def compileSourcesAndDeps():
   compileLuceneModules(luceneDeps)
 
   # compile luceneserver sources
-  jarFileName = 'build/luceneserver-%s.jar' % LUCENE_SERVER_VERSION
+  jarFileName = 'build/luceneserver-%s.jar' % jarVersion
 
   l = getCompileClassPath()
   l.append('build/classes/java')
@@ -382,7 +383,30 @@ def compileSourcesAndDeps():
 
   if anyChanges('build/classes/java', jarFileName):
     print('build %s' % jarFileName)
-    run('jar cf %s -C build/classes/java .' % jarFileName)
+    gitHash = os.popen('git rev-parse --short HEAD').readline().strip()
+    modifiedFileCount = 0
+    with os.popen('git ls-files -m') as p:
+      while True:
+        line = p.readline()
+        if line == '':
+          break
+        modifiedFileCount += 1
+        
+    with open('build/manifest.mf', 'w') as f:
+      f.write('Extension-Name: org.apache.lucene.server\n')
+      f.write('Specification-Title: Thin HTTP/REST server wrapper for Apache Lucene\n')
+      f.write('Specification-Vendor: Mike McCandless\n')
+      f.write('Specification-Version: %s\n' % LUCENE_SERVER_BASE_VERSION)
+      f.write('Implementation-Title: org.apache.lucene.server\n')
+      f.write('Implementation-Vendor: Mike McCandless\n')
+      if modifiedFileCount > 0:
+        if '-SNAPSHOT' not in jarVersion:
+          raise RuntimeError('there are modified sources; cannot build releasable JAR')
+        f.write('Implementation-Version: %s %s; %d source files modified\n' % (jarVersion, gitHash, modifiedFileCount))
+      else:
+        f.write('Implementation-Version: %s %s\n' % (jarVersion, gitHash))
+      
+    run('jar cefm org.apache.lucene.server.Server %s build/manifest.mf -C build/classes/java  .' % jarFileName)
 
   return jarFileName
 
@@ -403,14 +427,18 @@ def main():
       run('ant clean')
       os.chdir(ROOT_DIR)
     elif what == 'package':
-      
-      jarFileName = compileSourcesAndDeps()
 
-      destFileName = 'build/luceneserver-%s.zip' % LUCENE_SERVER_VERSION
-      rootDirName = 'luceneserver-%s' % LUCENE_SERVER_VERSION
+      jarVersion = getArg('-version')
+      if jarVersion is None:
+        jarVersion = LUCENE_SERVER_VERSION
+      
+      jarFileName = compileSourcesAndDeps(jarVersion)
+
+      destFileName = 'build/luceneserver-%s.zip' % jarVersion
+      rootDirName = 'luceneserver-%s' % jarVersion
 
       with zipfile.ZipFile(destFileName, 'w') as z:
-        z.write(jarFileName, '%s/lib/luceneserver-%s.jar' % (rootDirName, LUCENE_SERVER_VERSION))
+        z.write(jarFileName, '%s/lib/luceneserver-%s.jar' % (rootDirName, jarVersion))
         for org, name, version in deps:
           z.write('lib/%s-%s.jar' % (name, version), '%s/lib/%s-%s.jar' % (rootDirName, name, version))
         for dep in luceneDeps:
