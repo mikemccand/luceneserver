@@ -63,6 +63,7 @@ public class TestMathUtil extends LuceneTestCase {
     checkDouble(Double.NEGATIVE_INFINITY, Double.toString(Double.NEGATIVE_INFINITY));
     checkDouble(Double.MIN_VALUE, Double.toString(Double.MIN_VALUE));
     checkDouble(Double.MAX_VALUE, Double.toString(Double.MAX_VALUE));
+    checkDouble(-Double.MAX_VALUE, Double.toString(-Double.MAX_VALUE));
     checkDouble(Double.MIN_NORMAL, Double.toString(Double.MIN_NORMAL));
     checkDouble(-0D, Double.toString(-0D));
     checkDouble(0D, Double.toString(0D));
@@ -104,6 +105,7 @@ public class TestMathUtil extends LuceneTestCase {
     checkFloat(Float.NEGATIVE_INFINITY, Float.toString(Float.NEGATIVE_INFINITY));
     checkFloat(Float.MIN_VALUE, Float.toString(Float.MIN_VALUE));
     checkFloat(Float.MAX_VALUE, Float.toString(Float.MAX_VALUE));
+    checkFloat(-Float.MAX_VALUE, Float.toString(-Float.MAX_VALUE));
     checkFloat(Float.MIN_NORMAL, Float.toString(Float.MIN_NORMAL));
     checkFloat(-0F, Float.toString(-0F));
     checkFloat(0F, Float.toString(0F));
