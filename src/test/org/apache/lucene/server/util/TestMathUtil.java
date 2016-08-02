@@ -58,11 +58,11 @@ public class TestMathUtil extends LuceneTestCase {
   }
 
   public void testInterestingDoubles() throws Exception {
-		checkDouble(Double.NaN, Double.toString(Double.NaN));
-		checkDouble(Double.POSITIVE_INFINITY, Double.toString(Double.POSITIVE_INFINITY));
-		checkDouble(Double.NEGATIVE_INFINITY, Double.toString(Double.NEGATIVE_INFINITY));
-		checkDouble(-0D, Double.toString(-0D));
-		checkDouble(0D, Double.toString(0D));
+    checkDouble(Double.NaN, Double.toString(Double.NaN));
+    checkDouble(Double.POSITIVE_INFINITY, Double.toString(Double.POSITIVE_INFINITY));
+    checkDouble(Double.NEGATIVE_INFINITY, Double.toString(Double.NEGATIVE_INFINITY));
+    checkDouble(-0D, Double.toString(-0D));
+    checkDouble(0D, Double.toString(0D));
   }
 
   public void testRandomFloats() throws Exception {
