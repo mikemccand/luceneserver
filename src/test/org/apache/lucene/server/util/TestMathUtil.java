@@ -61,6 +61,9 @@ public class TestMathUtil extends LuceneTestCase {
     checkDouble(Double.NaN, Double.toString(Double.NaN));
     checkDouble(Double.POSITIVE_INFINITY, Double.toString(Double.POSITIVE_INFINITY));
     checkDouble(Double.NEGATIVE_INFINITY, Double.toString(Double.NEGATIVE_INFINITY));
+    checkDouble(Double.MIN_VALUE, Double.toString(Double.MIN_VALUE));
+    checkDouble(Double.MAX_VALUE, Double.toString(Double.MAX_VALUE));
+    checkDouble(Double.MIN_NORMAL, Double.toString(Double.MIN_NORMAL));
     checkDouble(-0D, Double.toString(-0D));
     checkDouble(0D, Double.toString(0D));
   }
@@ -74,6 +77,36 @@ public class TestMathUtil extends LuceneTestCase {
       float v2 = MathUtil.parseFloat(bytes.bytes, bytes.offset, bytes.length);
       assertEquals(v1, v2, 0.0);
     }
+  }
+
+  public void testReallyRandomFloats() throws Exception {
+    int iters = atLeast(10000);
+    for(int i=0;i<iters;i++) {
+      int bits = random().nextInt();
+      float v1 = Float.intBitsToFloat(bits);
+      String s = Float.toString(v1);
+      BytesRef bytes = getBytes(s);
+      float v2 = MathUtil.parseFloat(bytes.bytes, bytes.offset, bytes.length);
+      assertEquals(v1, v2, 0.0);
+    }
+  }
+
+  private void checkFloat(float expected, String string) {
+    int expectedBits = Float.floatToRawIntBits(expected);
+    BytesRef bytes = getBytes(string);
+    float v = MathUtil.parseFloat(bytes.bytes, bytes.offset, bytes.length);
+    assertEquals(string + " didn't parse to " + expected + ", instead: " + v, expectedBits, Float.floatToRawIntBits(v));
+  }
+
+  public void testInterestingFloats() throws Exception {
+    checkFloat(Float.NaN, Float.toString(Float.NaN));
+    checkFloat(Float.POSITIVE_INFINITY, Float.toString(Float.POSITIVE_INFINITY));
+    checkFloat(Float.NEGATIVE_INFINITY, Float.toString(Float.NEGATIVE_INFINITY));
+    checkFloat(Float.MIN_VALUE, Float.toString(Float.MIN_VALUE));
+    checkFloat(Float.MAX_VALUE, Float.toString(Float.MAX_VALUE));
+    checkFloat(Float.MIN_NORMAL, Float.toString(Float.MIN_NORMAL));
+    checkFloat(-0F, Float.toString(-0F));
+    checkFloat(0F, Float.toString(0F));
   }
 
   public void testRandomLongs() throws Exception {

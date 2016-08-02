@@ -31,17 +31,14 @@ public class MathUtil {
    * Returns the closest <code>double</code> representation of the
    * specified <code>long</code> number multiplied by a power of two.
    *
-   * @param m the <code>long</code> multiplier.
+   * @param m the <code>long</code> multiplier. (must be non-negative)
    * @param n the power of two exponent.
    * @return <code>m * 2<sup>n</sup></code>.
    */
-  public static double toDoublePow2(long m, int n) {
+  private static double toDoublePow2(long m, int n) {
+    assert m >= 0;
     if (m == 0)
       return 0.0;
-    if (m == Long.MIN_VALUE)
-      return toDoublePow2(Long.MIN_VALUE >> 1, n + 1);
-    if (m < 0)
-      return -toDoublePow2(-m, n);
     int bitLength = bitLength(m);
     int shift = bitLength - 53;
     long exp = 1023L + 52 + n + shift; // Use long to avoid overflow.
@@ -66,17 +63,14 @@ public class MathUtil {
    * Returns the closest <code>double</code> representation of the
    * specified <code>long</code> number multiplied by a power of ten.
    *
-   * @param m the <code>long</code> multiplier.
+   * @param m the <code>long</code> multiplier. (must be non-negative)
    * @param n the power of ten exponent.
    * @return <code>multiplier * 10<sup>n</sup></code>.
    **/
-  public static double toDoublePow10(long m, int n) {
+  private static double toDoublePow10(long m, int n) {
+    assert m >= 0;
     if (m == 0)
       return 0.0;
-    if (m == Long.MIN_VALUE)
-      return toDoublePow10(Long.MIN_VALUE / 10, n + 1);
-    if (m < 0)
-      return -toDoublePow10(-m, n);
     if (n >= 0) { // Positive power.
       if (n > 308)
         return Double.POSITIVE_INFINITY;
@@ -306,23 +300,23 @@ public class MathUtil {
     }
 
     // Reads sign.
-    long negMul;
+    double sigNum;
     if (c == '-') {
-      negMul = -1;
+      sigNum = -1D;
       i++;
       c = (char) bytes[i];
     } else if (c == '+') {
-      negMul = 1;
+      sigNum = 1D;
       i++;
       c = (char) bytes[i];
     } else {
-      negMul = 1;
+      sigNum = 1D;
     }
 
     // Checks for Infinity.
     if (c == 'I') {
       if (match("Infinity", bytes, i, end)) {
-        return negMul == -1 ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
+        return sigNum == -1 ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
       } else {
         throw newNumberFormatException("cannot parse string as double", bytes, start, length);
       }
@@ -355,8 +349,6 @@ public class MathUtil {
       }
       c = (char) bytes[i];
     }
-
-    decimal = negMul * decimal;
 
     int fractionLength = (decimalPoint >= 0) ? i - decimalPoint - 1 : 0;
 
@@ -395,7 +387,7 @@ public class MathUtil {
       }
     }
 
-    return toDoublePow10(decimal, exp - fractionLength);
+    return sigNum * toDoublePow10(decimal, exp - fractionLength);
   }
 
   /**
