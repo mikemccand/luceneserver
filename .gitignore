@@ -1,0 +1,5 @@
+build/
+data/
+install/
+lib/
+lucene6x/

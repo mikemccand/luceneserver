@@ -19,6 +19,7 @@ package org.apache.lucene.server.util;
 
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.LuceneTestCase;
+import org.apache.lucene.util.TestUtil;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
@@ -35,6 +36,33 @@ public class TestMathUtil extends LuceneTestCase {
       double v2 = MathUtil.parseDouble(bytes.bytes, bytes.offset, bytes.length);
       assertEquals(v1, v2, 0.0);
     }
+  }
+
+  public void testReallyRandomDoubles() throws Exception {
+    int iters = atLeast(10000);
+    for(int i=0;i<iters;i++) {
+      long bits = TestUtil.nextLong(random(), Long.MIN_VALUE, Long.MAX_VALUE);
+      double v1 = Double.longBitsToDouble(bits);
+      String s = Double.toString(v1);
+      BytesRef bytes = getBytes(s);
+      double v2 = MathUtil.parseDouble(bytes.bytes, bytes.offset, bytes.length);
+      assertEquals(v1, v2, 0.0);
+    }
+  }
+
+  private void checkDouble(double expected, String string) {
+    long expectedBits = Double.doubleToRawLongBits(expected);
+    BytesRef bytes = getBytes(string);
+    double v = MathUtil.parseDouble(bytes.bytes, bytes.offset, bytes.length);
+    assertEquals(string + " didn't parse to " + expected + ", instead: " + v, expectedBits, Double.doubleToRawLongBits(v));
+  }
+
+  public void testInterestingDoubles() throws Exception {
+		checkDouble(Double.NaN, Double.toString(Double.NaN));
+		checkDouble(Double.POSITIVE_INFINITY, Double.toString(Double.POSITIVE_INFINITY));
+		checkDouble(Double.NEGATIVE_INFINITY, Double.toString(Double.NEGATIVE_INFINITY));
+		checkDouble(-0D, Double.toString(-0D));
+		checkDouble(0D, Double.toString(0D));
   }
 
   public void testRandomFloats() throws Exception {
