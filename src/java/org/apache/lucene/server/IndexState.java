@@ -1199,6 +1199,10 @@ public class IndexState implements Closeable {
     return ((Number) o).doubleValue();
   }
 
+  private synchronized boolean hasSetting(String name) {
+    return settingsSaveState.containsKey(name);
+  }
+
   private synchronized int getIntSetting(String name) {
     Object o = settingsSaveState.get(name);
     if (o == null) {
@@ -1326,9 +1330,13 @@ public class IndexState implements Closeable {
       } else {
         cms.disableAutoIOThrottle();
       }
-      
-      cms.setMaxMergesAndThreads(getIntSetting("concurrentMergeScheduler.maxMergeCount"),
-                                 getIntSetting("concurrentMergeScheduler.maxThreadCount"));
+
+      if (hasSetting("concurrentMergeScheduler.maxMergeCount")) {
+        // SettingsHandler verifies this:
+        assert hasSetting("concurrentMergeScheduler.maxThreadCount");
+        cms.setMaxMergesAndThreads(getIntSetting("concurrentMergeScheduler.maxMergeCount"),
+                                   getIntSetting("concurrentMergeScheduler.maxThreadCount"));
+      }
 
       snapshots = new PersistentSnapshotDeletionPolicy(new KeepOnlyLastCommitDeletionPolicy(),
                                                        origIndexDir,
@@ -1558,10 +1566,20 @@ public class IndexState implements Closeable {
       iwc.setOpenMode(openMode);
       iwc.setRAMBufferSizeMB(indexRAMBufferSizeMB);
       iwc.setMergedSegmentWarmer(new SimpleMergedSegmentWarmer(iwc.getInfoStream()));
-
       ConcurrentMergeScheduler cms = (ConcurrentMergeScheduler) iwc.getMergeScheduler();
-      cms.setMaxMergesAndThreads(getIntSetting("concurrentMergeScheduler.maxMergeCount"),
-                                 getIntSetting("concurrentMergeScheduler.maxThreadCount"));
+
+      if (getBooleanSetting("index.merge.scheduler.auto_throttle")) {
+        cms.enableAutoIOThrottle();
+      } else {
+        cms.disableAutoIOThrottle();
+      }
+
+      if (hasSetting("concurrentMergeScheduler.maxMergeCount")) {
+        // SettingsHandler verifies this:
+        assert hasSetting("concurrentMergeScheduler.maxThreadCount");
+        cms.setMaxMergesAndThreads(getIntSetting("concurrentMergeScheduler.maxMergeCount"),
+                                   getIntSetting("concurrentMergeScheduler.maxThreadCount"));
+      }
 
       snapshots = new PersistentSnapshotDeletionPolicy(new KeepOnlyLastCommitDeletionPolicy(),
                                                        origIndexDir,

@@ -124,7 +124,11 @@ class SimpleCopyJob extends CopyJob {
     if (highPriority != other.highPriority) {
       return highPriority ? -1 : 1;
     } else if (ord < other.ord) {
+      // let earlier merges run to completion first
       return -1;
+    } else if (ord > other.ord) {
+      // let earlier merges run to completion first
+      return 1;
     } else {
       return 0;
     }

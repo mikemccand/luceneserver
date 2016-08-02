@@ -462,7 +462,7 @@ def main():
       seed = getArg('-seed')
       verbose = getFlag('-verbose')
 
-      jarFileName = compileSourcesAndDeps()
+      jarFileName = compileSourcesAndDeps(LUCENE_SERVER_VERSION)
 
       compileLuceneModules(luceneTestDeps)
 

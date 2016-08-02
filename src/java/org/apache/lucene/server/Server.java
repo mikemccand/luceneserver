@@ -56,6 +56,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 
+import org.apache.lucene.replicator.nrt.Node;
 import org.apache.lucene.server.handlers.*;
 import org.apache.lucene.server.params.Param;
 import org.apache.lucene.server.params.PolyType.PolyEntry;
@@ -87,7 +88,6 @@ public class Server {
   public static final int DEFAULT_PORT = 4000;
 
   public static final String SERVER_VERSION = computeVersion();
-
 
   private static String computeVersion() {
     Package p = Server.class.getPackage();
@@ -606,6 +606,8 @@ public class Server {
     bindIPs = new ArrayList<>();
     actualPorts = new ArrayList<>();
     actualBinaryPorts = new ArrayList<>();
+
+    Node.globalStartNS = System.nanoTime();
 
     globalState.addHandler("addDocument", new AddDocumentHandler(globalState));
     globalState.addHandler("addDocuments", new AddDocumentsHandler(globalState));

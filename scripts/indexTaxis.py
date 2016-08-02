@@ -1,3 +1,4 @@
+import random
 import gzip
 import socket
 import struct
@@ -11,16 +12,10 @@ import http.client
 import getpass
 import urllib.request
 
+# killall java; ssh 10.17.4.12 killall java; rm -rf /c/taxis; ssh 10.17.4.12 "rm -rf /l/taxis"; python3 -u scripts/indexTaxis.py -rebuild -ip 10.17.4.92 -installPath /c/taxis -replica 10.17.4.12:/l/taxis
+
 # TODO
 #   - index lat/lon as geopoint!
-
-#host1 = '10.17.4.92'
-host1 = '127.0.0.1'
-host2 = '10.17.4.12'
-#host2 = '127.0.0.1'
-
-DO_REPLICA = False
-DO_SEARCH = False
 
 LOCALHOST = '127.0.0.1'
 
@@ -49,8 +44,7 @@ class BinarySend:
   def close(self):
     self.socket.close()
 
-def launchServer(host, installDir, port):
-  os.makedirs(installDir)
+def launchServer(host, installDir, port, ip=None):
   zipFileName = os.path.split(PACKAGE_FILE)[1]
 
   # copy install bits over
@@ -59,6 +53,7 @@ def launchServer(host, installDir, port):
     # unzip it
     run('ssh %s@%s "mkdir -p %s; cd %s; unzip /tmp/%s"' % (USER_NAME, host, installDir, installDir, zipFileName))
   else:
+    os.makedirs(installDir)
     run('cd %s; unzip %s' % (installDir, PACKAGE_FILE))
 
   serverDirName = zipFileName[:-4]
@@ -69,7 +64,10 @@ def launchServer(host, installDir, port):
     #command = r'cd %s/%s; java -XX:MaxInlineSize=0 -agentlib:yjpagent=sampling -Xms4g -Xmx4g -cp lib/\* org.apache.lucene.server.Server -stateDir %s/state -ipPort %s:%s' % (installDir, serverDirName, installDir, host, port)
     command = r'cd %s/%s; java -Xms4g -Xmx4g -cp lib/\* org.apache.lucene.server.Server -stateDir %s/state -ipPort %s:%s' % (installDir, serverDirName, installDir, host, port)
 
-  #print('%s: server command %s' % (host, command))
+  if ip is not None:
+    command += ' -ipPort %s:%s' % (ip, port)
+
+  print('%s: server command %s' % (host, command))
   p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
   # Read lines until we see the server is started, then launch bg thread to read future lines:
@@ -81,12 +79,13 @@ def launchServer(host, installDir, port):
       print('ERROR: server on %s fail to start:' % host)
       print('\n'.join(pending))
       raise RuntimeError('server on %s failed to start' % host)
-    #print('%s: %s' % (host, line))
+    print('%s: %s' % (host, line))
     pending.append(line)
 
-    if 'Server main: listening on' in line:
+    if 'node main: listening on' in line:
       line = p.stdout.readline().strip().decode('utf-8')
       i = line.find(':')
+      print('%s: %s' % (host, line))
       ports = list(int(x) for x in line[i+1:].split('/'))
       break
     
@@ -164,41 +163,56 @@ def main():
     raise RuntimeError('primary install path %s already exists; please remove it and rerun' % primaryInstallPath)
 
   replicas = []
+  primaryIP = getArg('-ip')
+  
   while True:
     s = getArg('-replica')
     if s is not None:
+      if primaryIP is None:
+        raise RuntimeError('you must specify -ip if there are any -replica')
       tup = s.split(':')
       if len(tup) == 2:
-        replicas.append((replicaHost, DEFAULT_PORT, replicaInstallPath))
+        replicas.append((tup[0], DEFAULT_PORT, tup[1]))
       elif len(tup) == 3:
-        replicas.append((replicaHost, int(tup[1]), replicaInstallPath))
+        replicas.append((tup[0], int(tup[2]), tup[1]))
       else:
         raise RuntimeError('-replica should be host:installPath or host:port:installPath')
     else:
       break
 
   for host, port, installPath in replicas:
-    s = os.popen('ssh %s@%s ls %s' % (USER_NAME, host, installPath)).read()
+    s = os.popen('ssh %s@%s ls %s 2>&1' % (USER_NAME, host, installPath)).read()
     if 'no such file or directory' not in s.lower():
       raise RuntimeError('path %s on replica %s already exists; please remove it and rerun' % (installPath, host))
     
   os.makedirs(primaryInstallPath)
   for host, port, path in replicas:
+    print('mkdir %s on %s' % (path, host))
     run('ssh %s@%s mkdir -p %s' % (USER_NAME, host, path))
 
-  primaryPorts = launchServer(LOCALHOST, '%s/server0' % primaryInstallPath, 4000)
+  primaryPorts = launchServer(LOCALHOST, '%s/server0' % primaryInstallPath, 4000, primaryIP)
+  if len(replicas) != 0:
+    print('Done launch primary')
 
   replicaPorts = []
   for i, (host, port, installPath) in enumerate(replicas):
-    replicaPorts.append((i+1, host, installPath) + launchServer(host, '%s/server%s' % (installPath, i+1), port))
+    replicaPorts.append((i+1, host, installPath) + tuple(launchServer(host, '%s/server%s' % (installPath, i+1), port)))
+
+  if len(replicas) != 0:
+    print('Done launch replicas')
 
   try:
     send(LOCALHOST, primaryPorts[0], 'createIndex', {'indexName': 'index', 'rootDir': '%s/server0/index' % primaryInstallPath})
     for id, host, installPath, port, binaryPort in replicaPorts:
       send(host, port, 'createIndex', {'indexName': 'index', 'rootDir': '%s/server%s/index' % (installPath, id)})
 
-    # Turn off refreshes to maximize indexing throughput:
-    send(LOCALHOST, primaryPorts[0], "liveSettings", {'indexName': 'index', 'index.ramBufferSizeMB': 1024., 'maxRefreshSec': 100000.0})
+    if len(replicaPorts) > 0:
+      refreshSec = 1.0
+    else:
+      # Turn off refreshes to maximize indexing throughput:
+      #refreshSec = 100000.0
+      refreshSec = 1.0
+    send(LOCALHOST, primaryPorts[0], "liveSettings", {'indexName': 'index', 'index.ramBufferSizeMB': 1024., 'maxRefreshSec': refreshSec})
 
     fields = {'indexName': 'index',
               'fields':
@@ -234,7 +248,7 @@ def main():
 
     send(LOCALHOST, primaryPorts[0], "settings", {'indexName': 'index',
                                     #'indexSort': [{'field': 'pick_up_lon'}],
-                                    'index.verbose': False,
+                                    'index.verbose': True,
                                     'directory': 'MMapDirectory',
                                     'nrtCachingDirectory.maxSizeMB': 0.0,
                                     #'index.merge.scheduler.auto_throttle': False,
@@ -249,8 +263,8 @@ def main():
 
     if len(replicas) > 0:
       send(LOCALHOST, primaryPorts[0], 'startIndex', {'indexName': 'index', 'mode': 'primary', 'primaryGen': 0})
-      for id, host, installPath, port, binaryPort in replicaPorts:
-        send(host2, port2, 'startIndex', {'indexName': 'index', 'mode': 'replica', 'primaryAddress': host1, 'primaryGen': 0, 'primaryPort': binaryPort1})
+      for id, host2, installPath, port2, binaryPort2 in replicaPorts:
+        send(host2, port2, 'startIndex', {'indexName': 'index', 'mode': 'replica', 'primaryAddress': primaryIP, 'primaryGen': 0, 'primaryPort': primaryPorts[1]})
     else:
       send(LOCALHOST, primaryPorts[0], 'startIndex', {'indexName': 'index'})
 
@@ -290,6 +304,12 @@ def main():
     totBytes = 0
     chunkCount = 0
 
+    doSearch = len(replicaPorts) > 0
+
+    dps = getArg('-dps')
+    if dps is not None:
+      dps = float(dps)
+
     with open(docSource, 'rb') as f:
       csvHeader = f.readline()
       b1.add(csvHeader)
@@ -307,17 +327,21 @@ def main():
         if id >= nextPrint:
           delay = time.time()-tStart
           dps = id / delay
-          if DO_SEARCH:
-            if DO_REPLICA:
-              x = json.loads(send(host2, port2, 'search', {'indexName': 'index', 'queryText': '*:*'}));
-            else:
-              x = json.loads(send(host1, port1, 'search', {'indexName': 'index', 'queryText': '*:*'}));
-            print('%6.1f sec: %d hits, %.2f M docs... %.1f docs/sec, %.1f MB/sec' % (delay, x['totalHits'], id/1000000., dps, (totBytes/1024./1024.)/delay))
+          if doSearch:
+            replica = random.choice(replicaPorts)
+            x = json.loads(send(replica[1], replica[3], 'search', {'indexName': 'index', 'queryText': '*:*'}));
+            print('%6.1f sec: %.2fM hits on replica, %.2f M docs... %.1f docs/sec, %.1f MB/sec' % (delay, x['totalHits']/1000000., id/1000000., dps, (totBytes/1024./1024.)/delay))
           else:
             print('%6.1f sec: %.2f M docs... %.1f docs/sec, %.1f MB/sec' % (delay, id/1000000., dps, (totBytes/1024./1024.)/delay))
 
           while nextPrint <= id:
             nextPrint += 250000
+
+        if dps is not None:
+          now = time.time()
+          expected = tStart + (id / dps)
+          if expected > now:
+            time.sleep(expected-now)
 
     b1.finish()
 
@@ -354,7 +378,8 @@ if __name__ == '__main__':
 Usage: python3 scripts/indexTaxis.py <options>:
     [-installPath /path/to/install] install the server and state directory to this path; ./install by default
     [-rebuild] rebuild luceneserver artifact first; default will do this if it does not already exist
-    [-replica hostName:installPath or hostName:serverPort:installPath] remote host name and path to install and launch a replica server; your current user must have passwordless ssh access for this to work.  More than one -replica may be specified.
+    [-replica hostName:installPath or hostName:installPath:serverPort] remote host name and path to install and launch a replica server; your current user must have passwordless ssh access for this to work.  More than one -replica may be specified.
+    [-ip ip] which IP to bind to, in addition to 127.0.0.1; this is required if you use -replica
     [-help] prints this message
 ''')
   main()

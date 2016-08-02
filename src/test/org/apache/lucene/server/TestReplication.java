@@ -171,7 +171,7 @@ public class TestReplication extends ServerBaseTestCase {
         JSONObject result = server1.sendChunked(s, "bulkAddDocument");
         assertEquals(100, result.get("indexedDocumentCount"));
 
-        result = server2.send("search", "{indexName: index, queryText: '*:*', retrieveFields: [body]}");
+        result = server2.send("search", "{indexName: index, queryText: \"*:*\", retrieveFields: [body]}");
         //System.out.println("GOT: " + result);
         int searchCount = getInt(result, "totalHits");
         if (searchCount != lastSearchCount) {

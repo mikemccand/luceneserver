@@ -68,6 +68,7 @@ class Jobs extends Thread implements Closeable {
         break;
       }
       //node.message("JOBS: run " + topJob);
+      //System.out.println("JOBS: run " + topJob);
 
       this.setName("jobs o" + topJob.ord);
 
