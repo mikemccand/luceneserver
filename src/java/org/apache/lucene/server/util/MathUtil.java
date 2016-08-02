@@ -39,7 +39,7 @@ public class MathUtil {
     assert m >= 0;
     if (m == 0)
       return 0.0;
-    int bitLength = bitLength(m);
+    int bitLength = Long.SIZE - Long.numberOfLeadingZeros(m);
     int shift = bitLength - 53;
     long exp = 1023L + 52 + n + shift; // Use long to avoid overflow.
     if (exp >= 0x7FF)
@@ -116,7 +116,8 @@ public class MathUtil {
       }
 
       // Merges registers to a 63 bits mantissa.
-      int shift = 31 - bitLength(x3); // -1..30
+      assert x3 >= 0;
+      int shift = 31 - (Long.SIZE - Long.numberOfLeadingZeros(x3)); // -1..30
       pow2 -= shift;
       long mantissa = (shift < 0) ? (x3 << 31) | (x2 >>> 1) : // x3 is 32 bits.
         (((x3 << 32) | x2) << shift) | (x1 >>> (32 - shift));
@@ -133,7 +134,7 @@ public class MathUtil {
       while (true) {
 
         // Normalizes x1:x0
-        int shift = 63 - bitLength(x1);
+        int shift = 63 - (Long.SIZE - Long.numberOfLeadingZeros(x1));
         x1 <<= shift;
         x1 |= x0 >>> (63 - shift);
         x0 = (x0 << shift) & MASK_63;
@@ -388,67 +389,6 @@ public class MathUtil {
     }
 
     return sigNum * toDoublePow10(decimal, exp - fractionLength);
-  }
-
-  /**
-   * Returns the number of bits in the minimal two's-complement representation
-   * of the specified <code>int</code>, excluding a sign bit.
-   * For positive <code>int</code>, this is equivalent to the number of bits
-   * in the ordinary binary representation. For negative <code>int</code>,
-   * it is equivalent to the number of bits of the positive value 
-   * <code>-(i + 1)</code>.
-   * 
-   * @param i the <code>int</code> value for which the bit length is returned.
-   * @return the bit length of <code>i</code>.
-   */
-  public static int bitLength(int i) {
-    if (i < 0)
-      i = -++i;
-    return (i < 1 << 16) ? (i < 1 << 8) ? BIT_LENGTH[i]
-      : BIT_LENGTH[i >>> 8] + 8
-      : (i < 1 << 24) ? BIT_LENGTH[i >>> 16] + 16
-      : BIT_LENGTH[i >>> 24] + 24;
-  }
-
-  private static final byte[] BIT_LENGTH = { 0, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4,
-                                             4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6,
-                                             6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-                                             6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-                                             7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-                                             7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-                                             7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-                                             8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-                                             8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-                                             8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-                                             8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-                                             8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-                                             8, 8, 8 };
-
-  /**
-   * Returns the number of bits in the minimal two's-complement representation
-   * of the specified <code>long</code>, excluding a sign bit.
-   * For positive <code>long</code>, this is equivalent to the number of bits
-   * in the ordinary binary representation. For negative <code>long</code>,
-   * it is equivalent to the number of bits of the positive value 
-   * <code>-(l + 1)</code>.
-   * 
-   * @param l the <code>long</code> value for which the bit length is returned.
-   * @return the bit length of <code>l</code>.
-   */
-  public static int bitLength(long l) {
-    int i = (int) (l >> 32);
-    if (i > 0)
-      return (i < 1 << 16) ? (i < 1 << 8) ? BIT_LENGTH[i] + 32
-        : BIT_LENGTH[i >>> 8] + 40
-        : (i < 1 << 24) ? BIT_LENGTH[i >>> 16] + 48
-        : BIT_LENGTH[i >>> 24] + 56;
-    if (i < 0)
-      return bitLength(-++l);
-    i = (int) l;
-    return (i < 0) ? 32 : (i < 1 << 16) ? (i < 1 << 8) ? BIT_LENGTH[i]
-      : BIT_LENGTH[i >>> 8] + 8
-      : (i < 1 << 24) ? BIT_LENGTH[i >>> 16] + 16
-      : BIT_LENGTH[i >>> 24] + 24;
   }
 
   /** Assumes ascii!! */
