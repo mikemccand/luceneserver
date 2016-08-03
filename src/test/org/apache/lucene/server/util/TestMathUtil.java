@@ -20,8 +20,6 @@ package org.apache.lucene.server.util;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.LuceneTestCase;
 import org.apache.lucene.util.TestUtil;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -56,11 +54,16 @@ public class TestMathUtil extends LuceneTestCase {
   private void checkDouble(double expected, String string) {
     long expectedBits = Double.doubleToRawLongBits(expected);
     BytesRef bytes = getBytes(string);
-    double v = MathUtil.parseDouble(bytes.bytes, bytes.offset, bytes.length);
+    final double v;
+    try {
+      v = MathUtil.parseDouble(bytes.bytes, bytes.offset, bytes.length);
+    } catch (Throwable t) {
+      throw new AssertionError(string + " didn't parse to " + expected + ", instead hit " + t, t);
+    }
     try {
       assertEquals(expectedBits, Double.doubleToRawLongBits(v));
-    } catch (Throwable e) {
-      throw new AssertionError(string + " didn't parse to " + expected + ", instead: " + v, e);
+    } catch (Throwable t) {
+      throw new AssertionError(string + " didn't parse to " + expected + ", instead: " + v, t);
     }
   }
 
@@ -117,7 +120,12 @@ public class TestMathUtil extends LuceneTestCase {
   private void checkFloat(float expected, String string) {
     int expectedBits = Float.floatToRawIntBits(expected);
     BytesRef bytes = getBytes(string);
-    float v = MathUtil.parseFloat(bytes.bytes, bytes.offset, bytes.length);
+    final float v;
+    try {
+      v = MathUtil.parseFloat(bytes.bytes, bytes.offset, bytes.length);
+    } catch (Throwable t) {
+      throw new AssertionError(string + " didn't parse to " + expected + ", instead hit " + t, t);
+    }
     try {
       assertEquals(expectedBits, Float.floatToRawIntBits(v));
     } catch (Throwable t) {
