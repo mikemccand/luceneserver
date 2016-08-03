@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="lucene6x/lucene/analysis/common/src/java"/>
+	<classpathentry kind="src" path="lucene6x/lucene/analysis/common/src/resources" output="eclipse-build/0"/>
+	<classpathentry kind="src" path="lucene6x/lucene/analysis/icu/src/java"/>
+	<classpathentry kind="src" path="lucene6x/lucene/analysis/icu/src/resources" output="eclipse-build/1"/>
+	<classpathentry kind="src" path="lucene6x/lucene/codecs/src/java"/>
+	<classpathentry kind="src" path="lucene6x/lucene/codecs/src/resources" output="eclipse-build/2"/>
+	<classpathentry kind="src" path="lucene6x/lucene/core/src/java"/>
+	<classpathentry kind="src" path="lucene6x/lucene/core/src/resources" output="eclipse-build/3"/>
+	<classpathentry kind="src" path="lucene6x/lucene/expressions/src/java"/>
+	<classpathentry kind="src" path="lucene6x/lucene/facet/src/java"/>
+	<classpathentry kind="src" path="lucene6x/lucene/grouping/src/java"/>
+	<classpathentry kind="src" path="lucene6x/lucene/highlighter/src/java"/>
+	<classpathentry kind="src" path="lucene6x/lucene/join/src/java"/>
+	<classpathentry kind="src" path="lucene6x/lucene/memory/src/java"/>
+	<classpathentry kind="src" path="lucene6x/lucene/misc/src/java"/>
+	<classpathentry kind="src" path="lucene6x/lucene/queries/src/java"/>
+	<classpathentry kind="src" path="lucene6x/lucene/queryparser/src/java"/>
+	<classpathentry kind="src" path="lucene6x/lucene/replicator/src/java"/>
+	<classpathentry kind="src" path="lucene6x/lucene/sandbox/src/java"/>
+	<classpathentry kind="src" path="lucene6x/lucene/suggest/src/java"/>
+	<classpathentry kind="src" path="lucene6x/lucene/test-framework/src/java"/>
+	<classpathentry kind="src" path="lucene6x/lucene/test-framework/src/resources" output="eclipse-build/4"/>
+	<classpathentry kind="src" path="src/java"/>
+	<classpathentry kind="src" path="src/test"/>
+	<classpathentry kind="lib" path="lib/commons-codec-1.10.jar"/>
+	<classpathentry kind="lib" path="lib/jackson-core-asl-1.9.13.jar"/>
+	<classpathentry kind="lib" path="lib/jackson-mapper-asl-1.9.13.jar"/>
+	<classpathentry kind="lib" path="lib/json-smart-1.2.jar"/>
+	<classpathentry kind="lib" path="lib/junit-4.10.jar"/>
+	<classpathentry kind="lib" path="lib/junit4-ant-2.0.13.jar"/>
+	<classpathentry kind="lib" path="lib/randomizedtesting-runner-2.3.4.jar"/>
+	<classpathentry kind="lib" path="lucene6x/lucene/analysis/icu/lib/icu4j-56.1.jar"/>
+	<classpathentry kind="lib" path="lucene6x/lucene/expressions/lib/antlr4-runtime-4.5.1-1.jar"/>
+	<classpathentry kind="lib" path="lucene6x/lucene/expressions/lib/asm-5.1.jar"/>
+	<classpathentry kind="lib" path="lucene6x/lucene/expressions/lib/asm-commons-5.1.jar"/>
+	<classpathentry kind="lib" path="lucene6x/lucene/replicator/lib/commons-logging-1.1.3.jar"/>
+	<classpathentry kind="lib" path="lucene6x/lucene/replicator/lib/httpclient-4.4.1.jar"/>
+	<classpathentry kind="lib" path="lucene6x/lucene/replicator/lib/httpcore-4.4.1.jar"/>
+	<classpathentry kind="lib" path="lucene6x/lucene/replicator/lib/javax.servlet-api-3.1.0.jar"/>
+	<classpathentry kind="lib" path="lucene6x/lucene/replicator/lib/jetty-continuation-9.3.8.v20160314.jar"/>
+	<classpathentry kind="lib" path="lucene6x/lucene/replicator/lib/jetty-http-9.3.8.v20160314.jar"/>
+	<classpathentry kind="lib" path="lucene6x/lucene/replicator/lib/jetty-io-9.3.8.v20160314.jar"/>
+	<classpathentry kind="lib" path="lucene6x/lucene/replicator/lib/jetty-server-9.3.8.v20160314.jar"/>
+	<classpathentry kind="lib" path="lucene6x/lucene/replicator/lib/jetty-servlet-9.3.8.v20160314.jar"/>
+	<classpathentry kind="lib" path="lucene6x/lucene/replicator/lib/jetty-util-9.3.8.v20160314.jar"/>
+	<classpathentry kind="lib" path="lucene6x/lucene/test-framework/lib/junit-4.10.jar"/>
+	<classpathentry kind="lib" path="lucene6x/lucene/test-framework/lib/randomizedtesting-runner-2.3.4.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="output" path="eclipse-build/main"/>
+</classpath>
