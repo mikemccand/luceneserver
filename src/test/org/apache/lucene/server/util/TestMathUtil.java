@@ -23,6 +23,9 @@ import org.apache.lucene.util.TestUtil;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.math.MathContext;
 import java.nio.charset.StandardCharsets;
 
 public class TestMathUtil extends LuceneTestCase {
@@ -54,7 +57,11 @@ public class TestMathUtil extends LuceneTestCase {
     long expectedBits = Double.doubleToRawLongBits(expected);
     BytesRef bytes = getBytes(string);
     double v = MathUtil.parseDouble(bytes.bytes, bytes.offset, bytes.length);
-    assertEquals(string + " didn't parse to " + expected + ", instead: " + v, expectedBits, Double.doubleToRawLongBits(v));
+    try {
+      assertEquals(expectedBits, Double.doubleToRawLongBits(v));
+    } catch (Throwable e) {
+      throw new AssertionError(string + " didn't parse to " + expected + ", instead: " + v, e);
+    }
   }
 
   public void testInterestingDoubles() throws Exception {
@@ -67,6 +74,21 @@ public class TestMathUtil extends LuceneTestCase {
     checkDouble(Double.MIN_NORMAL, Double.toString(Double.MIN_NORMAL));
     checkDouble(-0D, Double.toString(-0D));
     checkDouble(0D, Double.toString(0D));
+  }
+
+  /**
+   * Makes something like a random quad float, toString's it, and checks parsing.
+   */
+  public void testDoublesLargerThanLife() throws Exception {
+    int iters = atLeast(1000);
+    for (int i = 0; i < iters; i++) {
+      BigInteger unscaled = TestUtil.nextBigInteger(random(), 16);
+      int scale = TestUtil.nextInt(random(), -34, 34);
+      BigDecimal bigDecimal = new BigDecimal(unscaled, scale, MathContext.DECIMAL128);
+      String encoded = bigDecimal.toString();
+      double v = Double.parseDouble(encoded);
+      checkDouble(v, encoded);
+    }
   }
 
   public void testRandomFloats() throws Exception {
@@ -96,7 +118,11 @@ public class TestMathUtil extends LuceneTestCase {
     int expectedBits = Float.floatToRawIntBits(expected);
     BytesRef bytes = getBytes(string);
     float v = MathUtil.parseFloat(bytes.bytes, bytes.offset, bytes.length);
-    assertEquals(string + " didn't parse to " + expected + ", instead: " + v, expectedBits, Float.floatToRawIntBits(v));
+    try {
+      assertEquals(expectedBits, Float.floatToRawIntBits(v));
+    } catch (Throwable t) {
+      throw new AssertionError(string + " didn't parse to " + expected + ", instead: " + v, t);
+    }
   }
 
   public void testInterestingFloats() throws Exception {
