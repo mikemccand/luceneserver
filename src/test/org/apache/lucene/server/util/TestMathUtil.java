@@ -51,7 +51,13 @@ public class TestMathUtil extends LuceneTestCase {
     }
   }
 
-  private void checkDouble(double expected, String string) {
+  /**
+   * Checks double parse
+   * @param expected expected value
+   * @param string unparsed string
+   * @param delta allowed number of ulps difference
+   */
+  private void checkDouble(double expected, String string, int delta) {
     long expectedBits = Double.doubleToRawLongBits(expected);
     BytesRef bytes = getBytes(string);
     final double v;
@@ -61,36 +67,40 @@ public class TestMathUtil extends LuceneTestCase {
       throw new AssertionError(string + " didn't parse to " + expected + ", instead hit " + t, t);
     }
     try {
-      assertEquals(expectedBits, Double.doubleToRawLongBits(v));
+      long actualBits = Double.doubleToRawLongBits(v);
+      long actualDelta = Math.abs(expectedBits - actualBits);
+      if (actualDelta > delta) {
+        throw new AssertionError("expected: <" + expectedBits + "> but was:<" + actualBits + ">");
+      }
     } catch (Throwable t) {
       throw new AssertionError(string + " didn't parse to " + expected + ", instead: " + v, t);
     }
   }
 
   public void testInterestingDoubles() throws Exception {
-    checkDouble(Double.NaN, Double.toString(Double.NaN));
-    checkDouble(Double.POSITIVE_INFINITY, Double.toString(Double.POSITIVE_INFINITY));
-    checkDouble(Double.NEGATIVE_INFINITY, Double.toString(Double.NEGATIVE_INFINITY));
-    checkDouble(Double.MIN_VALUE, Double.toString(Double.MIN_VALUE));
-    checkDouble(Double.MAX_VALUE, Double.toString(Double.MAX_VALUE));
-    checkDouble(-Double.MAX_VALUE, Double.toString(-Double.MAX_VALUE));
-    checkDouble(Double.MIN_NORMAL, Double.toString(Double.MIN_NORMAL));
-    checkDouble(-0D, Double.toString(-0D));
-    checkDouble(0D, Double.toString(0D));
+    checkDouble(Double.NaN, Double.toString(Double.NaN), 0);
+    checkDouble(Double.POSITIVE_INFINITY, Double.toString(Double.POSITIVE_INFINITY), 0);
+    checkDouble(Double.NEGATIVE_INFINITY, Double.toString(Double.NEGATIVE_INFINITY), 0);
+    checkDouble(Double.MIN_VALUE, Double.toString(Double.MIN_VALUE), 0);
+    checkDouble(Double.MAX_VALUE, Double.toString(Double.MAX_VALUE), 0);
+    checkDouble(-Double.MAX_VALUE, Double.toString(-Double.MAX_VALUE), 0);
+    checkDouble(Double.MIN_NORMAL, Double.toString(Double.MIN_NORMAL), 0);
+    checkDouble(-0D, Double.toString(-0D), 0);
+    checkDouble(0D, Double.toString(0D), 0);
   }
 
   /**
    * Makes something like a random quad float, toString's it, and checks parsing.
    */
   public void testDoublesLargerThanLife() throws Exception {
-    int iters = atLeast(1000);
+    int iters = atLeast(10000);
     for (int i = 0; i < iters; i++) {
       BigInteger unscaled = TestUtil.nextBigInteger(random(), 16);
       int scale = TestUtil.nextInt(random(), -34, 34);
       BigDecimal bigDecimal = new BigDecimal(unscaled, scale, MathContext.DECIMAL128);
       String encoded = bigDecimal.toString();
       double v = Double.parseDouble(encoded);
-      checkDouble(v, encoded);
+      checkDouble(v, encoded, 1);
     }
   }
 
@@ -117,7 +127,13 @@ public class TestMathUtil extends LuceneTestCase {
     }
   }
 
-  private void checkFloat(float expected, String string) {
+  /**
+   * Checks float parse
+   * @param expected expected value
+   * @param string unparsed string
+   * @param delta allowed number of ulps difference
+   */
+  private void checkFloat(float expected, String string, int delta) {
     int expectedBits = Float.floatToRawIntBits(expected);
     BytesRef bytes = getBytes(string);
     final float v;
@@ -127,22 +143,26 @@ public class TestMathUtil extends LuceneTestCase {
       throw new AssertionError(string + " didn't parse to " + expected + ", instead hit " + t, t);
     }
     try {
-      assertEquals(expectedBits, Float.floatToRawIntBits(v));
+      int actualBits = Float.floatToRawIntBits(v);
+      int actualDelta = Math.abs(expectedBits - actualBits);
+      if (actualDelta > delta) {
+        throw new AssertionError("expected: <" + expectedBits + "> but was:<" + actualBits + ">");
+      }
     } catch (Throwable t) {
       throw new AssertionError(string + " didn't parse to " + expected + ", instead: " + v, t);
     }
   }
 
   public void testInterestingFloats() throws Exception {
-    checkFloat(Float.NaN, Float.toString(Float.NaN));
-    checkFloat(Float.POSITIVE_INFINITY, Float.toString(Float.POSITIVE_INFINITY));
-    checkFloat(Float.NEGATIVE_INFINITY, Float.toString(Float.NEGATIVE_INFINITY));
-    checkFloat(Float.MIN_VALUE, Float.toString(Float.MIN_VALUE));
-    checkFloat(Float.MAX_VALUE, Float.toString(Float.MAX_VALUE));
-    checkFloat(-Float.MAX_VALUE, Float.toString(-Float.MAX_VALUE));
-    checkFloat(Float.MIN_NORMAL, Float.toString(Float.MIN_NORMAL));
-    checkFloat(-0F, Float.toString(-0F));
-    checkFloat(0F, Float.toString(0F));
+    checkFloat(Float.NaN, Float.toString(Float.NaN), 0);
+    checkFloat(Float.POSITIVE_INFINITY, Float.toString(Float.POSITIVE_INFINITY), 0);
+    checkFloat(Float.NEGATIVE_INFINITY, Float.toString(Float.NEGATIVE_INFINITY), 0);
+    checkFloat(Float.MIN_VALUE, Float.toString(Float.MIN_VALUE), 0);
+    checkFloat(Float.MAX_VALUE, Float.toString(Float.MAX_VALUE), 0);
+    checkFloat(-Float.MAX_VALUE, Float.toString(-Float.MAX_VALUE), 0);
+    checkFloat(Float.MIN_NORMAL, Float.toString(Float.MIN_NORMAL), 0);
+    checkFloat(-0F, Float.toString(-0F), 0);
+    checkFloat(0F, Float.toString(0F), 0);
   }
 
   public void testRandomLongs() throws Exception {

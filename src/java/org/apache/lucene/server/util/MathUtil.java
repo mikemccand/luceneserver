@@ -336,7 +336,9 @@ public class MathUtil {
       if (digit >= 0 && digit < 10) {
         long tmp = decimal * 10 + digit;
         if (decimal > LONG_MAX_DIV10 || tmp < decimal) {
-          throw newNumberFormatException("overflow", bytes, start, length);
+          // we'd overflow here, fall back to BigDecimal method
+          // TODO: improve this: can we detect up front?
+          return Double.parseDouble(new String(bytes, start, length, StandardCharsets.UTF_8));
         }
         decimal = tmp;
       } else if (c == '.' && decimalPoint == -1) {
@@ -370,7 +372,9 @@ public class MathUtil {
           if ((digit >= 0) && (digit < 10)) {
             int tmp = exp * 10 + digit;
             if ((exp > INT_MAX_DIV10) || (tmp < exp)) {
-              throw newNumberFormatException("exponent overflow", bytes, start, length);
+              // we'd overflow here, fall back to BigDecimal method
+              // TODO: improve this: can we detect up front?
+              return Double.parseDouble(new String(bytes, start, length, StandardCharsets.UTF_8));
             }
             exp = tmp;
           } else
