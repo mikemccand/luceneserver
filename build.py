@@ -149,6 +149,12 @@ class RunTestsJVM(threading.Thread):
                 message(chunk, False)
               else:
                 pendingOutput.append(chunk)
+            elif event[0] == 'TEST_FINISHED':
+              if self.doPrintOutput:
+                s = event[1]['description']
+                s = s[s.find('#')+1:]
+                s = s[:s.find('(')]
+                message('\nNOTE: test case done: %.3f sec for %s\n' % (event[1]['executionTime']/1000., s))
             elif event[0] in ('TEST_FAILURE', 'SUITE_FAILURE'):
               details = event[1]['failure']
               s = '\n!! %s.%s FAILED !!:\n\n' % (job[25:], testCaseName)
