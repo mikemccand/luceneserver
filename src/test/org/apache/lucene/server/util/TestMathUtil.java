@@ -24,6 +24,7 @@ import org.apache.lucene.util.TestUtil;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 
 public class TestMathUtil extends LuceneTestCase {
@@ -90,14 +91,16 @@ public class TestMathUtil extends LuceneTestCase {
   }
 
   /**
-   * Makes something like a random quad float, toString's it, and checks parsing.
+   * Makes something like a random "database" fixed point double, toString's it, and checks parsing.
+   * we check up to 100 digits for now.
    */
   public void testDoublesLargerThanLife() throws Exception {
-    int iters = atLeast(10000);
+    int iters = atLeast(100000);
     for (int i = 0; i < iters; i++) {
-      BigInteger unscaled = TestUtil.nextBigInteger(random(), 16);
-      int scale = TestUtil.nextInt(random(), -34, 34);
-      BigDecimal bigDecimal = new BigDecimal(unscaled, scale, MathContext.DECIMAL128);
+      BigInteger unscaled = TestUtil.nextBigInteger(random(), 42); // ~ log2(10^100)/8
+      int scale = TestUtil.nextInt(random(), -100, 100);
+      int precision = TestUtil.nextInt(random(), 1, 100);
+      BigDecimal bigDecimal = new BigDecimal(unscaled, scale, new MathContext(precision, RoundingMode.HALF_EVEN));
       String encoded = bigDecimal.toString();
       double v = Double.parseDouble(encoded);
       checkDouble(v, encoded, 1);
