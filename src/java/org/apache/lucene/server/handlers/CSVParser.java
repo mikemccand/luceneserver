@@ -94,16 +94,23 @@ class CSVParser {
       switch(fd.valueType) {
       case "atom":
         {
-          reuseFields[i] = new StringField(fd.name, "", stored ? Field.Store.YES : Field.Store.NO);
+          BytesRef br;
           if (fd.usePoints) {
             reusePoints[i] = new BinaryPoint(fd.name, new byte[0]);
+            // little bit sneaky sharing of a single BytesRef across all Lucene
+            // fields we add for this user's field:
+            br = reusePoints[i].binaryValue();
+            assert br != null;
+          } else {
+            br = new BytesRef();
           }
+          reuseFields[i] = new StringField(fd.name, br, stored ? Field.Store.YES : Field.Store.NO);
           if (dvType == DocValuesType.SORTED) {
-            reuseDVs[i] = new SortedDocValuesField(fd.name, new BytesRef());
+            reuseDVs[i] = new SortedDocValuesField(fd.name, br);
           } else if (dvType == DocValuesType.SORTED_SET) {
-            reuseDVs[i] = new SortedSetDocValuesField(fd.name, new BytesRef());
+            reuseDVs[i] = new SortedSetDocValuesField(fd.name, br);
           } else if (dvType == DocValuesType.BINARY) {
-            reuseDVs[i] = new BinaryDocValuesField(fd.name, new BytesRef());
+            reuseDVs[i] = new BinaryDocValuesField(fd.name, br);
           }
           break;
         }
@@ -193,29 +200,19 @@ class CSVParser {
     switch(fields[i].valueType) {
     case "atom":
       {
-        String s = new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8);
         Field field = reuseFields[i];
-        field.setStringValue(s);
+        BytesRef br = field.binaryValue();
+        assert br != null;
+        br.bytes = bytes;
+        br.offset = lastFieldStart;
+        br.length = len;
         reuseDoc.add(field);
         Field point = reusePoints[i];
-        BytesRef br;
         if (point != null) {
-          br = point.binaryValue();
-          br.bytes = bytes;
-          br.offset = lastFieldStart;
-          br.length = len;
           reuseDoc.add(point);
-        } else {
-          br = null;
         }
         Field dv = reuseDVs[i];
         if (dv != null) {
-          if (br == null) {
-            br = dv.binaryValue();
-            br.bytes = bytes;
-            br.offset = lastFieldStart;
-            br.length = len;
-          }
           dv.setBytesValue(br);
           reuseDoc.add(dv);
         }

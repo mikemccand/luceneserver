@@ -419,7 +419,7 @@ public class TestIndexing extends ServerBaseTestCase {
         server.sendBinary("bulkCSVAddDocument",
                           "csv\ncount,id2,body\n0,1,some text\n118371391723487213472,2,some more text".getBytes(StandardCharsets.UTF_8));
       });
-    assertTrue(t.getMessage().contains("doc at offset 66: could not parse field \"count\" as long: overflow: \"118371391723487213472\""));
+    assertContains(t.getMessage(), "doc at offset 66: could not parse field \"count\" as long: overflow: \"118371391723487213472\"");
     send("stopIndex");
     send("deleteIndex");
   }
@@ -430,9 +430,9 @@ public class TestIndexing extends ServerBaseTestCase {
     send("startIndex");
     Throwable t = expectThrows(IOException.class, () -> {
         server.sendBinary("bulkCSVAddDocument",
-                          "csv\ncount,id2,body\n0,1,some text\n118371391723487213472,2,some more text".getBytes(StandardCharsets.UTF_8));
+                          "csv\ncount,id2,body\n0,1,some text\n1183x71391723487213472,2,some more text".getBytes(StandardCharsets.UTF_8));
       });
-    assertContains(t.getMessage(), "doc at offset 66: could not parse field \"count\" as float: overflow: \"118371391723487213472\"");
+    assertContains(t.getMessage(), "doc at offset 67: could not parse field \"count\" as float: extra characters: \"1183x71391723487213472\"");
     send("stopIndex");
     send("deleteIndex");
   }
@@ -443,9 +443,9 @@ public class TestIndexing extends ServerBaseTestCase {
     send("startIndex");
     Throwable t = expectThrows(IOException.class, () -> {
         server.sendBinary("bulkCSVAddDocument",
-                          "csv\ncount,id2,body\n0,1,some text\n118371391723487213472,2,some more text".getBytes(StandardCharsets.UTF_8));
+                          "csv\ncount,id2,body\n0,1,some text\n1183x71391723487213472,2,some more text".getBytes(StandardCharsets.UTF_8));
       });
-    assertContains(t.getMessage(), "doc at offset 66: could not parse field \"count\" as double: overflow: \"118371391723487213472\"");
+    assertContains(t.getMessage(), "doc at offset 67: could not parse field \"count\" as double: extra characters: \"1183x71391723487213472\"");
     send("stopIndex");
     send("deleteIndex");
   }

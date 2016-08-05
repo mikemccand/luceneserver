@@ -210,8 +210,7 @@ def main():
       refreshSec = 1.0
     else:
       # Turn off refreshes to maximize indexing throughput:
-      #refreshSec = 100000.0
-      refreshSec = 1.0
+      refreshSec = 100000.0
     send(LOCALHOST, primaryPorts[0], "liveSettings", {'indexName': 'index', 'index.ramBufferSizeMB': 1024., 'maxRefreshSec': refreshSec})
 
     fields = {'indexName': 'index',
@@ -223,23 +222,23 @@ def main():
                 'pick_up_date_time': {'type': 'long', 'search': True, 'sort': True},
                 'drop_off_date_time': {'type': 'long', 'search': True, 'sort': True},
                 'passenger_count': {'type': 'int', 'search': True, 'sort': True},
-                'trip_distance': {'type': 'double', 'search': True, 'sort': True},
-                'pick_up_lat': {'type': 'double', 'search': True, 'sort': True},
-                'pick_up_lon': {'type': 'double', 'search': True, 'sort': True},
-                'drop_off_lat': {'type': 'double', 'search': True, 'sort': True},
-                'drop_off_lon': {'type': 'double', 'search': True, 'sort': True},
+                'trip_distance': {'type': 'float', 'search': True, 'sort': True},
+                'pick_up_lat': {'type': 'float', 'search': True, 'sort': True},
+                'pick_up_lon': {'type': 'float', 'search': True, 'sort': True},
+                'drop_off_lat': {'type': 'float', 'search': True, 'sort': True},
+                'drop_off_lon': {'type': 'float', 'search': True, 'sort': True},
                 'payment_type': {'type': 'atom', 'sort': True},
                 'trip_type': {'type': 'atom', 'sort': True},
                 'rate_code': {'type': 'atom', 'sort': True},
-                'fare_amount': {'type': 'double', 'search': True, 'sort': True},
-                'surcharge': {'type': 'double', 'search': True, 'sort': True},
-                'mta_tax': {'type': 'double', 'search': True, 'sort': True},
-                'extra': {'type': 'double', 'search': True, 'sort': True},
-                'ehail_fee': {'type': 'double', 'search': True, 'sort': True},
-                'improvement_surcharge': {'type': 'double', 'search': True, 'sort': True},
-                'tip_amount': {'type': 'double', 'search': True, 'sort': True},
-                'tolls_amount': {'type': 'double', 'search': True, 'sort': True},
-                'total_amount': {'type': 'double', 'search': True, 'sort': True},
+                'fare_amount': {'type': 'float', 'search': True, 'sort': True},
+                'surcharge': {'type': 'float', 'search': True, 'sort': True},
+                'mta_tax': {'type': 'float', 'search': True, 'sort': True},
+                'extra': {'type': 'float', 'search': True, 'sort': True},
+                'ehail_fee': {'type': 'float', 'search': True, 'sort': True},
+                'improvement_surcharge': {'type': 'float', 'search': True, 'sort': True},
+                'tip_amount': {'type': 'float', 'search': True, 'sort': True},
+                'tolls_amount': {'type': 'float', 'search': True, 'sort': True},
+                'total_amount': {'type': 'float', 'search': True, 'sort': True},
                 'store_and_fwd_flag': {'type': 'atom', 'sort': True}}}
 
     send(LOCALHOST, primaryPorts[0], 'registerFields', fields)
@@ -248,10 +247,12 @@ def main():
 
     send(LOCALHOST, primaryPorts[0], "settings", {'indexName': 'index',
                                     #'indexSort': [{'field': 'pick_up_lon'}],
-                                    'index.verbose': True,
+                                    'index.verbose': False,
                                     'directory': 'MMapDirectory',
                                     'nrtCachingDirectory.maxSizeMB': 0.0,
-                                    #'index.merge.scheduler.auto_throttle': False,
+                                    'concurrentMergeScheduler.maxThreadCount': 4,
+                                    'concurrentMergeScheduler.maxMergeCount': 9,
+                                    'index.merge.scheduler.auto_throttle': False,
                                     })
 
     for id, host, installPath, port, binaryPort in replicaPorts:
@@ -277,7 +278,8 @@ def main():
     replicaStarted = False
 
     #docSource = '/lucenedata/nyc-taxi-data/alltaxis.csv.blocks'
-    docSource = '/b/alltaxis.csv.blocks'
+    #docSource = '/b/alltaxis.csv.blocks'
+    docSource = '/l/data/alltaxis.csv.blocks'
     if not os.path.exists(docSource):
       # Not Mike's home computer!
       docSource = 'data/alltaxis.1M.csv.blocks'
