@@ -27,7 +27,7 @@ testDeps = [
   ]
   
 LUCENE_VERSION = '6.2.0-SNAPSHOT'
-LUCENE_SERVER_BASE_VERSION = '0.1.0'
+LUCENE_SERVER_BASE_VERSION = '0.1.1'
 LUCENE_SERVER_VERSION = '%s-SNAPSHOT' % LUCENE_SERVER_BASE_VERSION
 
 luceneDeps = ('core',
@@ -457,6 +457,7 @@ def main():
           if os.path.exists(libDir):
             for name in os.listdir(libDir):
               z.write('%s/%s' % (libDir, name), '%s/lib/%s' % (rootDirName, name))
+        z.write('scripts/indexTaxis.py', '%s/scripts/indexTaxis.py' % rootDirName)
 
         print('\nWrote %s (%.1f MB)\n' % (destFileName, os.path.getsize(destFileName)/1024./1024.))
 

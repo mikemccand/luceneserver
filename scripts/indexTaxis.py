@@ -12,12 +12,17 @@ import http.client
 import getpass
 import urllib.request
 
+LUCENE_SERVER_BASE_VERSION = '0.1.1'
+
 # killall java; ssh 10.17.4.12 killall java; rm -rf /c/taxis; ssh 10.17.4.12 "rm -rf /l/taxis"; python3 -u scripts/indexTaxis.py -rebuild -ip 10.17.4.92 -installPath /c/taxis -replica 10.17.4.12:/l/taxis
 
 # TODO
 #   - index lat/lon as geopoint!
 
 LOCALHOST = '127.0.0.1'
+
+IS_INSTALLED = os.path.exists('lib/luceneserver-%s.jar' % LUCENE_SERVER_BASE_VERSION) or \
+               os.path.exists('lib/luceneserver-%s-SNAPSHOT.jar' % LUCENE_SERVER_BASE_VERSION)
 
 DEFAULT_PORT = 4000
 
@@ -45,24 +50,29 @@ class BinarySend:
     self.socket.close()
 
 def launchServer(host, installDir, port, ip=None):
-  zipFileName = os.path.split(PACKAGE_FILE)[1]
 
-  # copy install bits over
-  if host != LOCALHOST:
-    run('scp %s %s@%s:/tmp' % (PACKAGE_FILE, USER_NAME, host))
-    # unzip it
-    run('ssh %s@%s "mkdir -p %s; cd %s; unzip /tmp/%s"' % (USER_NAME, host, installDir, installDir, zipFileName))
+  if IS_INSTALLED:
+    cwd = '.'
   else:
-    os.makedirs(installDir)
-    run('cd %s; unzip %s' % (installDir, PACKAGE_FILE))
 
-  serverDirName = zipFileName[:-4]
+    zipFileName = os.path.split(PACKAGE_FILE)[1]
+    # copy install bits over
+    if host != LOCALHOST:
+      run('scp %s %s@%s:/tmp' % (PACKAGE_FILE, USER_NAME, host))
+      # unzip it
+      run('ssh %s@%s "mkdir -p %s; cd %s; unzip /tmp/%s"' % (USER_NAME, host, installDir, installDir, zipFileName))
+    else:
+      os.makedirs(installDir)
+      run('cd %s; unzip %s' % (installDir, PACKAGE_FILE))
+
+    serverDirName = zipFileName[:-4]
+    cwd = '%s/%s' % (installDir, serverDirName)
 
   if host != LOCALHOST:
-    command = r'ssh %s@%s "cd %s/%s; java -Xms4g -Xmx4g -cp lib/\* org.apache.lucene.server.Server -stateDir %s/state -ipPort %s:%s"' % (USER_NAME, host, installDir, serverDirName, installDir, host, port)
+    command = r'ssh %s@%s "cd %s; java -Xms4g -Xmx4g -cp lib/\* org.apache.lucene.server.Server -stateDir %s/state -ipPort %s:%s"' % (USER_NAME, host, cwd, installDir, host, port)
   else:
-    #command = r'cd %s/%s; java -XX:MaxInlineSize=0 -agentlib:yjpagent=sampling -Xms4g -Xmx4g -cp lib/\* org.apache.lucene.server.Server -stateDir %s/state -ipPort %s:%s' % (installDir, serverDirName, installDir, host, port)
-    command = r'cd %s/%s; java -Xms4g -Xmx4g -cp lib/\* org.apache.lucene.server.Server -stateDir %s/state -ipPort %s:%s' % (installDir, serverDirName, installDir, host, port)
+    #command = r'cd %s; java -XX:MaxInlineSize=0 -agentlib:yjpagent=sampling -Xms4g -Xmx4g -cp lib/\* org.apache.lucene.server.Server -stateDir %s/state -ipPort %s:%s' % (cwd, installDir, host, port)
+    command = r'cd %s; java -Xms4g -Xmx4g -cp lib/\* org.apache.lucene.server.Server -stateDir %s/state -ipPort %s:%s' % (cwd, installDir, host, port)
 
   if ip is not None:
     command += ' -ipPort %s:%s' % (ip, port)
@@ -147,20 +157,26 @@ def getFlag(option):
 
 def main():
 
-  if not os.path.exists('src/java/org/apache/lucene/server/Server.java'):
-    print('\nERROR: please run this from the luceneserver working directory\n')
+  if not os.path.exists('src/java/org/apache/lucene/server/Server.java') and not IS_INSTALLED:
+    print('\nERROR: please run this from the luceneserver working directory (git clone) or an installation\n')
     sys.exit(1)
 
-  if getFlag('-rebuild') or not os.path.exists('build/luceneserver-0.1.0-SNAPSHOT.zip'):
+  if IS_INSTALLED:
+    if getFlag('-rebuild'):
+      raise RuntimeError('cannot rebuild from a binary installation')
+    primaryInstallPath = '.'
+  elif getFlag('-rebuild') or not os.path.exists('build/luceneserver-%s-SNAPSHOT.zip' % LUCENE_SERVER_BASE_VERSION):
     print('Building server release artifact...')
     run('python3 -u build.py package')
 
-  primaryInstallPath = getArg('-installPath')
-  if primaryInstallPath is None:
-    primaryInstallPath = os.path.abspath('install')
+    primaryInstallPath = getArg('-installPath')
+    if primaryInstallPath is None:
+      primaryInstallPath = os.path.abspath('install')
 
-  if os.path.exists(primaryInstallPath):
-    raise RuntimeError('primary install path %s already exists; please remove it and rerun' % primaryInstallPath)
+    if os.path.exists(primaryInstallPath):
+      raise RuntimeError('primary install path %s already exists; please remove it and rerun' % primaryInstallPath)
+
+    os.makedirs(primaryInstallPath)
 
   replicas = []
   primaryIP = getArg('-ip')
@@ -168,6 +184,8 @@ def main():
   while True:
     s = getArg('-replica')
     if s is not None:
+      if IS_INSTALLED:
+        raise RuntimeError('-replica does not yet work when installed; try running from a git clone instead')
       if primaryIP is None:
         raise RuntimeError('you must specify -ip if there are any -replica')
       tup = s.split(':')
@@ -185,7 +203,6 @@ def main():
     if 'no such file or directory' not in s.lower():
       raise RuntimeError('path %s on replica %s already exists; please remove it and rerun' % (installPath, host))
     
-  os.makedirs(primaryInstallPath)
   for host, port, path in replicas:
     print('mkdir %s on %s' % (path, host))
     run('ssh %s@%s mkdir -p %s' % (USER_NAME, host, path))
