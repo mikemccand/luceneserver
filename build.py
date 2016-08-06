@@ -458,6 +458,8 @@ def main():
             for name in os.listdir(libDir):
               z.write('%s/%s' % (libDir, name), '%s/lib/%s' % (rootDirName, name))
         z.write('scripts/indexTaxis.py', '%s/scripts/indexTaxis.py' % rootDirName)
+        z.write('CHANGES.txt', '%s/CHANGES.txt' % rootDirName)
+        z.write('README.md', '%s/README.md' % rootDirName)
 
         print('\nWrote %s (%.1f MB)\n' % (destFileName, os.path.getsize(destFileName)/1024./1024.))
 
