@@ -1,9 +1,15 @@
 
 make sure tests pass
 
+git add/commit/push all changes
+
 ./build.py package -version x.y.z
 
 install it, confirm scripts/indexTaxis.py works
+
+git tag -m "Release x.y.z" -a vx.y.z
+
+git push --tags
 
 after:
   - bump version constants in indexTaxis.py and build.py
