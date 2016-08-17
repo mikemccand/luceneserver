@@ -267,16 +267,15 @@ def main():
                                     'index.verbose': False,
                                     'directory': 'MMapDirectory',
                                     'nrtCachingDirectory.maxSizeMB': 0.0,
-                                    'concurrentMergeScheduler.maxThreadCount': 4,
-                                    'concurrentMergeScheduler.maxMergeCount': 9,
                                     'index.merge.scheduler.auto_throttle': False,
+                                    'concurrentMergeScheduler.maxMergeCount': 16,
+                                    'concurrentMergeScheduler.maxThreadCount': 8,
                                     })
 
     for id, host, installPath, port, binaryPort in replicaPorts:
       send(host, port, "settings", {'indexName': 'index',
                                     'directory': 'MMapDirectory',
-                                    'nrtCachingDirectory.maxSizeMB': 0.0,
-                                    #'index.merge.scheduler.auto_throttle': False,
+                                    'nrtCachingDirectory.maxSizeMB': 0.0
                                     })
 
     if len(replicas) > 0:

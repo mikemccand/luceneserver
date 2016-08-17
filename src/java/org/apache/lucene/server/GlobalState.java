@@ -102,7 +102,8 @@ public class GlobalState implements Closeable {
 
   // TODO: make these controllable
   // nocommit allow controlling per CSV/json bulk import max concurrency sent into IW?
-  private final static int MAX_INDEXING_THREADS = Runtime.getRuntime().availableProcessors();
+  private final static int MAX_INDEXING_THREADS = 10;
+  //private final static int MAX_INDEXING_THREADS = Runtime.getRuntime().availableProcessors();
   //private final static int MAX_INDEXING_THREADS = 1;
 
   final DocHandler docHandler = new DocHandler();
@@ -111,13 +112,13 @@ public class GlobalState implements Closeable {
 
   private final Map<String,Plugin> plugins = new HashMap<String,Plugin>();
 
-  private final static int MAX_BUFFERED_DOCS = Math.max(100, 2*MAX_INDEXING_THREADS);
+  private final static int MAX_BUFFERED_ITEMS = Math.max(100, 2*MAX_INDEXING_THREADS);
 
   // Seems to be substantially faster than ArrayBlockingQueue at high throughput:  
-  final BlockingQueue<Runnable> docsToIndex = new LinkedBlockingQueue<Runnable>(MAX_BUFFERED_DOCS);
+  final BlockingQueue<Runnable> docsToIndex = new LinkedBlockingQueue<Runnable>(MAX_BUFFERED_ITEMS);
 
   /** Common thread pool to index documents. */
-  public final ExecutorService indexService = new BlockingThreadPoolExecutor(MAX_BUFFERED_DOCS,
+  public final ExecutorService indexService = new BlockingThreadPoolExecutor(MAX_BUFFERED_ITEMS,
                                                                              MAX_INDEXING_THREADS,
                                                                              MAX_INDEXING_THREADS,
                                                                              60, TimeUnit.SECONDS,
