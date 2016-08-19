@@ -249,7 +249,7 @@ def main():
               'admin3_code': {'type': 'atom', 'sort': True},
               'admin4_code': {'type': 'atom', 'sort': True},
               'feature_code': {'type': 'atom', 'sort': True},
-              'modification_date': {'type': 'atom', 'sort': True},
+              'modification_date': {'type': 'datetime', 'sort': True, 'dateTimeFormat': 'yyyy-MM-dd'},
               'alternatenames': {'type': 'text'},
               'population': {'type': 'long', 'search': True, 'sort': True}}}
 

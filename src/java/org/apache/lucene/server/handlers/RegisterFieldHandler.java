@@ -22,6 +22,7 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.text.Collator;
 import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -285,10 +286,12 @@ public class RegisterFieldHandler extends Handler {
                                "int", "Int value.",
                                "long", "Long value.",
                                "latlon", "A latitude/longitude point",
+                               "datetime", "Date and optional time",
                                // nocommit name this "dynamic" instead of "virtual"?
                                "virtual", "Virtual field defined with a JavaScript expression.",
                                // nocommit need tests for internal:
                                "internal", "Internal field, currently only for holding indexed facets data.")),
+        new Param("dateTimeFormat", "Format string used to parse datetime fields", new StringType()),
         new Param("search", "True if the value should be available for searching (or numeric range searching, for a numeric field).", new BooleanType(), false),
         new Param("tokenize", "True if the value should be tokenized.", new BooleanType(), true),
         new Param("store", "True if the value should be stored.", new BooleanType(), false),
@@ -399,7 +402,7 @@ public class RegisterFieldHandler extends Handler {
       values = null;
     }
 
-    return new FieldDef(name, null, "virtual", null, null, null, true, false, null, null, null, false, null, values);
+    return new FieldDef(name, null, "virtual", null, null, null, true, false, null, null, null, false, null, values, null);
   }
 
   private FieldDef parseOneFieldType(Request r, IndexState state, Map<String,FieldDef> pendingFieldDefs, String name, JSONObject o) throws IOException {
@@ -441,16 +444,20 @@ public class RegisterFieldHandler extends Handler {
 
     boolean multiValued = f.getBoolean("multiValued");
     if (multiValued) {
-      // nocommi not true!  but do we need something at search time so you can pick the picker?
+      // nocommit not true!  but do we need something at search time so you can pick the picker?
       //if (sorted) {
       //f.fail("multiValued", "cannot sort on multiValued fields");
       //}
       if (grouped) {
         f.fail("multiValued", "cannot group on multiValued fields");
       }
-    }      
+    }
 
-    if (type.equals("text")) {
+    String dateTimeFormat = null;
+
+    switch(type) {
+
+    case "text":
       if (sorted) {
         f.fail("sort", "cannot sort text fields; use atom instead");
       }
@@ -466,7 +473,9 @@ public class RegisterFieldHandler extends Handler {
       } else {
         ft.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS);
       }
-    } else if (type.equals("atom")) {
+      break;
+
+    case "atom":
       if (f.hasParam("analyzer")) {
         f.fail("analyzer", "no analyzer allowed with atom (it's hardwired to KeywordAnalyzer internally)");
       }
@@ -482,7 +491,9 @@ public class RegisterFieldHandler extends Handler {
       } else if (grouped || dv) {
         ft.setDocValuesType(DocValuesType.BINARY);
       }
-    } else if (type.equals("boolean")) {
+      break;
+      
+    case "boolean":
       if (dv || sorted || grouped) {
         if (multiValued) {
           ft.setDocValuesType(DocValuesType.SORTED_NUMERIC);
@@ -490,7 +501,9 @@ public class RegisterFieldHandler extends Handler {
           ft.setDocValuesType(DocValuesType.NUMERIC);
         }
       }
-    } else if (type.equals("long")) {
+      break;
+
+    case "long":
       if (dv || sorted || grouped) {
         if (multiValued) {
           ft.setDocValuesType(DocValuesType.SORTED_NUMERIC);
@@ -498,7 +511,9 @@ public class RegisterFieldHandler extends Handler {
           ft.setDocValuesType(DocValuesType.NUMERIC);
         }
       }
-    } else if (type.equals("int")) {
+      break;
+
+    case "int":
       if (dv || sorted || grouped) {
         if (multiValued) {
           ft.setDocValuesType(DocValuesType.SORTED_NUMERIC);
@@ -506,7 +521,9 @@ public class RegisterFieldHandler extends Handler {
           ft.setDocValuesType(DocValuesType.NUMERIC);
         }
       }
-    } else if (type.equals("double")) {
+      break;
+      
+    case "double":
       if (dv || sorted || grouped) {
         if (multiValued) {
           ft.setDocValuesType(DocValuesType.SORTED_NUMERIC);
@@ -514,7 +531,9 @@ public class RegisterFieldHandler extends Handler {
           ft.setDocValuesType(DocValuesType.NUMERIC);
         }
       }
-    } else if (type.equals("float")) {
+      break;
+      
+    case "float":
       if (dv || sorted || grouped) {
         if (multiValued) {
           ft.setDocValuesType(DocValuesType.SORTED_NUMERIC);
@@ -522,7 +541,9 @@ public class RegisterFieldHandler extends Handler {
           ft.setDocValuesType(DocValuesType.NUMERIC);
         }
       }
-    } else if (type.equals("latlon")) {
+      break;
+      
+    case "latlon":
       if (stored) {
         f.fail("stored", "latlon fields cannot be stored");
       }
@@ -530,13 +551,36 @@ public class RegisterFieldHandler extends Handler {
       if (sorted) {
         ft.setDocValuesType(DocValuesType.SORTED_NUMERIC);
       }
-    } else {
-      assert false;
+      break;
+
+    case "datetime":
+
+      dateTimeFormat = f.getString("dateTimeFormat");
+      try {
+        new SimpleDateFormat(dateTimeFormat);
+      } catch (IllegalArgumentException iae) {
+        f.fail("dateTimeFormat", "could not parse pattern", iae);
+      }
+      if (grouped) {
+        f.fail("group", "cannot group on datetime fields");
+      }
+      if (dv || sorted) {
+        if (multiValued) {
+          ft.setDocValuesType(DocValuesType.SORTED_NUMERIC);
+        } else {
+          ft.setDocValuesType(DocValuesType.NUMERIC);
+        }
+      }
+      
+      break;
+      
+    default:
+      throw new AssertionError("unhandled type \"" + type + "\"");
     }
 
     // System.out.println("REGISTER: " + name + " ft=" + ft);
 
-    // nocommit LatLonPoint, InetAddressPoint, BiggishInteger
+    // nocommit InetAddressPoint, BiggishInteger
 
     if (stored) {
       ft.setStored(true);
@@ -548,7 +592,7 @@ public class RegisterFieldHandler extends Handler {
 
     if (f.hasParam("search")) {
       if (f.getBoolean("search")) {
-        if (type.equals("int") || type.equals("long") || type.equals("float") || type.equals("double") || type.equals("latlon")) {
+        if (type.equals("int") || type.equals("long") || type.equals("float") || type.equals("double") || type.equals("latlon") || type.equals("datetime")) {
           usePoints = true;
         } else {
           ft.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS);
@@ -711,6 +755,8 @@ public class RegisterFieldHandler extends Handler {
       liveValuesIDField = null;
     }
 
+    // TODO: facets w/ dates
+
     String facet = f.getEnum("facet");
     if (facet.equals("hierarchy")) {
       if (highlighted) {
@@ -752,7 +798,7 @@ public class RegisterFieldHandler extends Handler {
 
     // nocommit facetsConfig.setRequireDimCount
 
-    return new FieldDef(name, ft, type, facet, pf, dvf, multiValued, usePoints, sim, indexAnalyzer, searchAnalyzer, highlighted, liveValuesIDField, null);
+    return new FieldDef(name, ft, type, facet, pf, dvf, multiValued, usePoints, sim, indexAnalyzer, searchAnalyzer, highlighted, liveValuesIDField, null, dateTimeFormat);
   }
 
   /** Messy: we need this for indexed-but-not-tokenized

@@ -20,6 +20,8 @@ package org.apache.lucene.server.handlers;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.text.ParsePosition;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -72,6 +74,8 @@ class CSVParser {
   private final Field[] reusePoints;
   private final Document reuseDoc;
   private final byte delimChar;
+  private SimpleDateFormat dateTimeParser;
+  private ParsePosition dateTimePosition;
   
   public CSVParser(byte delimChar, long globalOffset, FieldDef[] fields, IndexState indexState, byte[] bytes, int startOffset) {
     this.delimChar = delimChar;
@@ -174,6 +178,24 @@ class CSVParser {
           }
           if (fd.usePoints) {
             reusePoints[i] = new DoublePoint(fd.name, 0.0);
+          }
+          if (dvType == DocValuesType.NUMERIC) {
+            reuseDVs[i] = new NumericDocValuesField(fd.name, 0);
+          } else if (dvType == DocValuesType.SORTED_NUMERIC) {
+            reuseDVs[i] = new SortedNumericDocValuesField(fd.name, 0);
+          }
+          break;
+        }
+      case "datetime":
+        {
+          assert fd.dateTimeFormat != null;
+          dateTimeParser = new SimpleDateFormat(fd.dateTimeFormat);
+          dateTimePosition = new ParsePosition(0);
+          if (stored) {
+            reuseFields[i] = new StoredField(fd.name, 0L);
+          }
+          if (fd.usePoints) {
+            reusePoints[i] = new LongPoint(fd.name, 0);
           }
           if (dvType == DocValuesType.NUMERIC) {
             reuseDVs[i] = new NumericDocValuesField(fd.name, 0);
@@ -329,6 +351,29 @@ class CSVParser {
         Field dv = reuseDVs[i];
         if (dv != null) {
           dv.setLongValue(NumericUtils.doubleToSortableLong(value));
+          reuseDoc.add(dv);
+        }
+        break;
+      }
+    case "datetime":
+      {
+        Field field = reuseFields[i];
+        String s = new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8);
+        dateTimePosition.setIndex(0);
+        long value = dateTimeParser.parse(s, dateTimePosition).getTime();
+        if (field != null) {
+          field.setLongValue(value);
+          reuseDoc.add(field);
+        }
+        Field point = reusePoints[i];
+        if (point != null) {
+          BytesRef br = point.binaryValue();
+          LongPoint.encodeDimension(value, br.bytes, 0);
+          reuseDoc.add(point);
+        }
+        Field dv = reuseDVs[i];
+        if (dv != null) {
+          dv.setLongValue(value);
           reuseDoc.add(dv);
         }
         break;

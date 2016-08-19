@@ -47,6 +47,9 @@ public class FieldDef {
   /** Postings format (codec). */
   public final String postingsFormat;
 
+  /** Non-null for date time fields */
+  public final String dateTimeFormat;
+
   /** Doc values format (codec). */
   public final String docValuesFormat;
 
@@ -78,7 +81,7 @@ public class FieldDef {
   public FieldDef(String name, FieldType fieldType, String valueType, String faceted,
                   String postingsFormat, String docValuesFormat, boolean multiValued, boolean usePoints,
                   Similarity sim, Analyzer indexAnalyzer, Analyzer searchAnalyzer, boolean highlighted, String liveValuesIDField,
-                  ValueSource valueSource) {
+                  ValueSource valueSource, String dateTimeFormat) {
     this.name = name;
     this.fieldType = fieldType;
     if (fieldType != null) {
@@ -95,6 +98,7 @@ public class FieldDef {
     this.searchAnalyzer = searchAnalyzer;
     this.highlighted = highlighted;
     this.liveValuesIDField = liveValuesIDField;
+    this.dateTimeFormat = dateTimeFormat;
     // nocommit messy:
     if (fieldType != null) {
       fieldTypeNoDV = new FieldType(fieldType);
