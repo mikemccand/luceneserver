@@ -98,9 +98,11 @@ public class BulkCSVAddDocumentHandler extends Handler {
     private byte[] nextStartFragment;
     private int nextStartFragmentOffset;
     private int nextStartFragmentLength;
+    private final byte delimChar;
     
-    public ParseAndIndexOneChunk(long globalOffset, IndexState.IndexingContext ctx, ParseAndIndexOneChunk prev, IndexState indexState,
+    public ParseAndIndexOneChunk(byte delimChar, long globalOffset, IndexState.IndexingContext ctx, ParseAndIndexOneChunk prev, IndexState indexState,
                                  FieldDef[] fields, byte[] bytes, Semaphore semaphore) throws InterruptedException {
+      this.delimChar = delimChar;
       this.ctx = ctx;
       ctx.inFlightChunkCount.incrementAndGet();
       this.prev = prev;
@@ -129,7 +131,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
         byte[] allBytes = new byte[endFragmentLength + nextStartFragmentLength];
         System.arraycopy(bytes, endFragmentStartOffset, allBytes, 0, endFragmentLength);
         System.arraycopy(nextStartFragment, 0, allBytes, endFragmentLength, nextStartFragmentLength);
-        CSVParser parser = new CSVParser(globalOffset + endFragmentStartOffset, fields, indexState, allBytes, 0);
+        CSVParser parser = new CSVParser(delimChar, globalOffset + endFragmentStartOffset, fields, indexState, allBytes, 0);
         Document doc;
         try {
           doc = parser.nextDoc();
@@ -222,7 +224,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
 
                 // now parse & index whole documents:
 
-                final CSVParser parser = new CSVParser(globalOffset, fields, indexState, bytes, startUpto);
+                final CSVParser parser = new CSVParser(delimChar, globalOffset, fields, indexState, bytes, startUpto);
                 final boolean hasFacets = indexState.hasFacets();
 
                 return new Iterator<Document>() {
@@ -288,6 +290,16 @@ public class BulkCSVAddDocumentHandler extends Handler {
 
   @Override
   public void handleBinary(InputStream in, DataInput dataIn, DataOutput out, OutputStream streamOut) throws Exception {
+
+    int v = in.read();
+    if (v == -1) {
+      throw new IllegalArgumentException("first byte should be delimiter character");
+    }
+    byte delimChar = (byte) v;
+    if (delimChar != (byte) ',' && delimChar != (byte) '\t') {
+      throw new IllegalArgumentException("delimiter character should be comma or tab; got: " + v);
+    }
+    System.out.println("DELIM: " + delimChar);
 
     // parse index name and fields header and lookup fields:
     List<FieldDef> fieldsList = new ArrayList<>();
@@ -367,7 +379,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
           buffer = realloc;
         }
         // NOTE: This ctor will stall when it tries to acquire the semaphore if we already have too many in-flight indexing chunks:
-        prev = new ParseAndIndexOneChunk(globalOffset, ctx, prev, indexState, fields, buffer, semaphore);
+        prev = new ParseAndIndexOneChunk(delimChar, globalOffset, ctx, prev, indexState, fields, buffer, semaphore);
         globalState.indexService.submit(prev);
         if (count == -1) {
           // the end

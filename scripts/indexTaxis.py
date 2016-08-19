@@ -26,7 +26,7 @@ IS_INSTALLED = os.path.exists('lib/luceneserver-%s.jar' % LUCENE_SERVER_BASE_VER
 
 DEFAULT_PORT = 4000
 
-PACKAGE_FILE = os.path.abspath('build/luceneserver-0.1.0-SNAPSHOT.zip')
+PACKAGE_FILE = os.path.abspath('build/luceneserver-%s-SNAPSHOT.zip' % LUCENE_SERVER_BASE_VERSION)
 
 USER_NAME = getpass.getuser()
 
@@ -169,14 +169,14 @@ def main():
     print('Building server release artifact...')
     run('python3 -u build.py package')
 
-    primaryInstallPath = getArg('-installPath')
-    if primaryInstallPath is None:
-      primaryInstallPath = os.path.abspath('install')
+  primaryInstallPath = getArg('-installPath')
+  if primaryInstallPath is None:
+    primaryInstallPath = os.path.abspath('install')
 
-    if os.path.exists(primaryInstallPath):
-      raise RuntimeError('primary install path %s already exists; please remove it and rerun' % primaryInstallPath)
+  if os.path.exists(primaryInstallPath):
+    raise RuntimeError('primary install path %s already exists; please remove it and rerun' % primaryInstallPath)
 
-    os.makedirs(primaryInstallPath)
+  os.makedirs(primaryInstallPath)
 
   replicas = []
   primaryIP = getArg('-ip')
@@ -286,7 +286,7 @@ def main():
       send(LOCALHOST, primaryPorts[0], 'startIndex', {'indexName': 'index'})
 
     b1 = BinarySend(LOCALHOST, primaryPorts[1], 'bulkCSVAddDocument')
-    b1.add(b'index\n')
+    b1.add(b',index\n')
 
     id = 0
     tStart = time.time()
@@ -294,8 +294,8 @@ def main():
     replicaStarted = False
 
     #docSource = '/lucenedata/nyc-taxi-data/alltaxis.csv.blocks'
-    #docSource = '/b/alltaxis.csv.blocks'
-    docSource = '/l/data/alltaxis.csv.blocks'
+    docSource = '/b/alltaxis.csv.blocks'
+    #docSource = '/l/data/alltaxis.csv.blocks'
     if not os.path.exists(docSource):
       # Not Mike's home computer!
       docSource = 'data/alltaxis.1M.csv.blocks'

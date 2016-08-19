@@ -71,8 +71,10 @@ class CSVParser {
   private final Field[] reuseDVs;
   private final Field[] reusePoints;
   private final Document reuseDoc;
+  private final byte delimChar;
   
-  public CSVParser(long globalOffset, FieldDef[] fields, IndexState indexState, byte[] bytes, int startOffset) {
+  public CSVParser(byte delimChar, long globalOffset, FieldDef[] fields, IndexState indexState, byte[] bytes, int startOffset) {
+    this.delimChar = delimChar;
     this.bytes = bytes;
     this.fields = fields;
     bufferUpto = startOffset;
@@ -104,6 +106,7 @@ class CSVParser {
           } else {
             br = new BytesRef();
           }
+          // nocommit is passing BR messing up hotspot here?
           reuseFields[i] = new StringField(fd.name, br, stored ? Field.Store.YES : Field.Store.NO);
           if (dvType == DocValuesType.SORTED) {
             reuseDVs[i] = new SortedDocValuesField(fd.name, br);
@@ -343,7 +346,7 @@ class CSVParser {
     
     while (bufferUpto < bytes.length) {
       byte b = bytes[bufferUpto++];
-      if (b == COMMA) {
+      if (b == delimChar) {
 
         if (fieldUpto == fields.length) {
           throw new IllegalArgumentException("doc at offset " + lastDocStart + ": line has too many fields");

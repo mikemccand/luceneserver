@@ -352,7 +352,7 @@ public class TestIndexing extends ServerBaseTestCase {
     send("registerFields", "{fields: {id: {type: atom, store: true, sort: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
     send("startIndex");
     byte[] bytes = server.sendBinary("bulkCSVAddDocument",
-                                     "csv\nid,id2,body\n0,1,some text\n1,2,some more text\n".getBytes(StandardCharsets.UTF_8));
+                                     ",csv\nid,id2,body\n0,1,some text\n1,2,some more text\n".getBytes(StandardCharsets.UTF_8));
     JSONObject result = parseJSONObject(new String(bytes, StandardCharsets.UTF_8));
     assertEquals(2, getInt(result, "indexedDocumentCount"));
     send("stopIndex");
@@ -365,7 +365,7 @@ public class TestIndexing extends ServerBaseTestCase {
     send("startIndex");
     Throwable t = expectThrows(IOException.class, () -> {
         server.sendBinary("bulkCSVAddDocument",
-                          "csv\nid,id2,body\n0,1,some text,boo\n1,2,some more text\n".getBytes(StandardCharsets.UTF_8));
+                          ",csv\nid,id2,body\n0,1,some text,boo\n1,2,some more text\n".getBytes(StandardCharsets.UTF_8));
       });
     assertTrue(t.getMessage().contains("doc at offset 0: line has wrong number of fields: expected 3 but saw 4"));
     send("stopIndex");
@@ -378,7 +378,7 @@ public class TestIndexing extends ServerBaseTestCase {
     send("startIndex");
     Throwable t = expectThrows(IOException.class, () -> {
         server.sendBinary("bulkCSVAddDocument",
-                          "csv\nid,id2,body\n0,1\n1,2,some more text\n".getBytes(StandardCharsets.UTF_8));
+                          ",csv\nid,id2,body\n0,1\n1,2,some more text\n".getBytes(StandardCharsets.UTF_8));
       });
     assertTrue(t.getMessage().contains("doc at offset 0: line has wrong number of fields: expected 3 but saw 2"));
     send("stopIndex");
@@ -391,7 +391,7 @@ public class TestIndexing extends ServerBaseTestCase {
     send("startIndex");
     Throwable t = expectThrows(IOException.class, () -> {
         server.sendBinary("bulkCSVAddDocument",
-                          "csv\nid,id2,body\n0,1,some text\n1,2,some more text".getBytes(StandardCharsets.UTF_8));
+                          ",csv\nid,id2,body\n0,1,some text\n1,2,some more text".getBytes(StandardCharsets.UTF_8));
       });
     assertTrue(t.getMessage().contains("last document starting at offset 46 is missing the trailing newline"));
     send("stopIndex");
@@ -404,7 +404,7 @@ public class TestIndexing extends ServerBaseTestCase {
     send("startIndex");
     Throwable t = expectThrows(IOException.class, () -> {
         server.sendBinary("bulkCSVAddDocument",
-                          "csv\ncount,id2,body\n0,1,some text\n118371391723487213472,2,some more text".getBytes(StandardCharsets.UTF_8));
+                          ",csv\ncount,id2,body\n0,1,some text\n118371391723487213472,2,some more text".getBytes(StandardCharsets.UTF_8));
       });
     assertTrue(t.getMessage().contains("doc at offset 66: could not parse field \"count\" as int: overflow: \"118371391723487213472\""));
     send("stopIndex");
@@ -417,7 +417,7 @@ public class TestIndexing extends ServerBaseTestCase {
     send("startIndex");
     Throwable t = expectThrows(IOException.class, () -> {
         server.sendBinary("bulkCSVAddDocument",
-                          "csv\ncount,id2,body\n0,1,some text\n118371391723487213472,2,some more text".getBytes(StandardCharsets.UTF_8));
+                          ",csv\ncount,id2,body\n0,1,some text\n118371391723487213472,2,some more text".getBytes(StandardCharsets.UTF_8));
       });
     assertContains(t.getMessage(), "doc at offset 66: could not parse field \"count\" as long: overflow: \"118371391723487213472\"");
     send("stopIndex");
@@ -430,7 +430,7 @@ public class TestIndexing extends ServerBaseTestCase {
     send("startIndex");
     Throwable t = expectThrows(IOException.class, () -> {
         server.sendBinary("bulkCSVAddDocument",
-                          "csv\ncount,id2,body\n0,1,some text\n1183x71391723487213472,2,some more text".getBytes(StandardCharsets.UTF_8));
+                          ",csv\ncount,id2,body\n0,1,some text\n1183x71391723487213472,2,some more text".getBytes(StandardCharsets.UTF_8));
       });
     assertContains(t.getMessage(), "doc at offset 67: could not parse field \"count\" as float: extra characters: \"1183x71391723487213472\"");
     send("stopIndex");
@@ -443,7 +443,7 @@ public class TestIndexing extends ServerBaseTestCase {
     send("startIndex");
     Throwable t = expectThrows(IOException.class, () -> {
         server.sendBinary("bulkCSVAddDocument",
-                          "csv\ncount,id2,body\n0,1,some text\n1183x71391723487213472,2,some more text".getBytes(StandardCharsets.UTF_8));
+                          ",csv\ncount,id2,body\n0,1,some text\n1183x71391723487213472,2,some more text".getBytes(StandardCharsets.UTF_8));
       });
     assertContains(t.getMessage(), "doc at offset 67: could not parse field \"count\" as double: extra characters: \"1183x71391723487213472\"");
     send("stopIndex");
