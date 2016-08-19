@@ -235,14 +235,14 @@ def main():
             {
               'name': {'type': 'text'},
               'asciiname': {'type': 'text'},
-              'geonameid': {'type': 'long', 'search': True, 'store': True, 'sort': True},
+              'geonameid': {'type': 'atom', 'search': True, 'store': True, 'sort': True},
               'elevation': {'type': 'int', 'search': True, 'sort': True},
               'feature_class': {'type': 'atom', 'sort': True},
               'latitude': {'type': 'double', 'search': True, 'sort': True},
               'longitude': {'type': 'double', 'search': True, 'sort': True},
               'cc2': {'type': 'atom', 'sort': True},
-              'timezone': {'type': 'text'},
-              'dem': {'type': 'text'},
+              'timezone': {'type': 'atom'},
+              'dem': {'type': 'atom'},
               'country_code': {'type': 'atom', 'sort': True},
               'admin1_code': {'type': 'atom', 'sort': True},
               'admin2_code': {'type': 'atom', 'sort': True},
@@ -291,8 +291,32 @@ def main():
     docSource = '/l/data/geonames.20160818.csv'
     if not os.path.exists(docSource):
       # Not Mike's home computer!
-      # TODO
-      pass
+      docSource = 'data/geonames.csv'
+      if not os.path.exists(docSource):
+        if not os.path.exists('data'):
+          os.makedirs('data')
+        url = 'http://download.geonames.org/export/dump/allCountries.zip'
+        print('Downloading and decompressing geonames documents from %s to %s...' % (url, docSource))
+        with open(docSource + '.zip', 'wb') as fOut, urllib.request.urlopen(url) as fIn:
+          netBytes = 0
+          nextPrint = 5*1024*1024
+          while True:
+            b = fIn.read(16384)
+            if b == b'':
+              break
+            fOut.write(b)
+            netBytes += len(b)
+            if netBytes > nextPrint:
+              print('  %.1f MB of 154.0 MB...' % (netBytes/1024./1024.))
+              nextPrint += 5*1024*1024
+        print('  done: %.1f MB; now unzip' % (os.path.getsize(docSource + '.zip')/1024./1024.))
+        os.system('unzip %s.zip' % docSource)
+        os.rename('data/allCountries.txt', 'data/geonames.csv')
+        docCount = os.popen('wc -l data/geonames.csv').read().strip()
+        open('data/geonames.doccount', 'w').write(docCount)
+    else:
+      # Geonames doc count as of 08/18/2016
+      docCount = 11114470
     
     #with open('/lucenedata/nyc-taxi-data/alltaxis.csv.blocks', 'rb') as f:
     totBytes = 0
@@ -349,8 +373,7 @@ def main():
       print('GOT ANSWER:\n%s' % bytes.decode('utf-8'))
       b2.close()
 
-    # Geonames doc count as of 08/18/2016
-    id = 11114470
+    id = docCount
 
     indexingTime = time.time()-tStart
     dps = id / indexingTime
