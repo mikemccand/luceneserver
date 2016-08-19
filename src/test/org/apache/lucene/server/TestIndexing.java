@@ -359,6 +359,24 @@ public class TestIndexing extends ServerBaseTestCase {
     send("deleteIndex");
   }
 
+  public void testIndexCSVDateTime() throws Exception {
+    createIndex("csv");
+    send("registerFields", "{fields: {modified: {type: datetime, store: true, sort: true, dateTimeFormat: 'yyyy-MM-dd'}}}");
+    send("startIndex");
+    byte[] bytes = server.sendBinary("bulkCSVAddDocument",
+                                     ",csv\nmodified\n2016-10-14\n".getBytes(StandardCharsets.UTF_8));
+    JSONObject result = parseJSONObject(new String(bytes, StandardCharsets.UTF_8));
+    assertEquals(1, getInt(result, "indexedDocumentCount"));
+    send("stopIndex");
+    send("deleteIndex");
+  }
+
+  public void testMissingDateTimeFormat() throws Exception {
+    createIndex("csv");
+    expectThrows(IOException.class, () -> {send("registerFields", "{fields: {modified: {type: datetime, store: true, sort: true}}}");});
+    send("deleteIndex");
+  }
+
   public void testIllegalIndexCSVTooManyFields() throws Exception {
     createIndex("csv");
     send("registerFields", "{fields: {id: {type: atom, store: true, sort: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
