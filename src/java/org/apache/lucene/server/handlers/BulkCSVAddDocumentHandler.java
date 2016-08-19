@@ -299,7 +299,6 @@ public class BulkCSVAddDocumentHandler extends Handler {
     if (delimChar != (byte) ',' && delimChar != (byte) '\t') {
       throw new IllegalArgumentException("delimiter character should be comma or tab; got: " + v);
     }
-    System.out.println("DELIM: " + delimChar);
 
     // parse index name and fields header and lookup fields:
     List<FieldDef> fieldsList = new ArrayList<>();
@@ -320,7 +319,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
         bufferUpto = 0;
       }
       byte b = buffer[bufferUpto++];
-      if (b == CSVParser.COMMA) {
+      if (b == delimChar) {
         if (indexState == null) {
           throw new IllegalArgumentException("first line must be the index name");
         }
