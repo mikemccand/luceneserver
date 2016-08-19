@@ -20,10 +20,12 @@ package org.apache.lucene.server.handlers;
 import java.io.IOException;
 import java.text.BreakIterator;
 import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -782,7 +784,7 @@ public class SearchHandler extends Handler {
             SortField.Type sortType;
             if (fd.valueType.equals("atom")) {
               sortType = SortField.Type.STRING;
-            } else if (fd.valueType.equals("long")) {
+            } else if (fd.valueType.equals("long") || fd.valueType.equals("datetime")) {
               sortType = SortField.Type.LONG;
             } else if (fd.valueType.equals("int")) {
               sortType = SortField.Type.INT;
@@ -850,7 +852,10 @@ public class SearchHandler extends Handler {
         assert ((Integer) o).intValue() == 0;
         return Boolean.FALSE;
       }
-      //} else if (fd.valueType.equals("float") && fd.fieldType.docValueType() == DocValuesType.NUMERIC) {
+    } else if (fd.valueType.equals("datetime")) {
+      Date date = new Date(((Number) o).longValue());
+      return new SimpleDateFormat(fd.dateTimeFormat).format(date);
+    //} else if (fd.valueType.equals("float") && fd.fieldType.docValueType() == DocValuesType.NUMERIC) {
       // nocommit not right...
       //return Float.intBitsToFloat(((Number) o).intValue());
     } else {
@@ -881,7 +886,7 @@ public class SearchHandler extends Handler {
         // We detect invalid field above:
         assert fd != null;
 
-        // nocommit also allow pulling from doc values
+        // nocommit also allow pulling from doc values?
         if (fd.valueSource != null) {
           List<LeafReaderContext> leaves = s.getIndexReader().leaves();
           LeafReaderContext leaf = leaves.get(ReaderUtil.subIndex(hit.doc, leaves));
@@ -991,7 +996,7 @@ public class SearchHandler extends Handler {
       FieldDef fd = state.getField(r, "field");
       field = fd.name;
       if (fd.fieldType.indexOptions() == IndexOptions.NONE && fd.usePoints == false) {
-        r.fail("field", "field \"" + field + "\" was not registered with index=true; cannot search");
+        r.fail("field", "field \"" + field + "\" was not registered with search=true; cannot search");
       }
     }
 
@@ -1117,10 +1122,21 @@ public class SearchHandler extends Handler {
       Number min;
       if (pr.r.hasParam("min")) {
         Object o = pr.r.getAny("min");
-        if (!(o instanceof Number)) {
-          pr.r.fail("min", "expected number but got " + o);
+        if (fd.valueType.equals("datetime")) {
+          if (o instanceof String == false) {
+            pr.r.fail("min", "expected string date");
+          }
+          try {
+            min = new SimpleDateFormat(fd.dateTimeFormat).parse((String) o).getTime();
+          } catch (ParseException pe) {
+            throw pr.r.bad("min", "could not parse string \"" + o + "\" as date with format \"" + fd.dateTimeFormat + "\"", pe);
+          }
+        } else {
+          if (!(o instanceof Number)) {
+            pr.r.fail("min", "expected number but got " + o);
+          }
+          min = (Number) o;
         }
-        min = (Number) o;
       } else {
         min = null;
       }
@@ -1128,10 +1144,21 @@ public class SearchHandler extends Handler {
       Number max;
       if (pr.r.hasParam("max")) {
         Object o = pr.r.getAny("max");
-        if (!(o instanceof Number)) {
-          pr.r.fail("max", "expected number but got " + o);
+        if (fd.valueType.equals("datetime")) {
+          if (o instanceof String == false) {
+            pr.r.fail("max", "expected string date");
+          }
+          try {
+            max = new SimpleDateFormat(fd.dateTimeFormat).parse((String) o).getTime();
+          } catch (ParseException pe) {
+            throw pr.r.bad("max", "could not parse string \"" + o + "\" as date with format \"" + fd.dateTimeFormat + "\"", pe);
+          }
+        } else {
+          if (!(o instanceof Number)) {
+            pr.r.fail("max", "expected number but got " + o);
+          }
+          max = (Number) o;
         }
-        max = (Number) o;
       } else {
         max = null;
       }
@@ -1146,6 +1173,8 @@ public class SearchHandler extends Handler {
         q = FloatPoint.newRangeQuery(field, toMinFloat(min), toMaxFloat(max));
       } else if (fd.valueType.equals("double")) {
         q = DoublePoint.newRangeQuery(field, toMinDouble(min), toMaxDouble(max));
+      } else if (fd.valueType.equals("datetime")) {
+        q = LongPoint.newRangeQuery(field, toMinLong(min), toMaxLong(max));
       } else {
         // BUG
         assert false;
@@ -1494,7 +1523,7 @@ public class SearchHandler extends Handler {
         fd = null;
       }
       if (fd.fieldType.indexOptions() == IndexOptions.NONE) {
-        r.fail(param, "field \"" + field2 + "\" was not registered with index=true");
+        r.fail(param, "field \"" + field2 + "\" was not registered with search=true");
       }
       boosts.put(field2, boost);
     }

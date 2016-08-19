@@ -20,7 +20,7 @@ package org.apache.lucene.server.handlers;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.text.ParsePosition;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -75,7 +75,6 @@ class CSVParser {
   private final Document reuseDoc;
   private final byte delimChar;
   private SimpleDateFormat dateTimeParser;
-  private ParsePosition dateTimePosition;
   
   public CSVParser(byte delimChar, long globalOffset, FieldDef[] fields, IndexState indexState, byte[] bytes, int startOffset) {
     this.delimChar = delimChar;
@@ -190,7 +189,6 @@ class CSVParser {
         {
           assert fd.dateTimeFormat != null;
           dateTimeParser = new SimpleDateFormat(fd.dateTimeFormat);
-          dateTimePosition = new ParsePosition(0);
           if (stored) {
             reuseFields[i] = new StoredField(fd.name, 0L);
           }
@@ -216,7 +214,7 @@ class CSVParser {
     return bufferUpto;
   }
 
-  private void addOneField(int i, int lastFieldStart) {
+  private void addOneField(int i, int lastFieldStart) throws ParseException {
     int len = bufferUpto - lastFieldStart - 1;
     assert len > 0;
 
@@ -359,8 +357,7 @@ class CSVParser {
       {
         Field field = reuseFields[i];
         String s = new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8);
-        dateTimePosition.setIndex(0);
-        long value = dateTimeParser.parse(s, dateTimePosition).getTime();
+        long value = dateTimeParser.parse(s).getTime();
         if (field != null) {
           field.setLongValue(value);
           reuseDoc.add(field);
@@ -381,7 +378,7 @@ class CSVParser {
     }
   }
 
-  public Document nextDoc() {
+  public Document nextDoc() throws ParseException {
     // clear all prior fields
     reuseDoc.clear();
 

@@ -556,6 +556,8 @@ public class RegisterFieldHandler extends Handler {
     case "datetime":
 
       dateTimeFormat = f.getString("dateTimeFormat");
+
+      // make sure the format is valid:
       try {
         new SimpleDateFormat(dateTimeFormat);
       } catch (IllegalArgumentException iae) {

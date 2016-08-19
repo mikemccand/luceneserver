@@ -652,6 +652,17 @@ public class Request {
   /** Throws a {@link RequestFailedException} with the
    *  provided parameter and message and original cause. */
   public void fail(String param, String reason, Throwable cause) {
+    throw bad(param, reason, cause);
+  }
+
+  /** Throws a {@link RequestFailedException} with the
+   *  provided parameter and message. */
+  public RequestFailedException bad(String param, String message) {
+    return bad(param, message, null);
+  }
+
+  /** Constructs the exception to throw representing this failure */
+  public RequestFailedException bad(String param, String reason, Throwable cause) {
     StringBuilder sb = new StringBuilder();
     buildPath(sb);
     if (param != null) {
@@ -673,7 +684,6 @@ public class Request {
     if (cause != null) {
       e.initCause(cause);
     }
-
-    throw e;
+    return e;
   }
 }
