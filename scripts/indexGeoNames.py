@@ -315,7 +315,7 @@ def main():
         os.system('unzip geonames.csv.zip')
         os.chdir('..')
         os.rename('data/allCountries.txt', 'data/geonames.csv')
-        docCount = int(os.popen('wc -l data/geonames.csv').read().split()[0])
+        docCount = os.popen('wc -l data/geonames.csv').read().split()[0]
         open('data/geonames.doccount', 'w').write(docCount)
       else:
         docCount = int(open('data/geonames.doccount').read().split()[0])
