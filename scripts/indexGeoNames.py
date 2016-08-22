@@ -284,7 +284,6 @@ def main():
     b1.add(b'\tindex\n')
 
     id = 0
-    tStart = time.time()
     nextPrint = 250000
     replicaStarted = False
 
@@ -315,8 +314,8 @@ def main():
         os.system('unzip geonames.csv.zip')
         os.chdir('..')
         os.rename('data/allCountries.txt', 'data/geonames.csv')
-        docCount = os.popen('wc -l data/geonames.csv').read().split()[0]
-        open('data/geonames.doccount', 'w').write(docCount)
+        docCount = int(os.popen('wc -l data/geonames.csv').read().split()[0])
+        open('data/geonames.doccount', 'w').write(str(docCount))
       else:
         docCount = int(open('data/geonames.doccount').read().split()[0])
     else:
@@ -353,6 +352,7 @@ def main():
                'timezone',
                'modification_date']
     
+    tStart = time.time()
     with open(docSource, 'rb') as f:
       b1.add(('\t'.join(headers)+'\n').encode('ascii'))
       csvHeader = f.readline()
