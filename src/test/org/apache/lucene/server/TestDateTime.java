@@ -61,11 +61,26 @@ public class TestDateTime extends ServerBaseTestCase {
 
   public void testBogusDateTimeFormat() throws Exception {
     createIndex("csv");
-    Throwable t = expectThrows(IOException.class, () -> {
+    expectThrows(IOException.class, () -> {
         send("registerFields", "{fields: {modified: {type: datetime, store: true, sort: true, dateTimeFormat: 'xxxx'}}}");
       });
     send("deleteIndex");
   }
+
+  public void testBogusDateTimeValue() throws Exception {
+    createIndex("csv");
+    send("registerFields", "{fields: {modified: {type: datetime, store: true, sort: true, dateTimeFormat: 'yyyy-MM-dd'}}}");
+    send("startIndex");
+    IOException e = expectThrows(IOException.class, () -> {
+        server.sendBinary("bulkCSVAddDocument",
+                                     ",csv\nmodified\n2016-10-14x\n".getBytes(StandardCharsets.UTF_8));
+      });
+    assertContains(e.getMessage(), "could not parse field \"modified\", value \"2016-10-14x\" as date with format \"yyyy-MM-dd\"");
+    send("stopIndex");
+    send("deleteIndex");
+  }
+
+  // nocommit test time too
 
   public void testStored() throws Exception {
     createIndex("csv");

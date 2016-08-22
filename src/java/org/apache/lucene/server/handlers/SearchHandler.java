@@ -20,12 +20,15 @@ package org.apache.lucene.server.handlers;
 import java.io.IOException;
 import java.text.BreakIterator;
 import java.text.ParseException;
+import java.text.ParsePosition;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -33,6 +36,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -844,6 +848,37 @@ public class SearchHandler extends Handler {
     }
   }
 
+  /** NOTE: this is a slow method, since it makes many objects just to format one date/time value */
+  private static String msecToDateString(FieldDef fd, long value) {
+    assert fd.valueType.equals("datetime");
+    Calendar calendar = new GregorianCalendar(TimeZone.getTimeZone("UTC"), Locale.ROOT);
+    calendar.setLenient(false);
+    SimpleDateFormat dateTimeFormat = new SimpleDateFormat(fd.dateTimeFormat, Locale.ROOT);
+    dateTimeFormat.setCalendar(calendar);
+    Date date = new Date(value);
+    return dateTimeFormat.format(date);
+  }
+
+  /** NOTE: this is a slow method, since it makes many objects just to parse one date/time value */
+  private static long dateStringToMSec(FieldDef fd, String s) throws ParseException {
+    assert fd.valueType.equals("datetime");
+    Calendar calendar = new GregorianCalendar(TimeZone.getTimeZone("UTC"), Locale.ROOT);
+    calendar.setLenient(false);
+    SimpleDateFormat dateTimeFormat = new SimpleDateFormat(fd.dateTimeFormat, Locale.ROOT);
+    dateTimeFormat.setCalendar(calendar);
+    ParsePosition pos = new ParsePosition(0);    
+    Date date = dateTimeFormat.parse(s, pos);
+    if (pos.getErrorIndex() != -1) {
+      // nocommit more details about why?
+      throw new ParseException("could not parse field \"" + fd.name + "\", value \"" + s + "\" as date with format \"" + fd.dateTimeFormat + "\"", pos.getErrorIndex());
+    }
+    if (pos.getIndex() != s.length()) {
+      // nocommit more details about why?          
+      throw new ParseException("could not parse field \"" + fd.name + "\", value \"" + s + "\" as date with format \"" + fd.dateTimeFormat + "\"", pos.getIndex());
+    }
+    return date.getTime();
+  }
+
   private static Object convertType(FieldDef fd, Object o) {
     if (fd.valueType.equals("boolean")) {
       if (((Integer) o).intValue() == 1) {
@@ -853,8 +888,7 @@ public class SearchHandler extends Handler {
         return Boolean.FALSE;
       }
     } else if (fd.valueType.equals("datetime")) {
-      Date date = new Date(((Number) o).longValue());
-      return new SimpleDateFormat(fd.dateTimeFormat).format(date);
+      return msecToDateString(fd, ((Number) o).longValue());
     //} else if (fd.valueType.equals("float") && fd.fieldType.docValueType() == DocValuesType.NUMERIC) {
       // nocommit not right...
       //return Float.intBitsToFloat(((Number) o).intValue());
@@ -1127,7 +1161,7 @@ public class SearchHandler extends Handler {
             pr.r.fail("min", "expected string date");
           }
           try {
-            min = new SimpleDateFormat(fd.dateTimeFormat).parse((String) o).getTime();
+            min = dateStringToMSec(fd, (String) o);
           } catch (ParseException pe) {
             throw pr.r.bad("min", "could not parse string \"" + o + "\" as date with format \"" + fd.dateTimeFormat + "\"", pe);
           }
@@ -1149,7 +1183,7 @@ public class SearchHandler extends Handler {
             pr.r.fail("max", "expected string date");
           }
           try {
-            max = new SimpleDateFormat(fd.dateTimeFormat).parse((String) o).getTime();
+            max = dateStringToMSec(fd, (String) o);
           } catch (ParseException pe) {
             throw pr.r.bad("max", "could not parse string \"" + o + "\" as date with format \"" + fd.dateTimeFormat + "\"", pe);
           }

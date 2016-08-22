@@ -21,10 +21,16 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
+import java.text.ParsePosition;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.List;
+import java.util.Locale;
+import java.util.TimeZone;
 
 import org.apache.lucene.document.BinaryDocValuesField;
 import org.apache.lucene.document.BinaryPoint;
@@ -75,6 +81,7 @@ class CSVParser {
   private final Document reuseDoc;
   private final byte delimChar;
   private SimpleDateFormat dateTimeParser;
+  private ParsePosition dateTimeParsePosition;
   
   public CSVParser(byte delimChar, long globalOffset, FieldDef[] fields, IndexState indexState, byte[] bytes, int startOffset) {
     this.delimChar = delimChar;
@@ -188,7 +195,11 @@ class CSVParser {
       case "datetime":
         {
           assert fd.dateTimeFormat != null;
-          dateTimeParser = new SimpleDateFormat(fd.dateTimeFormat);
+          Calendar calendar = new GregorianCalendar(TimeZone.getTimeZone("UTC"), Locale.ROOT);
+          calendar.setLenient(false);
+          dateTimeParser = new SimpleDateFormat(fd.dateTimeFormat, Locale.ROOT);
+          dateTimeParser.setCalendar(calendar);          
+          dateTimeParsePosition = new ParsePosition(0);
           if (stored) {
             reuseFields[i] = new StoredField(fd.name, 0L);
           }
@@ -357,7 +368,17 @@ class CSVParser {
       {
         Field field = reuseFields[i];
         String s = new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8);
-        long value = dateTimeParser.parse(s).getTime();
+        dateTimeParsePosition.setIndex(0);
+        Date date = dateTimeParser.parse(s, dateTimeParsePosition);
+        if (dateTimeParsePosition.getErrorIndex() != -1) {
+          // nocommit more details about why?
+          throw new IllegalArgumentException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\", value \"" + s + "\" as date with format \"" + fields[i].dateTimeFormat + "\"");
+        }
+        if (dateTimeParsePosition.getIndex() != s.length()) {
+          // nocommit more details about why?          
+          throw new IllegalArgumentException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\", value \"" + s + "\" as date with format \"" + fields[i].dateTimeFormat + "\"");
+        }
+        long value = date.getTime();
         if (field != null) {
           field.setLongValue(value);
           reuseDoc.add(field);
