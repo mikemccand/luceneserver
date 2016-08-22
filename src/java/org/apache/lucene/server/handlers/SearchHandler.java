@@ -851,6 +851,7 @@ public class SearchHandler extends Handler {
   /** NOTE: this is a slow method, since it makes many objects just to format one date/time value */
   private static String msecToDateString(FieldDef fd, long value) {
     assert fd.valueType.equals("datetime");
+    // nocommit use CTL to reuse these?
     Calendar calendar = new GregorianCalendar(TimeZone.getTimeZone("UTC"), Locale.ROOT);
     calendar.setLenient(false);
     SimpleDateFormat dateTimeFormat = new SimpleDateFormat(fd.dateTimeFormat, Locale.ROOT);
@@ -862,6 +863,7 @@ public class SearchHandler extends Handler {
   /** NOTE: this is a slow method, since it makes many objects just to parse one date/time value */
   private static long dateStringToMSec(FieldDef fd, String s) throws ParseException {
     assert fd.valueType.equals("datetime");
+    // nocommit use CTL to reuse these?
     Calendar calendar = new GregorianCalendar(TimeZone.getTimeZone("UTC"), Locale.ROOT);
     calendar.setLenient(false);
     SimpleDateFormat dateTimeFormat = new SimpleDateFormat(fd.dateTimeFormat, Locale.ROOT);

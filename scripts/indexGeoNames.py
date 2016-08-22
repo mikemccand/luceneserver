@@ -297,7 +297,7 @@ def main():
           os.makedirs('data')
         url = 'http://download.geonames.org/export/dump/allCountries.zip'
         print('Downloading and decompressing geonames documents from %s to %s...' % (url, docSource))
-        with open(docSource + '.zip', 'wb') as fOut, urllib.request.urlopen(url) as fIn:
+        with open(docSource + '.zip.tmp', 'wb') as fOut, urllib.request.urlopen(url) as fIn:
           netBytes = 0
           nextPrint = 5*1024*1024
           while True:
@@ -307,13 +307,18 @@ def main():
             fOut.write(b)
             netBytes += len(b)
             if netBytes > nextPrint:
-              print('  %.1f MB of 154.0 MB...' % (netBytes/1024./1024.))
+              print('  %.1f MB...' % (netBytes/1024./1024.))
               nextPrint += 5*1024*1024
+        os.rename('%s.zip.tmp' % docSource, '%s.zip' % docSource)
         print('  done: %.1f MB; now unzip' % (os.path.getsize(docSource + '.zip')/1024./1024.))
-        os.system('unzip %s.zip' % docSource)
+        os.chdir('data')
+        os.system('unzip geonames.csv.zip')
+        os.chdir('..')
         os.rename('data/allCountries.txt', 'data/geonames.csv')
-        docCount = os.popen('wc -l data/geonames.csv').read().strip()
+        docCount = int(os.popen('wc -l data/geonames.csv').read().strip())
         open('data/geonames.doccount', 'w').write(docCount)
+      else:
+        docCount = int(open('data/geonames.doccount').read().split()[0])
     else:
       # Geonames doc count as of 08/18/2016
       docCount = 11114470

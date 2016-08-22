@@ -80,6 +80,7 @@ class CSVParser {
   private final Field[] reusePoints;
   private final Document reuseDoc;
   private final byte delimChar;
+  // nocommit use CTL to reuse these?
   private SimpleDateFormat dateTimeParser;
   private ParsePosition dateTimeParsePosition;
   
