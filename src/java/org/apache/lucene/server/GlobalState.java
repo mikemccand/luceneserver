@@ -18,16 +18,12 @@ package org.apache.lucene.server;
  */
 
 import java.io.Closeable;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.RandomAccessFile;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.SeekableByteChannel;
@@ -38,20 +34,16 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
 import org.apache.lucene.search.TimeLimitingCollector;
 import org.apache.lucene.server.handlers.DocHandler;
@@ -308,25 +300,8 @@ public class GlobalState implements Closeable {
   /** Load any plugins. */
   @SuppressWarnings({"unchecked"})
   public void loadPlugins() throws Exception {
-    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-    Class<?> classLoaderClass = classLoader.getClass();
-    Method addURL = null;
-    while (!classLoaderClass.equals(Object.class)) {
-      try {
-        addURL = classLoaderClass.getDeclaredMethod("addURL", URL.class);
-        addURL.setAccessible(true);
-        break;
-      } catch (NoSuchMethodException e) {
-        // no method, try the parent
-        classLoaderClass = classLoaderClass.getSuperclass();
-      }
-    }
-
-    if (addURL == null) {
-      throw new IllegalStateException("failed to find addURL method on classLoader [" + classLoader + "] to add methods");
-    }
-
     Path pluginsDir = stateDir.resolve("plugins");
+    
     if (Files.exists(pluginsDir)) {
 
       if (Files.isDirectory(pluginsDir) == false) {
@@ -357,54 +332,33 @@ public class GlobalState implements Closeable {
           }
           
           // Verify the plugin contains
-          // PLUGIN_PROPERTIES_FILE somewhere:
+          // PLUGIN_PROPERTIES_FILE:
           Path propFile = pluginDir.resolve(PLUGIN_PROPERTIES_FILE);
 
           if (Files.exists(propFile) == false) {
-            // See if properties file is in root JAR/ZIP:
-            boolean found = false;
-            for(Path pluginFile : pluginFiles) {
-              if (pluginFile.toString().endsWith(".jar") || 
-                  pluginFile.toString().endsWith(".zip")) {
-                ZipInputStream zis;
-                try {
-                  // nocommit nio2 version?
-                  zis = new ZipInputStream(new FileInputStream(pluginFile.toFile()));
-                } catch (Exception e) {
-                  throw new IllegalStateException("failed to open \"" + pluginFile + "\" as ZipInputStream");
-                }
-                try {
-                  ZipEntry e;
-                  while((e = zis.getNextEntry()) != null) {
-                    if (e.getName().equals(PLUGIN_PROPERTIES_FILE)) {
-                      found = true;
-                      break;
-                    }
-                  }
-                } finally {
-                  zis.close();
-                }
-                if (found) {
-                  break;
-                }
-              }
-            }
-
-            if (!found) {
-              throw new IllegalStateException("plugin \"" + pluginDir.toAbsolutePath() + "\" is missing the " + PLUGIN_PROPERTIES_FILE + " file");
-            }
+            throw new IllegalStateException("plugin \"" + pluginDir + "\" is missing the " + PLUGIN_PROPERTIES_FILE + " file");
           }
 
           System.out.println("Start plugin " + pluginDir.toAbsolutePath());
 
-          // Add the plugin's root
-          addURL.invoke(classLoader, pluginDir.toUri().toURL());
+          // read plugin properties
+          Properties pluginProps = new Properties();
+          try (InputStream is = Files.newInputStream(propFile)) {
+            pluginProps.load(is);
+          }
+          
+          String pluginClassName = pluginProps.getProperty("class");
+          if (pluginClassName == null) {
+            throw new IllegalStateException("property file \"" + pluginDir + "\" does not have the \"class\" property");
+          }
+          
+          List<URL> urls = new ArrayList<>();
 
           // Add any .jar/.zip in the plugin's root directory:
           for(Path pluginFile : pluginFiles) {
             if (pluginFile.toString().endsWith(".jar") || 
                 pluginFile.toString().endsWith(".zip")) {
-              addURL.invoke(classLoader, pluginFile.toUri().toURL());
+              urls.add(pluginFile.toUri().toURL());
             }
           }
 
@@ -421,52 +375,33 @@ public class GlobalState implements Closeable {
             
             for(Path pluginFile : pluginLibFiles) {
               if (pluginFile.toString().endsWith(".jar")) {
-                addURL.invoke(classLoader, pluginFile.toUri().toURL());
+                urls.add(pluginFile.toUri().toURL());
               }
             }
           }
-        }
-      }
           
-      // Then, init/load all plugins:
-      Enumeration<URL> pluginURLs = classLoader.getResources(PLUGIN_PROPERTIES_FILE);
+          // make a new classloader with the Urls
+          ClassLoader loader = URLClassLoader.newInstance(urls.toArray(new URL[0]));
+          Class<? extends Plugin> pluginClass = (Class<? extends Plugin>) loader.loadClass(pluginClassName);
+          Constructor<? extends Plugin> ctor;
+          try {
+            ctor = pluginClass.getConstructor(GlobalState.class);
+          } catch (NoSuchMethodException e1) {
+            throw new IllegalStateException("class \"" + pluginClassName + "\" for plugin \"" + pluginDir + "\" does not have constructor that takes GlobalState");
+          }
 
-      while (pluginURLs.hasMoreElements()) {
-        URL pluginURL = pluginURLs.nextElement();
-        Properties pluginProps = new Properties();
-        InputStream is = pluginURL.openStream();
-        try {
-          pluginProps.load(new InputStreamReader(is, "UTF-8"));
-        } catch (Exception e) {
-          throw new IllegalStateException("property file \"" + pluginURL + "\" could not be loaded", e);
-        } finally {
-          is.close();
+          Plugin plugin;
+          try {
+            plugin = ctor.newInstance(this);
+          } catch (Exception e) {
+            throw new IllegalStateException("failed to instantiate class \"" + pluginClassName + "\" for plugin \"" + pluginDir, e);
+          }
+          if (plugins.containsKey(plugin.getName())) {
+            throw new IllegalStateException("plugin \"" + plugin.getName() + "\" appears more than once");
+          }
+          // nocommit verify plugin name matches subdir directory name
+          plugins.put(plugin.getName(), plugin);
         }
-
-        String pluginClassName = pluginProps.getProperty("class");
-        if (pluginClassName == null) {
-          throw new IllegalStateException("property file \"" + pluginURL + "\" does not have the \"class\" property");
-        }
-
-        Class<? extends Plugin> pluginClass = (Class<? extends Plugin>) classLoader.loadClass(pluginClassName);
-        Constructor<? extends Plugin> ctor;
-        try {
-          ctor = pluginClass.getConstructor(GlobalState.class);
-        } catch (NoSuchMethodException e1) {
-          throw new IllegalStateException("class \"" + pluginClassName + "\" for plugin \"" + pluginURL + "\" does not have constructor that takes GlobalState");
-        }
-
-        Plugin plugin;
-        try {
-          plugin = ctor.newInstance(this);
-        } catch (Exception e) {
-          throw new IllegalStateException("failed to instantiate class \"" + pluginClassName + "\" for plugin \"" + pluginURL, e);
-        }
-        if (plugins.containsKey(plugin.getName())) {
-          throw new IllegalStateException("plugin \"" + plugin.getName() + "\" appears more than once");
-        }
-        // nocommit verify plugin name matches subdir directory name
-        plugins.put(plugin.getName(), plugin);
       }
     }
   }
