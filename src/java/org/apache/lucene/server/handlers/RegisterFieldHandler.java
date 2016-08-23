@@ -402,7 +402,7 @@ public class RegisterFieldHandler extends Handler {
       values = null;
     }
 
-    return new FieldDef(name, null, "virtual", null, null, null, true, false, null, null, null, false, null, values, null);
+    return new FieldDef(name, null, FieldDef.FieldValueType.VIRTUAL, null, null, null, true, false, null, null, null, false, null, values, null);
   }
 
   private FieldDef parseOneFieldType(Request r, IndexState state, Map<String,FieldDef> pendingFieldDefs, String name, JSONObject o) throws IOException {
@@ -410,9 +410,42 @@ public class RegisterFieldHandler extends Handler {
     // This way f.fail reports which field name was problematic:
     Request f = new Request(r, name, o, FIELD_TYPE);
 
-    String type = f.getEnum("type");
-    if (type.equals("virtual")) {
+    String typeString = f.getEnum("type");
+    if (typeString.equals("virtual")) {
       return parseOneVirtualFieldType(f, state, pendingFieldDefs, name, o);
+    }
+    FieldDef.FieldValueType type;
+    switch(typeString) {
+    case "atom":
+      type = FieldDef.FieldValueType.ATOM;
+      break;
+    case "text":
+      type = FieldDef.FieldValueType.TEXT;
+      break;
+    case "boolean":
+      type = FieldDef.FieldValueType.BOOLEAN;
+      break;
+    case "long":
+      type = FieldDef.FieldValueType.LONG;
+      break;
+    case "int":
+      type = FieldDef.FieldValueType.INT;
+      break;
+    case "double":
+      type = FieldDef.FieldValueType.DOUBLE;
+      break;
+    case "float":
+      type = FieldDef.FieldValueType.FLOAT;
+      break;
+    case "latlon":
+      type = FieldDef.FieldValueType.LAT_LON;
+      break;
+    case "datetime":
+      type = FieldDef.FieldValueType.DATE_TIME;
+      break;
+    default:
+      // bug!  we declare the allowed types
+      throw new AssertionError();
     }
 
     FieldType ft = new FieldType();
@@ -437,7 +470,7 @@ public class RegisterFieldHandler extends Handler {
     boolean highlighted = f.getBoolean("highlight");
 
     if (highlighted) {
-      if (type.equals("text") == false && type.equals("atom") == false) {
+      if (type != FieldDef.FieldValueType.TEXT && type != FieldDef.FieldValueType.ATOM) {
         f.fail("highlight", "only type=text or type=atom fields can have highlight=true");
       }
     }
@@ -457,7 +490,7 @@ public class RegisterFieldHandler extends Handler {
 
     switch(type) {
 
-    case "text":
+    case TEXT:
       if (sorted) {
         f.fail("sort", "cannot sort text fields; use atom instead");
       }
@@ -475,7 +508,7 @@ public class RegisterFieldHandler extends Handler {
       }
       break;
 
-    case "atom":
+    case ATOM:
       if (f.hasParam("analyzer")) {
         f.fail("analyzer", "no analyzer allowed with atom (it's hardwired to KeywordAnalyzer internally)");
       }
@@ -493,7 +526,7 @@ public class RegisterFieldHandler extends Handler {
       }
       break;
       
-    case "boolean":
+    case BOOLEAN:
       if (dv || sorted || grouped) {
         if (multiValued) {
           ft.setDocValuesType(DocValuesType.SORTED_NUMERIC);
@@ -503,7 +536,7 @@ public class RegisterFieldHandler extends Handler {
       }
       break;
 
-    case "long":
+    case LONG:
       if (dv || sorted || grouped) {
         if (multiValued) {
           ft.setDocValuesType(DocValuesType.SORTED_NUMERIC);
@@ -513,7 +546,7 @@ public class RegisterFieldHandler extends Handler {
       }
       break;
 
-    case "int":
+    case INT:
       if (dv || sorted || grouped) {
         if (multiValued) {
           ft.setDocValuesType(DocValuesType.SORTED_NUMERIC);
@@ -523,7 +556,7 @@ public class RegisterFieldHandler extends Handler {
       }
       break;
       
-    case "double":
+    case DOUBLE:
       if (dv || sorted || grouped) {
         if (multiValued) {
           ft.setDocValuesType(DocValuesType.SORTED_NUMERIC);
@@ -533,7 +566,7 @@ public class RegisterFieldHandler extends Handler {
       }
       break;
       
-    case "float":
+    case FLOAT:
       if (dv || sorted || grouped) {
         if (multiValued) {
           ft.setDocValuesType(DocValuesType.SORTED_NUMERIC);
@@ -543,7 +576,7 @@ public class RegisterFieldHandler extends Handler {
       }
       break;
       
-    case "latlon":
+    case LAT_LON:
       if (stored) {
         f.fail("stored", "latlon fields cannot be stored");
       }
@@ -553,7 +586,7 @@ public class RegisterFieldHandler extends Handler {
       }
       break;
 
-    case "datetime":
+    case DATE_TIME:
 
       dateTimeFormat = f.getString("dateTimeFormat");
 
@@ -594,7 +627,12 @@ public class RegisterFieldHandler extends Handler {
 
     if (f.hasParam("search")) {
       if (f.getBoolean("search")) {
-        if (type.equals("int") || type.equals("long") || type.equals("float") || type.equals("double") || type.equals("latlon") || type.equals("datetime")) {
+        if (type == FieldDef.FieldValueType.INT ||
+            type == FieldDef.FieldValueType.LONG ||
+            type == FieldDef.FieldValueType.FLOAT ||
+            type == FieldDef.FieldValueType.DOUBLE ||
+            type == FieldDef.FieldValueType.LAT_LON ||
+            type == FieldDef.FieldValueType.DATE_TIME) {
           usePoints = true;
         } else {
           ft.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS);
@@ -608,7 +646,7 @@ public class RegisterFieldHandler extends Handler {
       f.fail("analyzer", "no analyzer allowed when search=false");
     }
 
-    if (type.equals("text") || type.equals("atom")) {
+    if (type == FieldDef.FieldValueType.TEXT || type == FieldDef.FieldValueType.ATOM) {
 
       if (ft.indexOptions() != IndexOptions.NONE) {
         if (f.hasParam("tokenize")) {
@@ -654,7 +692,7 @@ public class RegisterFieldHandler extends Handler {
           }
         }
       }
-    } else if (type.equals("boolean")) {
+    } else if (type == FieldDef.FieldValueType.BOOLEAN) {
       ft.setOmitNorms(true);
       ft.setTokenized(false);
       ft.setIndexOptions(IndexOptions.DOCS);
@@ -698,7 +736,7 @@ public class RegisterFieldHandler extends Handler {
       searchAnalyzer = getAnalyzer(state, f, "searchAnalyzer");
     }
 
-    if (type.equals("text") && ft.indexOptions() != IndexOptions.NONE) {
+    if (type == FieldDef.FieldValueType.TEXT && ft.indexOptions() != IndexOptions.NONE) {
       if (indexAnalyzer == null) {
         indexAnalyzer = new StandardAnalyzer();
         if (searchAnalyzer == null) {
@@ -729,7 +767,7 @@ public class RegisterFieldHandler extends Handler {
       // fields in same request...
       FieldDef idField = state.getField(f, "liveValues");
       liveValuesIDField = idField.name;
-      if (!type.equals("atom") && !type.equals("atom")) {
+      if (type != FieldDef.FieldValueType.ATOM && type != FieldDef.FieldValueType.TEXT) {
         f.fail("liveValues", "only type=atom or type=text fields may have liveValues enabled");
       }
       if (multiValued) {
@@ -744,7 +782,7 @@ public class RegisterFieldHandler extends Handler {
       if (idField.multiValued) {
         f.fail("liveValues", "id field \"" + liveValuesIDField + "\" must not be multiValued");
       }
-      if (!idField.valueType.equals("atom") && !idField.valueType.equals("text")) {
+      if (idField.valueType != FieldDef.FieldValueType.ATOM && idField.valueType != FieldDef.FieldValueType.TEXT) {
         f.fail("liveValues", "id field \"" + liveValuesIDField + "\" must have type=atom or type=text");
       }
       // TODO: we could relax this, since
@@ -771,7 +809,7 @@ public class RegisterFieldHandler extends Handler {
         f.fail("facet", "facet=hierarchy fields cannot have store=true");
       }
     } else if (facet.equals("numericRange")) {
-      if (!type.equals("long") && !type.equals("int") && !type.equals("float") && !type.equals("double")) {
+      if (type != FieldDef.FieldValueType.LONG && type != FieldDef.FieldValueType.INT && type != FieldDef.FieldValueType.FLOAT && type != FieldDef.FieldValueType.DOUBLE) {
         f.fail("facet", "numericRange facets only applies to numeric types");
       }
       if (ft.indexOptions() == IndexOptions.NONE && usePoints == false) {

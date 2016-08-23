@@ -36,9 +36,10 @@ public class FieldDef {
    * and then the "normal" field. */
   public final FieldType fieldTypeNoDV;
 
-  // nocommit use enum:
+  public static enum FieldValueType {ATOM, TEXT, BOOLEAN, LONG, INT, DOUBLE, FLOAT, LAT_LON, DATE_TIME, VIRTUAL};
+
   /** Value type (atom, text, boolean, etc.). */
-  public final String valueType;
+  public final FieldValueType valueType;
 
   // nocommit use enum:
   /** Facet type (no, flat, hierarchical, numericRange, sortedSetDocValues). */
@@ -78,7 +79,7 @@ public class FieldDef {
   public final boolean usePoints;
 
   /** Sole constructor. */
-  public FieldDef(String name, FieldType fieldType, String valueType, String faceted,
+  public FieldDef(String name, FieldType fieldType, FieldValueType valueType, String faceted,
                   String postingsFormat, String docValuesFormat, boolean multiValued, boolean usePoints,
                   Similarity sim, Analyzer indexAnalyzer, Analyzer searchAnalyzer, boolean highlighted, String liveValuesIDField,
                   ValueSource valueSource, String dateTimeFormat) {

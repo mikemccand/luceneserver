@@ -47,16 +47,16 @@ public final class FieldDefBindings extends Bindings {
     if (fd == null) {
       throw new IllegalArgumentException("Invalid reference '" + name + "'");
     }
-    if (fd.valueType.equals("virtual")) {
+    if (fd.valueType == FieldDef.FieldValueType.VIRTUAL) {
       return fd.valueSource;
     } else if (fd.fieldType != null && fd.fieldType.docValuesType() == DocValuesType.NUMERIC) {
-      if (fd.valueType.equals("int")) {
+      if (fd.valueType == FieldDef.FieldValueType.INT) {
         return new IntFieldSource(name);
-      } else if (fd.valueType.equals("float")) {
+      } else if (fd.valueType == FieldDef.FieldValueType.FLOAT) {
         return new FloatFieldSource(name);
-      } else if (fd.valueType.equals("long")) {
+      } else if (fd.valueType == FieldDef.FieldValueType.LONG) {
         return new LongFieldSource(name);
-      } else if (fd.valueType.equals("double")) {
+      } else if (fd.valueType == FieldDef.FieldValueType.DOUBLE) {
         return new DoubleFieldSource(name);
       } else {
         assert false: "unknown numeric field type: " + fd.valueType;

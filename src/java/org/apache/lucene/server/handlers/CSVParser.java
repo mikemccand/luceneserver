@@ -105,7 +105,7 @@ class CSVParser {
       boolean stored = fd.fieldType.stored();
       DocValuesType dvType = fd.fieldType.docValuesType();
       switch(fd.valueType) {
-      case "atom":
+      case ATOM:
         {
           BytesRef br;
           if (fd.usePoints) {
@@ -128,12 +128,12 @@ class CSVParser {
           }
           break;
         }
-      case "text":
+      case TEXT:
         {
           reuseFields[i] = new AddDocumentHandler.MyField(fd.name, fd.fieldType, "");
           break;
         }
-      case "int":
+      case INT:
         {
           if (stored) {
             reuseFields[i] = new StoredField(fd.name, 0);
@@ -148,7 +148,7 @@ class CSVParser {
           }
           break;
         }
-      case "long":
+      case LONG:
         {
           if (stored) {
             reuseFields[i] = new StoredField(fd.name, 0L);
@@ -163,7 +163,7 @@ class CSVParser {
           }
           break;
         }
-      case "float":
+      case FLOAT:
         {
           if (stored) {
             reuseFields[i] = new StoredField(fd.name, 0.0f);
@@ -178,7 +178,7 @@ class CSVParser {
           }
           break;
         }
-      case "double":
+      case DOUBLE:
         {
           if (stored) {
             reuseFields[i] = new StoredField(fd.name, 0.0);
@@ -193,7 +193,7 @@ class CSVParser {
           }
           break;
         }
-      case "datetime":
+      case DATE_TIME:
         {
           assert fd.dateTimeFormat != null;
           Calendar calendar = new GregorianCalendar(TimeZone.getTimeZone("UTC"), Locale.ROOT);
@@ -214,6 +214,7 @@ class CSVParser {
           }
           break;
         }
+      // nocommit LAT_LON?
       default:
         throw new AssertionError();
       }
@@ -235,7 +236,7 @@ class CSVParser {
     // nocommit need to handle escaping!
     
     switch(fields[i].valueType) {
-    case "atom":
+    case ATOM:
       {
         Field field = reuseFields[i];
         BytesRef br = field.binaryValue();
@@ -255,7 +256,7 @@ class CSVParser {
         }
         break;
       }
-    case "text":
+    case TEXT:
       {
         String s = new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8);
         Field field = reuseFields[i];
@@ -263,7 +264,7 @@ class CSVParser {
         reuseDoc.add(field);
         break;
       }
-    case "int":
+    case INT:
       {
         int value;
         Field field = reuseFields[i];
@@ -289,7 +290,7 @@ class CSVParser {
         }
         break;
       }
-    case "long":
+    case LONG:
       {
         Field field = reuseFields[i];
         long value;
@@ -315,7 +316,7 @@ class CSVParser {
         }
         break;
       }
-    case "float":
+    case FLOAT:
       {
         Field field = reuseFields[i];
         float value;
@@ -341,7 +342,7 @@ class CSVParser {
         }
         break;
       }
-    case "double":
+    case DOUBLE:
       {
         Field field = reuseFields[i];
         double value;
@@ -367,7 +368,7 @@ class CSVParser {
         }
         break;
       }
-    case "datetime":
+    case DATE_TIME:
       {
         Field field = reuseFields[i];
         String s = new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8);
@@ -399,6 +400,7 @@ class CSVParser {
         }
         break;
       }
+    // nocommit LAT_LON
     default:
       throw new AssertionError();
     }

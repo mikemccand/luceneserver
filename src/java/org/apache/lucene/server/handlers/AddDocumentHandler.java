@@ -104,12 +104,15 @@ public class AddDocumentHandler extends Handler {
     assert fd != null;
     
     if (fd.fieldType.stored() || fd.fieldType.indexOptions() != IndexOptions.NONE || fd.fieldType.docValuesType() != null) {
-      if (fd.valueType.equals("text") || fd.valueType.equals("atom")) {
+      switch(fd.valueType) {
+      case TEXT:
+      case ATOM:
         // nocommit why...?
         //if (!(o instanceof String)) {
         //fail(fd.name, "expected String value but got " + o);
         //}
-      } else if (fd.valueType.equals("boolean")) {
+        break;
+      case BOOLEAN:
         if (!(o instanceof Boolean)) {
           fail(fd.name, "expected Boolean value but got " + o.getClass());
         }
@@ -119,19 +122,27 @@ public class AddDocumentHandler extends Handler {
         } else {
           o = Integer.valueOf(0);
         }
-      } else if (fd.valueType.equals("float") || fd.valueType.equals("double")) {
+        break;
+      case FLOAT:
+      case DOUBLE:
         if (!(o instanceof Number)) {
           fail(fd.name, "for float or double field, expected Number value but got " + o);
         }
-      } else if (fd.valueType.equals("latlon")) {
+        break;
+      case LAT_LON:
         if (o instanceof double[] == false) {
           fail(fd.name, "for latlon field, expected [lat, lon] double array " + o);
         }
-      } else {
+        break;
+      case INT:
+      case LONG:
         // int or long
         if (!(o instanceof Integer) && !(o instanceof Long)) {
           fail(fd.name, "for int or long field, expected Integer or Long value but got " + o + " of class=" + o.getClass());
         }
+        break;
+      default:
+        throw new AssertionError();
       }
     }
 
@@ -191,36 +202,36 @@ public class AddDocumentHandler extends Handler {
       } else {
         doc.add(new SortedSetDocValuesField(fd.name, new BytesRef((String) o)));
       }
-    } else if (fd.valueType.equals("latlon") && dvType == DocValuesType.SORTED_NUMERIC) {
+    } else if (fd.valueType == FieldDef.FieldValueType.LAT_LON && dvType == DocValuesType.SORTED_NUMERIC) {
       double[] latLon = (double[]) o;
       doc.add(new LatLonDocValuesField(fd.name, latLon[0], latLon[1]));
     } else if (dvType == DocValuesType.NUMERIC || dvType == DocValuesType.SORTED_NUMERIC) {
-      if (fd.valueType.equals("float")) {
+      if (fd.valueType == FieldDef.FieldValueType.FLOAT) {
         if (fd.multiValued) {
           doc.add(new SortedNumericDocValuesField(fd.name, NumericUtils.floatToSortableInt(((Number) o).floatValue())));
         } else {
           doc.add(new FloatDocValuesField(fd.name, ((Number) o).floatValue()));
         }
-      } else if (fd.valueType.equals("double")) {
+      } else if (fd.valueType == FieldDef.FieldValueType.DOUBLE) {
         if (fd.multiValued) {
           doc.add(new SortedNumericDocValuesField(fd.name, NumericUtils.doubleToSortableLong(((Number) o).doubleValue())));
         } else {
           doc.add(new DoubleDocValuesField(fd.name, ((Number) o).doubleValue()));
         }
-      } else if (fd.valueType.equals("int")) {
+      } else if (fd.valueType == FieldDef.FieldValueType.INT) {
         if (fd.multiValued) {
           doc.add(new SortedNumericDocValuesField(fd.name, ((Number) o).intValue()));
         } else {
           doc.add(new NumericDocValuesField(fd.name, ((Number) o).intValue()));
         }
-      } else if (fd.valueType.equals("long")) {
+      } else if (fd.valueType == FieldDef.FieldValueType.LONG) {
         if (fd.multiValued) {
           doc.add(new SortedNumericDocValuesField(fd.name, ((Number) o).longValue()));
         } else {
           doc.add(new NumericDocValuesField(fd.name, ((Number) o).longValue()));
         }
       } else {
-        assert fd.valueType.equals("boolean");
+        assert fd.valueType == FieldDef.FieldValueType.BOOLEAN;
         if (fd.multiValued) {
           doc.add(new SortedNumericDocValuesField(fd.name, ((Integer) o).intValue()));
         } else {
@@ -231,15 +242,15 @@ public class AddDocumentHandler extends Handler {
 
     // maybe add separate points field:
     if (fd.usePoints) {
-      if (fd.valueType.equals("int")) {
+      if (fd.valueType == FieldDef.FieldValueType.INT) {
         doc.add(new IntPoint(fd.name, ((Number) o).intValue()));
-      } else if (fd.valueType.equals("long")) {
+      } else if (fd.valueType == FieldDef.FieldValueType.LONG) {
         doc.add(new LongPoint(fd.name, ((Number) o).longValue()));
-      } else if (fd.valueType.equals("float")) {
+      } else if (fd.valueType == FieldDef.FieldValueType.FLOAT) {
         doc.add(new FloatPoint(fd.name, ((Number) o).floatValue()));
-      } else if (fd.valueType.equals("double")) {
+      } else if (fd.valueType == FieldDef.FieldValueType.DOUBLE) {
         doc.add(new DoublePoint(fd.name, ((Number) o).doubleValue()));
-      } else if (fd.valueType.equals("latlon")) {
+      } else if (fd.valueType == FieldDef.FieldValueType.LAT_LON) {
         double[] latLon = (double[]) o;
         doc.add(new LatLonPoint(fd.name, latLon[0], latLon[1]));
       } else {
@@ -398,7 +409,7 @@ public class AddDocumentHandler extends Handler {
         values.add(p.getText());
       }
       o = values;
-    } else if (fd.valueType.equals("latlon")) {
+    } else if (fd.valueType == FieldDef.FieldValueType.LAT_LON) {
       if (token != JsonToken.START_ARRAY) {
         fail(fd.name, "latlon field must be [lat, lon] value; got " + token);
       }
@@ -444,7 +455,7 @@ public class AddDocumentHandler extends Handler {
 
     JsonToken token = p.nextToken();
     if (token == JsonToken.START_ARRAY) {
-      if ("hierarchy".equals(fd.faceted) || "latlon".equals(fd.valueType)) {
+      if ("hierarchy".equals(fd.faceted) || fd.valueType == FieldDef.FieldValueType.LAT_LON) {
         o = getNativeValue(fd, token, p);
       } else {
         if (fd.multiValued == false) {

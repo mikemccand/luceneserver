@@ -341,8 +341,8 @@ public class IndexState implements Closeable {
   public final Analyzer indexAnalyzer = new AnalyzerWrapper(Analyzer.PER_FIELD_REUSE_STRATEGY) {
         @Override
         public Analyzer getWrappedAnalyzer(String name) {
-          FieldDef fd = getField(name);
-          if (fd.valueType.equals("atom")) {
+          FieldDef fd = getField(name); 
+          if (fd.valueType == FieldDef.FieldValueType.ATOM) {
             return keywordAnalyzer;
           }
           if (fd.indexAnalyzer == null) {
@@ -362,7 +362,7 @@ public class IndexState implements Closeable {
         @Override
         public Analyzer getWrappedAnalyzer(String name) {
           FieldDef fd = getField(name);
-          if (fd.valueType.equals("atom")) {
+          if (fd.valueType == FieldDef.FieldValueType.ATOM) {
             return keywordAnalyzer;
           }
           if (fd.searchAnalyzer == null) {

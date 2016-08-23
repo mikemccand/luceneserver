@@ -741,7 +741,7 @@ public class SearchHandler extends Handler {
 
         if (fd.valueSource != null) {
           sf = fd.valueSource.getSortField(sub.getBoolean("reverse"));
-        } else if (fd.valueType.equals("latlon")) {
+        } else if (fd.valueType == FieldDef.FieldValueType.LAT_LON) {
           if (fd.fieldType.docValuesType() == DocValuesType.NONE) {
             sub.fail("field", "field \"" + fieldName + "\" was not registered with sort=true");
           }
@@ -755,7 +755,7 @@ public class SearchHandler extends Handler {
 
           if (fd.multiValued) {
             String selectorString = sub.getEnum("selector");
-            if (fd.valueType.equals("atom")) {
+            if (fd.valueType == FieldDef.FieldValueType.ATOM) {
               SortedSetSelector.Type selector;
               if (selectorString.equals("min")) {
                 selector = SortedSetSelector.Type.MIN;
@@ -771,13 +771,13 @@ public class SearchHandler extends Handler {
                 selector = null;
               }
               sf = new SortedSetSortField(fieldName, sub.getBoolean("reverse"), selector);
-            } else if (fd.valueType.equals("int")) {
+            } else if (fd.valueType == FieldDef.FieldValueType.INT) {
               sf = new SortedNumericSortField(fieldName, SortField.Type.INT, sub.getBoolean("reverse"), parseNumericSelector(sub, selectorString));
-            } else if (fd.valueType.equals("long")) {
+            } else if (fd.valueType == FieldDef.FieldValueType.LONG) {
               sf = new SortedNumericSortField(fieldName, SortField.Type.LONG, sub.getBoolean("reverse"), parseNumericSelector(sub, selectorString));
-            } else if (fd.valueType.equals("float")) {
+            } else if (fd.valueType == FieldDef.FieldValueType.FLOAT) {
               sf = new SortedNumericSortField(fieldName, SortField.Type.FLOAT, sub.getBoolean("reverse"), parseNumericSelector(sub, selectorString));
-            } else if (fd.valueType.equals("double")) {
+            } else if (fd.valueType == FieldDef.FieldValueType.DOUBLE) {
               sf = new SortedNumericSortField(fieldName, SortField.Type.DOUBLE, sub.getBoolean("reverse"), parseNumericSelector(sub, selectorString));
             } else {
               sub.fail("field", "cannot sort by multiValued field \"" + fieldName + "\": type is " + fd.valueType);
@@ -786,15 +786,15 @@ public class SearchHandler extends Handler {
             }
           } else {
             SortField.Type sortType;
-            if (fd.valueType.equals("atom")) {
+            if (fd.valueType == FieldDef.FieldValueType.ATOM) {
               sortType = SortField.Type.STRING;
-            } else if (fd.valueType.equals("long") || fd.valueType.equals("datetime")) {
+            } else if (fd.valueType == FieldDef.FieldValueType.LONG || fd.valueType == FieldDef.FieldValueType.DATE_TIME) {
               sortType = SortField.Type.LONG;
-            } else if (fd.valueType.equals("int")) {
+            } else if (fd.valueType == FieldDef.FieldValueType.INT) {
               sortType = SortField.Type.INT;
-            } else if (fd.valueType.equals("double")) {
+            } else if (fd.valueType == FieldDef.FieldValueType.DOUBLE) {
               sortType = SortField.Type.DOUBLE;
-            } else if (fd.valueType.equals("float")) {
+            } else if (fd.valueType == FieldDef.FieldValueType.FLOAT) {
               sortType = SortField.Type.FLOAT;
             } else {
               sub.fail("field", "cannot sort by field \"" + fieldName + "\": type is " + fd.valueType);
@@ -812,19 +812,19 @@ public class SearchHandler extends Handler {
 
         boolean missingLast = sub.getBoolean("missingLast");
 
-        if (fd.valueType.equals("atom")) {
+        if (fd.valueType == FieldDef.FieldValueType.ATOM) {
           if (missingLast) {
             sf.setMissingValue(SortField.STRING_LAST);
           } else {
             sf.setMissingValue(SortField.STRING_FIRST);
           }
-        } else if (fd.valueType.equals("int")) {
+        } else if (fd.valueType == FieldDef.FieldValueType.INT) {
           sf.setMissingValue(missingLast ? Integer.MAX_VALUE : Integer.MIN_VALUE);
-        } else if (fd.valueType.equals("long")) {
+        } else if (fd.valueType == FieldDef.FieldValueType.LONG) {
           sf.setMissingValue(missingLast ? Long.MAX_VALUE : Long.MIN_VALUE);
-        } else if (fd.valueType.equals("float")) {
+        } else if (fd.valueType == FieldDef.FieldValueType.FLOAT) {
           sf.setMissingValue(missingLast ? Float.POSITIVE_INFINITY : Float.NEGATIVE_INFINITY);
-        } else if (fd.valueType.equals("double")) {
+        } else if (fd.valueType == FieldDef.FieldValueType.DOUBLE) {
           sf.setMissingValue(missingLast ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY);
         } else if (hasMissingLast) {
           sub.fail("missingLast", "field=" + fieldName + ": can only specify missingLast for string and numeric field types: got SortField type " + sf.getType());
@@ -850,7 +850,7 @@ public class SearchHandler extends Handler {
 
   /** NOTE: this is a slow method, since it makes many objects just to format one date/time value */
   private static String msecToDateString(FieldDef fd, long value) {
-    assert fd.valueType.equals("datetime");
+    assert fd.valueType == FieldDef.FieldValueType.DATE_TIME;
     // nocommit use CTL to reuse these?
     Calendar calendar = new GregorianCalendar(TimeZone.getTimeZone("UTC"), Locale.ROOT);
     calendar.setLenient(false);
@@ -862,7 +862,7 @@ public class SearchHandler extends Handler {
 
   /** NOTE: this is a slow method, since it makes many objects just to parse one date/time value */
   private static long dateStringToMSec(FieldDef fd, String s) throws ParseException {
-    assert fd.valueType.equals("datetime");
+    assert fd.valueType == FieldDef.FieldValueType.DATE_TIME;
     // nocommit use CTL to reuse these?
     Calendar calendar = new GregorianCalendar(TimeZone.getTimeZone("UTC"), Locale.ROOT);
     calendar.setLenient(false);
@@ -882,16 +882,16 @@ public class SearchHandler extends Handler {
   }
 
   private static Object convertType(FieldDef fd, Object o) {
-    if (fd.valueType.equals("boolean")) {
+    if (fd.valueType == FieldDef.FieldValueType.BOOLEAN) {
       if (((Integer) o).intValue() == 1) {
         return Boolean.TRUE;
       } else {
         assert ((Integer) o).intValue() == 0;
         return Boolean.FALSE;
       }
-    } else if (fd.valueType.equals("datetime")) {
+    } else if (fd.valueType == FieldDef.FieldValueType.DATE_TIME) {
       return msecToDateString(fd, ((Number) o).longValue());
-    //} else if (fd.valueType.equals("float") && fd.fieldType.docValueType() == DocValuesType.NUMERIC) {
+    //} else if (fd.valueType == FieldDef.FieldValueType.FLOAT && fd.fieldType.docValueType() == DocValuesType.NUMERIC) {
       // nocommit not right...
       //return Float.intBitsToFloat(((Number) o).intValue());
     } else {
@@ -1078,7 +1078,7 @@ public class SearchHandler extends Handler {
         r.fail("no field specified");
       }
       FieldDef fd = state.getField(field);
-      if (fd.valueType.equals("boolean") == false) {
+      if (fd.valueType != FieldDef.FieldValueType.BOOLEAN) {
         r.fail("field", "field \"" + field + "\" must be valueType=boolean but got: " + fd.valueType);
       }
       q = new ConstantScoreQuery(new TermQuery(new Term(field, "1")));
@@ -1158,7 +1158,7 @@ public class SearchHandler extends Handler {
       Number min;
       if (pr.r.hasParam("min")) {
         Object o = pr.r.getAny("min");
-        if (fd.valueType.equals("datetime")) {
+        if (fd.valueType == FieldDef.FieldValueType.DATE_TIME) {
           if (o instanceof String == false) {
             pr.r.fail("min", "expected string date");
           }
@@ -1180,7 +1180,7 @@ public class SearchHandler extends Handler {
       Number max;
       if (pr.r.hasParam("max")) {
         Object o = pr.r.getAny("max");
-        if (fd.valueType.equals("datetime")) {
+        if (fd.valueType == FieldDef.FieldValueType.DATE_TIME) {
           if (o instanceof String == false) {
             pr.r.fail("max", "expected string date");
           }
@@ -1201,15 +1201,15 @@ public class SearchHandler extends Handler {
 
       // nocommit also set queries
       
-      if (fd.valueType.equals("int")) {
+      if (fd.valueType == FieldDef.FieldValueType.INT) {
         q = IntPoint.newRangeQuery(field, toMinInt(min), toMaxInt(max));
-      } else if (fd.valueType.equals("long")) {
+      } else if (fd.valueType == FieldDef.FieldValueType.LONG) {
         q = LongPoint.newRangeQuery(field, toMinLong(min), toMaxLong(max));
-      } else if (fd.valueType.equals("float")) {
+      } else if (fd.valueType == FieldDef.FieldValueType.FLOAT) {
         q = FloatPoint.newRangeQuery(field, toMinFloat(min), toMaxFloat(max));
-      } else if (fd.valueType.equals("double")) {
+      } else if (fd.valueType == FieldDef.FieldValueType.DOUBLE) {
         q = DoublePoint.newRangeQuery(field, toMinDouble(min), toMaxDouble(max));
-      } else if (fd.valueType.equals("datetime")) {
+      } else if (fd.valueType == FieldDef.FieldValueType.DATE_TIME) {
         q = LongPoint.newRangeQuery(field, toMinLong(min), toMaxLong(max));
       } else {
         // BUG
@@ -1801,14 +1801,14 @@ public class SearchHandler extends Handler {
           } else if (fr.hasParam("numericRange")) {
             Request rr = fr.getStruct("numericRange");
             Range range;
-            if (fd.valueType.equals("int") || fd.valueType.equals("long")) {
+            if (fd.valueType == FieldDef.FieldValueType.INT || fd.valueType == FieldDef.FieldValueType.LONG) {
               range = new LongRange(rr.getString("label"),
                                     rr.getLong("min"),
                                     rr.getBoolean("minInclusive"),
                                     rr.getLong("max"),
                                     rr.getBoolean("maxInclusive"));
 
-            } else if (fd.valueType.equals("float") || fd.valueType.equals("double") || fd.valueType.equals("virtual")) {
+            } else if (fd.valueType == FieldDef.FieldValueType.FLOAT || fd.valueType == FieldDef.FieldValueType.DOUBLE || fd.valueType == FieldDef.FieldValueType.VIRTUAL) {
               range = new DoubleRange(rr.getString("label"),
                                       rr.getDouble("min"),
                                       rr.getBoolean("minInclusive"),
@@ -1823,13 +1823,13 @@ public class SearchHandler extends Handler {
 
             ValueSource valueSource;
             if (fd.valueSource == null) {
-              if (fd.valueType.equals("int")) {
+              if (fd.valueType == FieldDef.FieldValueType.INT) {
                 valueSource = new IntFieldSource(fd.name);
-              } else if (fd.valueType.equals("long")) {
+              } else if (fd.valueType == FieldDef.FieldValueType.LONG) {
                 valueSource = new LongFieldSource(fd.name);
-              } else if (fd.valueType.equals("double")) {
+              } else if (fd.valueType == FieldDef.FieldValueType.DOUBLE) {
                 valueSource = new DoubleFieldSource(fd.name);
-              } else if (fd.valueType.equals("float")) {
+              } else if (fd.valueType == FieldDef.FieldValueType.FLOAT) {
                 valueSource = new FloatFieldSource(fd.name);
               } else {
                 fr.fail("numericRange", "currently only supported for virtual and numeric fields");
@@ -1958,7 +1958,7 @@ public class SearchHandler extends Handler {
         if (fd.faceted != null && !fd.faceted.equals("numericRange")) {
           r2.fail("numericRanges", "field \"" + fd.name + "\" was not registered with facet=numericRange");
         }
-        if (fd.valueType.equals("int") || fd.valueType.equals("long")) {
+        if (fd.valueType == FieldDef.FieldValueType.INT || fd.valueType == FieldDef.FieldValueType.LONG) {
           List<Object> rangeList = r2.getList("numericRanges");
           LongRange[] ranges = new LongRange[rangeList.size()];
           for(int i=0;i<ranges.length;i++) {
@@ -1979,7 +1979,7 @@ public class SearchHandler extends Handler {
                                                    c,
                                                    ranges);
           facetResult = facets.getTopChildren(0, fd.name);
-        } else if (fd.valueType.equals("float") || fd.valueType.equals("double") || fd.valueType.equals("virtual")) {
+        } else if (fd.valueType == FieldDef.FieldValueType.FLOAT || fd.valueType == FieldDef.FieldValueType.DOUBLE || fd.valueType == FieldDef.FieldValueType.VIRTUAL) {
           List<Object> rangeList = r2.getList("numericRanges");
           DoubleRange[] ranges = new DoubleRange[rangeList.size()];
           for(int i=0;i<ranges.length;i++) {
@@ -1997,7 +1997,7 @@ public class SearchHandler extends Handler {
           }
 
           Facets facets;
-          if (fd.valueType.equals("virtual")) {
+          if (fd.valueType == FieldDef.FieldValueType.VIRTUAL) {
             facets = new DoubleRangeFacetCounts(fd.name,
                                                 fd.valueSource,
                                                 c,
@@ -2183,7 +2183,7 @@ public class SearchHandler extends Handler {
           values = null;
         }
 
-        FieldDef fd = new FieldDef(name, null, "virtual", null, null, null, true, false, null, null, null, false, null, values, null);
+        FieldDef fd = new FieldDef(name, null, FieldDef.FieldValueType.VIRTUAL, null, null, null, true, false, null, null, null, false, null, values, null);
 
         if (dynamicFields.put(name, fd) != null) {
           oneField.fail("name", "registered field or dynamic field \"" + name + "\" already exists");

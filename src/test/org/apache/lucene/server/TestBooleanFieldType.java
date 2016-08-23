@@ -76,6 +76,6 @@ public class TestBooleanFieldType extends ServerBaseTestCase {
     send("addDocument", "{fields: {id: 0, other: \"foo\", flagIndexed: false, flagStored: false}}");
     long gen = getLong(send("addDocument", "{fields: {id: 1, flagIndexed: true, flagStored: true}}"), "indexGen");
     Exception e = expectThrows(IOException.class, () -> {send("search", "{searcher: {indexGen: " + gen + "}, query: {class: BooleanFieldQuery, field: other}, retrieveFields: [id, flagStored]}");});
-    assertEquals("Server error:\nsearch > query > field: field \"other\" must be valueType=boolean but got: text", e.getMessage());
+    assertEquals("Server error:\nsearch > query > field: field \"other\" must be valueType=boolean but got: TEXT", e.getMessage());
   }
 }
