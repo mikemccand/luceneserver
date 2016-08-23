@@ -207,6 +207,64 @@ def main():
     print('mkdir %s on %s' % (path, host))
     run('ssh %s@%s mkdir -p %s' % (USER_NAME, host, path))
 
+  docSource = '/l/data/geonames.20160818.csv'
+  if not os.path.exists(docSource):
+    # Not Mike's home computer!
+    docSource = 'data/geonames.csv'
+    if not os.path.exists(docSource):
+      if not os.path.exists('data'):
+        os.makedirs('data')
+      url = 'http://download.geonames.org/export/dump/allCountries.zip'
+      print('Downloading and decompressing geonames documents from %s to %s...' % (url, docSource))
+      with open(docSource + '.zip.tmp', 'wb') as fOut, urllib.request.urlopen(url) as fIn:
+        netBytes = 0
+        nextPrint = 5*1024*1024
+        while True:
+          b = fIn.read(16384)
+          if b == b'':
+            break
+          fOut.write(b)
+          netBytes += len(b)
+          if netBytes > nextPrint:
+            print('  %.1f MB...' % (netBytes/1024./1024.))
+            nextPrint += 5*1024*1024
+      os.rename('%s.zip.tmp' % docSource, '%s.zip' % docSource)
+      print('  done: %.1f MB; now unzip' % (os.path.getsize(docSource + '.zip')/1024./1024.))
+      os.chdir('data')
+      os.system('unzip geonames.csv.zip')
+      os.chdir('..')
+      os.rename('data/allCountries.txt', 'data/geonames.csv')
+      docCount = int(os.popen('wc -l data/geonames.csv').read().split()[0])
+      open('data/geonames.doccount', 'w').write(str(docCount))
+    else:
+      docCount = int(open('data/geonames.doccount').read().split()[0])
+  else:
+    # Geonames doc count as of 08/18/2016
+    docCount = 11114470
+
+  fields = {'indexName': 'index',
+          'fields':
+          {
+            'name': {'type': 'text'},
+            'asciiname': {'type': 'text'},
+            'geonameid': {'type': 'atom', 'search': True, 'store': True, 'sort': True},
+            'elevation': {'type': 'int', 'search': True, 'sort': True},
+            'feature_class': {'type': 'atom', 'sort': True},
+            'latitude': {'type': 'double', 'search': True, 'sort': True},
+            'longitude': {'type': 'double', 'search': True, 'sort': True},
+            'cc2': {'type': 'atom', 'sort': True},
+            'timezone': {'type': 'atom'},
+            'dem': {'type': 'atom'},
+            'country_code': {'type': 'atom', 'sort': True},
+            'admin1_code': {'type': 'atom', 'sort': True},
+            'admin2_code': {'type': 'atom', 'sort': True},
+            'admin3_code': {'type': 'atom', 'sort': True},
+            'admin4_code': {'type': 'atom', 'sort': True},
+            'feature_code': {'type': 'atom', 'sort': True},
+            'modification_date': {'type': 'datetime', 'sort': True, 'dateTimeFormat': 'yyyy-MM-dd'},
+            'alternatenames': {'type': 'text'},
+            'population': {'type': 'long', 'search': True, 'sort': True}}}
+
   primaryPorts = launchServer(LOCALHOST, '%s/server0' % primaryInstallPath, 4000, primaryIP)
   if len(replicas) != 0:
     print('Done launch primary')
@@ -218,175 +276,115 @@ def main():
   if len(replicas) != 0:
     print('Done launch replicas')
 
+  headers = ['geonameid',
+             'name',
+             'asciiname',
+             'alternatenames',
+             'latitude',
+             'longitude',
+             'feature_class',
+             'feature_code',
+             'country_code',
+             'cc2',
+             'admin1_code',
+             'admin2_code',
+             'admin3_code',
+             'admin4_code',
+             'population',
+             'elevation',
+             'dem',
+             'timezone',
+             'modification_date']
+
   try:
-    send(LOCALHOST, primaryPorts[0], 'createIndex', {'indexName': 'index', 'rootDir': '%s/server0/index' % primaryInstallPath})
-    for id, host, installPath, port, binaryPort in replicaPorts:
-      send(host, port, 'createIndex', {'indexName': 'index', 'rootDir': '%s/server%s/index' % (installPath, id)})
+    for iter in range(5):
+      print('\niter %s:' % iter)
 
-    if len(replicaPorts) > 0:
-      refreshSec = 1.0
-    else:
-      # Turn off refreshes to maximize indexing throughput:
-      refreshSec = 100000.0
-    send(LOCALHOST, primaryPorts[0], "liveSettings", {'indexName': 'index', 'index.ramBufferSizeMB': 1024., 'maxRefreshSec': refreshSec})
+      send(LOCALHOST, primaryPorts[0], 'createIndex', {'indexName': 'index', 'rootDir': '%s/server0/index' % primaryInstallPath})
+      for id, host, installPath, port, binaryPort in replicaPorts:
+        send(host, port, 'createIndex', {'indexName': 'index', 'rootDir': '%s/server%s/index' % (installPath, id)})
 
-    fields = {'indexName': 'index',
-            'fields':
-            {
-              'name': {'type': 'text'},
-              'asciiname': {'type': 'text'},
-              'geonameid': {'type': 'atom', 'search': True, 'store': True, 'sort': True},
-              'elevation': {'type': 'int', 'search': True, 'sort': True},
-              'feature_class': {'type': 'atom', 'sort': True},
-              'latitude': {'type': 'double', 'search': True, 'sort': True},
-              'longitude': {'type': 'double', 'search': True, 'sort': True},
-              'cc2': {'type': 'atom', 'sort': True},
-              'timezone': {'type': 'atom'},
-              'dem': {'type': 'atom'},
-              'country_code': {'type': 'atom', 'sort': True},
-              'admin1_code': {'type': 'atom', 'sort': True},
-              'admin2_code': {'type': 'atom', 'sort': True},
-              'admin3_code': {'type': 'atom', 'sort': True},
-              'admin4_code': {'type': 'atom', 'sort': True},
-              'feature_code': {'type': 'atom', 'sort': True},
-              'modification_date': {'type': 'datetime', 'sort': True, 'dateTimeFormat': 'yyyy-MM-dd'},
-              'alternatenames': {'type': 'text'},
-              'population': {'type': 'long', 'search': True, 'sort': True}}}
-
-    send(LOCALHOST, primaryPorts[0], 'registerFields', fields)
-    for id, host, installPath, port, binaryPort in replicaPorts:
-      send(host, port, 'registerFields', fields)
-
-    send(LOCALHOST, primaryPorts[0], "settings", {'indexName': 'index',
-                                    #'indexSort': [{'field': 'pick_up_lon'}],
-                                    'index.verbose': False,
-                                    'directory': 'MMapDirectory',
-                                    'nrtCachingDirectory.maxSizeMB': 0.0,
-                                    'index.merge.scheduler.auto_throttle': False,
-                                    'concurrentMergeScheduler.maxMergeCount': 16,
-                                    'concurrentMergeScheduler.maxThreadCount': 8,
-                                    })
-
-    for id, host, installPath, port, binaryPort in replicaPorts:
-      send(host, port, "settings", {'indexName': 'index',
-                                    'directory': 'MMapDirectory',
-                                    'nrtCachingDirectory.maxSizeMB': 0.0
-                                    })
-
-    if len(replicas) > 0:
-      send(LOCALHOST, primaryPorts[0], 'startIndex', {'indexName': 'index', 'mode': 'primary', 'primaryGen': 0})
-      for id, host2, installPath, port2, binaryPort2 in replicaPorts:
-        send(host2, port2, 'startIndex', {'indexName': 'index', 'mode': 'replica', 'primaryAddress': primaryIP, 'primaryGen': 0, 'primaryPort': primaryPorts[1]})
-    else:
-      send(LOCALHOST, primaryPorts[0], 'startIndex', {'indexName': 'index'})
-
-    b1 = BinarySend(LOCALHOST, primaryPorts[1], 'bulkCSVAddDocument')
-    b1.add(b'\tindex\n')
-
-    id = 0
-    nextPrint = 250000
-    replicaStarted = False
-
-    docSource = '/l/data/geonames.20160818.csv'
-    if not os.path.exists(docSource):
-      # Not Mike's home computer!
-      docSource = 'data/geonames.csv'
-      if not os.path.exists(docSource):
-        if not os.path.exists('data'):
-          os.makedirs('data')
-        url = 'http://download.geonames.org/export/dump/allCountries.zip'
-        print('Downloading and decompressing geonames documents from %s to %s...' % (url, docSource))
-        with open(docSource + '.zip.tmp', 'wb') as fOut, urllib.request.urlopen(url) as fIn:
-          netBytes = 0
-          nextPrint = 5*1024*1024
-          while True:
-            b = fIn.read(16384)
-            if b == b'':
-              break
-            fOut.write(b)
-            netBytes += len(b)
-            if netBytes > nextPrint:
-              print('  %.1f MB...' % (netBytes/1024./1024.))
-              nextPrint += 5*1024*1024
-        os.rename('%s.zip.tmp' % docSource, '%s.zip' % docSource)
-        print('  done: %.1f MB; now unzip' % (os.path.getsize(docSource + '.zip')/1024./1024.))
-        os.chdir('data')
-        os.system('unzip geonames.csv.zip')
-        os.chdir('..')
-        os.rename('data/allCountries.txt', 'data/geonames.csv')
-        docCount = int(os.popen('wc -l data/geonames.csv').read().split()[0])
-        open('data/geonames.doccount', 'w').write(str(docCount))
+      if len(replicaPorts) > 0:
+        refreshSec = 1.0
       else:
-        docCount = int(open('data/geonames.doccount').read().split()[0])
-    else:
-      # Geonames doc count as of 08/18/2016
-      docCount = 11114470
-    
-    #with open('/lucenedata/nyc-taxi-data/alltaxis.csv.blocks', 'rb') as f:
-    totBytes = 0
-    chunkCount = 0
+        # Turn off refreshes to maximize indexing throughput:
+        refreshSec = 100000.0
+      send(LOCALHOST, primaryPorts[0], "liveSettings", {'indexName': 'index', 'index.ramBufferSizeMB': 1024., 'maxRefreshSec': refreshSec})
 
-    doSearch = len(replicaPorts) > 0
+      send(LOCALHOST, primaryPorts[0], 'registerFields', fields)
+      for id, host, installPath, port, binaryPort in replicaPorts:
+        send(host, port, 'registerFields', fields)
 
-    dps = getArg('-dps')
-    if dps is not None:
-      dps = float(dps)
+      send(LOCALHOST, primaryPorts[0], "settings", {'indexName': 'index',
+                                      #'indexSort': [{'field': 'pick_up_lon'}],
+                                      'index.verbose': False,
+                                      'directory': 'MMapDirectory',
+                                      'nrtCachingDirectory.maxSizeMB': 0.0,
+                                      'index.merge.scheduler.auto_throttle': False,
+                                      'concurrentMergeScheduler.maxMergeCount': 16,
+                                      'concurrentMergeScheduler.maxThreadCount': 8,
+                                      })
 
-    headers = ['geonameid',
-               'name',
-               'asciiname',
-               'alternatenames',
-               'latitude',
-               'longitude',
-               'feature_class',
-               'feature_code',
-               'country_code',
-               'cc2',
-               'admin1_code',
-               'admin2_code',
-               'admin3_code',
-               'admin4_code',
-               'population',
-               'elevation',
-               'dem',
-               'timezone',
-               'modification_date']
-    
-    tStart = time.time()
-    with open(docSource, 'rb') as f:
-      b1.add(('\t'.join(headers)+'\n').encode('ascii'))
-      csvHeader = f.readline()
-      b1.add(csvHeader)
-      while True:
-        bytes = f.read(256*1024)
-        if bytes == b'':
-          break
-        b1.add(bytes)
-    b1.finish()
+      for id, host, installPath, port, binaryPort in replicaPorts:
+        send(host, port, "settings", {'indexName': 'index',
+                                      'directory': 'MMapDirectory',
+                                      'nrtCachingDirectory.maxSizeMB': 0.0
+                                      })
 
-    status = b1.socket.recv(1)
-    bytes = b1.socket.recv(4)
-    size = struct.unpack('>i', bytes)
-    bytes = b1.socket.recv(size[0])
-    print('Indexing done; status: %s, result: %s' % (status, bytes.decode('utf-8')))
-    b1.close()
+      if len(replicas) > 0:
+        send(LOCALHOST, primaryPorts[0], 'startIndex', {'indexName': 'index', 'mode': 'primary', 'primaryGen': 0})
+        for id, host2, installPath, port2, binaryPort2 in replicaPorts:
+          send(host2, port2, 'startIndex', {'indexName': 'index', 'mode': 'replica', 'primaryAddress': primaryIP, 'primaryGen': 0, 'primaryPort': primaryPorts[1]})
+      else:
+        send(LOCALHOST, primaryPorts[0], 'startIndex', {'indexName': 'index'})
 
-    if False:
-      bytes = b2.socket.recv(4)
+      id = 0
+      nextPrint = 250000
+      replicaStarted = False
+
+      totBytes = 0
+      chunkCount = 0
+
+      doSearch = len(replicaPorts) > 0
+
+      tStart = time.time()
+      b1 = BinarySend(LOCALHOST, primaryPorts[1], 'bulkCSVAddDocument')
+      b1.add(b'\tindex\n')
+      with open(docSource, 'rb') as f:
+        b1.add(('\t'.join(headers)+'\n').encode('ascii'))
+        csvHeader = f.readline()
+        b1.add(csvHeader)
+        while True:
+          bytes = f.read(256*1024)
+          if bytes == b'':
+            break
+          b1.add(bytes)
+      b1.finish()
+
+      status = b1.socket.recv(1)
+      bytes = b1.socket.recv(4)
       size = struct.unpack('>i', bytes)
-      bytes = b2.socket.recv(size[0])
-      print('GOT ANSWER:\n%s' % bytes.decode('utf-8'))
-      b2.close()
+      bytes = b1.socket.recv(size[0])
+      print('Indexing done; status: %s, result: %s' % (status, bytes.decode('utf-8')))
+      b1.close()
 
-    id = docCount
+      if False:
+        bytes = b2.socket.recv(4)
+        size = struct.unpack('>i', bytes)
+        bytes = b2.socket.recv(size[0])
+        print('GOT ANSWER:\n%s' % bytes.decode('utf-8'))
+        b2.close()
 
-    indexingTime = time.time()-tStart
-    dps = id / indexingTime
-    print('Total: %.1f docs/sec for %.1f sec' % (dps, indexingTime))
+      id = docCount
 
-    print('Now stop index...')
-    send(LOCALHOST, primaryPorts[0], 'stopIndex', {'indexName': 'index'})
-    print('Done stop index...')
+      indexingTime = time.time()-tStart
+      dps = id / indexingTime
+      print('  %.1f docs/sec for %.1f sec' % (dps, indexingTime))
+
+      print('Now stop index...')
+      send(LOCALHOST, primaryPorts[0], 'stopIndex', {'indexName': 'index'})
+      print('Done stop index...')
+      send(LOCALHOST, primaryPorts[0], 'deleteIndex', {'indexName': 'index'})
 
   finally:
     # nocommit why is this leaving leftover files?  it should close all open indices gracefully?
