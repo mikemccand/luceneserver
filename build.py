@@ -21,6 +21,7 @@ deps = [
   ]
 
 testDeps = [
+  ('de.thetaphi', 'forbiddenapis', '2.2'),
   ('com.carrotsearch.randomizedtesting', 'junit4-ant', '2.0.13'),
   ('com.carrotsearch.randomizedtesting', 'randomizedtesting-runner', '2.3.4'),
   ('junit', 'junit', '4.10')
@@ -435,6 +436,19 @@ def main():
       os.chdir('lucene6x')
       run('ant clean')
       os.chdir(ROOT_DIR)
+    elif what == 'forbidden':
+      jarVersion = getArg('-version')
+      if jarVersion is None:
+        jarVersion = LUCENE_SERVER_VERSION
+      jarFileName = compileSourcesAndDeps(jarVersion)
+      testCP = getTestClassPath()
+      testCP.append('build/classes/test')
+      testCP.append(jarFileName)
+      compileChangedSources('src/test', 'build/classes/test', testCP)
+      cmd = "java -jar lib/forbiddenapis-2.2.jar -c '%s' -d build/classes -b jdk-system-out -b jdk-non-portable -b jdk-reflection -b jdk-unsafe-1.8 -b jdk-deprecated-1.8 -b jdk-internal-1.8" % (':'.join(getTestClassPath()))
+      print('cmd %s' % cmd)
+      run(cmd)
+
     elif what == 'package':
 
       jarVersion = getArg('-version')
