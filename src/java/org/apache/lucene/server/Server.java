@@ -638,6 +638,7 @@ public class Server {
     globalState.addHandler("stopIndex", new StopIndexHandler(globalState));
     globalState.addHandler("suggestLookup", new SuggestLookupHandler(globalState));
     globalState.addHandler("refresh", new RefreshHandler(globalState));
+    globalState.addHandler("rollback", new RollbackHandler(globalState));
     globalState.addHandler("updateSuggest", new UpdateSuggestHandler(globalState));
     globalState.addHandler("updateDocument", new UpdateDocumentHandler(globalState));
     globalState.addHandler("setCommitUserData", new SetCommitUserDataHandler(globalState));

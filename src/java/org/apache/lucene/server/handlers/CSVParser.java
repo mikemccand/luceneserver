@@ -214,6 +214,8 @@ class CSVParser {
           }
           break;
         }
+      default:
+        throw new AssertionError();
       }
     }
   }
@@ -397,6 +399,8 @@ class CSVParser {
         }
         break;
       }
+    default:
+      throw new AssertionError();
     }
   }
 

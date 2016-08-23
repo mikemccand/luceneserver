@@ -381,9 +381,9 @@ def main():
       dps = id / indexingTime
       print('  %.1f docs/sec for %.1f sec' % (dps, indexingTime))
 
-      print('Now stop index...')
-      send(LOCALHOST, primaryPorts[0], 'stopIndex', {'indexName': 'index'})
-      print('Done stop index...')
+      print('  rollback...')
+      send(LOCALHOST, primaryPorts[0], 'rollback', {'indexName': 'index'})
+      print('  done')
       send(LOCALHOST, primaryPorts[0], 'deleteIndex', {'indexName': 'index'})
 
   finally:

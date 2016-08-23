@@ -920,6 +920,30 @@ public class IndexState implements Closeable {
     }
   }
 
+  public synchronized void rollback() throws IOException {
+    if (writer == null) {
+      throw new IllegalStateException("can only rollback non-primary and non-replica indices");
+    }
+    writer.rollback();
+    writer = null;
+
+    List<Closeable> closeables = new ArrayList<Closeable>();    
+    closeables.add(reopenThread);
+    closeables.add(manager);
+    closeables.add(slm);
+    closeables.add(taxoWriter);
+    closeables.add(indexDir);
+    closeables.add(taxoDir);
+
+    for(Lookup suggester : suggesters.values()) {
+      if (suggester instanceof Closeable) {
+        closeables.add((Closeable) suggester);
+      }
+    }
+    IOUtils.close(closeables);
+    globalState.indices.remove(name);
+  }
+
   @Override
   public synchronized void close() throws IOException {
     //System.out.println("IndexState.close name=" + name);

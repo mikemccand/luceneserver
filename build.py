@@ -269,6 +269,9 @@ def anyChanges(srcDir, destJAR):
 
   for root, dirNames, fileNames in os.walk(srcDir):
     for fileName in fileNames:
+      if fileName.startswith('.#'):
+        # emacs silliness
+        continue
       if os.path.getmtime('%s/%s' % (root, fileName)) > t1:
         return True
 
