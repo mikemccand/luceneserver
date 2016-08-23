@@ -40,11 +40,11 @@ public class TestDateTime extends ServerBaseTestCase {
   }
 
   public void testIndexCSVDateTime() throws Exception {
-    createIndex("csv");
+    createIndex();
     send("registerFields", "{fields: {modified: {type: datetime, store: true, sort: true, dateTimeFormat: 'yyyy-MM-dd'}}}");
     send("startIndex");
     byte[] bytes = server.sendBinary("bulkCSVAddDocument",
-                                     ",csv\nmodified\n2016-10-14\n".getBytes(StandardCharsets.UTF_8));
+                                     ("," + server.curIndexName + "\nmodified\n2016-10-14\n").getBytes(StandardCharsets.UTF_8));
     JSONObject result = parseJSONObject(new String(bytes, StandardCharsets.UTF_8));
     assertEquals(1, getInt(result, "indexedDocumentCount"));
     send("stopIndex");
@@ -52,7 +52,7 @@ public class TestDateTime extends ServerBaseTestCase {
   }
 
   public void testMissingDateTimeFormat() throws Exception {
-    createIndex("csv");
+    createIndex();
     expectThrows(IOException.class, () -> {
         send("registerFields", "{fields: {modified: {type: datetime, store: true, sort: true}}}");
       });
@@ -60,20 +60,20 @@ public class TestDateTime extends ServerBaseTestCase {
   }
 
   public void testBogusDateTimeFormat() throws Exception {
-    createIndex("csv");
+    createIndex();
     expectThrows(IOException.class, () -> {
-        send("registerFields", "{fields: {modified: {type: datetime, store: true, sort: true, dateTimeFormat: 'xxxx'}}}");
+        send("registerFields", "{fields: {modified: {type: datetime, store: true, sort: true, dateTimeFormat: 'g'}}}");
       });
     send("deleteIndex");
   }
 
   public void testBogusDateTimeValue() throws Exception {
-    createIndex("csv");
+    createIndex();
     send("registerFields", "{fields: {modified: {type: datetime, store: true, sort: true, dateTimeFormat: 'yyyy-MM-dd'}}}");
     send("startIndex");
     IOException e = expectThrows(IOException.class, () -> {
         server.sendBinary("bulkCSVAddDocument",
-                                     ",csv\nmodified\n2016-10-14x\n".getBytes(StandardCharsets.UTF_8));
+                          ("," + server.curIndexName + "\nmodified\n2016-10-14x\n").getBytes(StandardCharsets.UTF_8));
       });
     assertContains(e.getMessage(), "could not parse field \"modified\", value \"2016-10-14x\" as date with format \"yyyy-MM-dd\"");
     send("stopIndex");
@@ -83,11 +83,11 @@ public class TestDateTime extends ServerBaseTestCase {
   // nocommit test time too
 
   public void testStored() throws Exception {
-    createIndex("csv");
+    createIndex();
     send("registerFields", "{fields: {modified: {type: datetime, store: true, sort: true, dateTimeFormat: 'yyyy-MM-dd'}}}");
     send("startIndex");
     byte[] bytes = server.sendBinary("bulkCSVAddDocument",
-                                     ",csv\nmodified\n2016-10-14\n".getBytes(StandardCharsets.UTF_8));
+                                     ("," + server.curIndexName + "\nmodified\n2016-10-14\n").getBytes(StandardCharsets.UTF_8));
     JSONObject result = parseJSONObject(new String(bytes, StandardCharsets.UTF_8));
     assertEquals(1, getInt(result, "indexedDocumentCount"));
 
@@ -100,11 +100,11 @@ public class TestDateTime extends ServerBaseTestCase {
   }
 
   public void testRangeQuery() throws Exception {
-    createIndex("csv");
+    createIndex();
     send("registerFields", "{fields: {modified: {type: datetime, search: true, store: true, sort: true, dateTimeFormat: 'yyyy-MM-dd'}}}");
     send("startIndex");
     byte[] bytes = server.sendBinary("bulkCSVAddDocument",
-                                     ",csv\nmodified\n2016-10-14\n".getBytes(StandardCharsets.UTF_8));
+                                     ("," + server.curIndexName + "\nmodified\n2016-10-14\n").getBytes(StandardCharsets.UTF_8));
     JSONObject result = parseJSONObject(new String(bytes, StandardCharsets.UTF_8));
     assertEquals(1, getInt(result, "indexedDocumentCount"));
 
@@ -117,11 +117,11 @@ public class TestDateTime extends ServerBaseTestCase {
   }
 
   public void testSort() throws Exception {
-    createIndex("csv");
+    createIndex();
     send("registerFields", "{fields: {modified: {type: datetime, search: true, store: true, sort: true, dateTimeFormat: 'yyyy-MM-dd'}}}");
     send("startIndex");
     byte[] bytes = server.sendBinary("bulkCSVAddDocument",
-                                     ",csv\nmodified\n2016-10-17\n2015-6-2\n".getBytes(StandardCharsets.UTF_8));
+                                     ("," + server.curIndexName + "\nmodified\n2016-10-17\n2015-06-02\n").getBytes(StandardCharsets.UTF_8));
     JSONObject result = parseJSONObject(new String(bytes, StandardCharsets.UTF_8));
     assertEquals(2, getInt(result, "indexedDocumentCount"));
 

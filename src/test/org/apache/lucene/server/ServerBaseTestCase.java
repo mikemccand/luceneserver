@@ -34,6 +34,7 @@ import java.nio.file.Paths;
 import java.util.Enumeration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -175,6 +176,12 @@ public abstract class ServerBaseTestCase extends LuceneTestCase {
 
   protected static void deleteIndex(String indexName) throws Exception {
     send("deleteIndex", "{indexName: " + indexName + "}");
+  }
+
+  private static AtomicInteger indexUpto = new AtomicInteger();
+
+  protected static void createIndex() throws Exception {
+    createIndex("index" + indexUpto.getAndIncrement());
   }
 
   protected static void createIndex(String indexName) throws Exception {
