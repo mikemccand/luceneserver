@@ -1,4 +1,4 @@
-package org.apache.lucene.server.handlers;
+package org.apache.lucene.server.util;
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
@@ -16,3 +16,9 @@ package org.apache.lucene.server.handlers;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+public class DateTimeUtil {
+  private DateTimeUtil() {
+    // no
+  }
+}

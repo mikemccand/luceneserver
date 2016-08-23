@@ -2183,7 +2183,7 @@ public class SearchHandler extends Handler {
           values = null;
         }
 
-        FieldDef fd = new FieldDef(name, null, "virtual", null, null, null, true, false, null, null, null, false, null, values, null);
+        FieldDef fd = new FieldDef(name, null, "virtual", null, null, null, true, false, null, null, null, false, null, values, null, null);
 
         if (dynamicFields.put(name, fd) != null) {
           oneField.fail("name", "registered field or dynamic field \"" + name + "\" already exists");

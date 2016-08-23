@@ -23,6 +23,11 @@ import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.ParsePosition;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -80,9 +85,6 @@ class CSVParser {
   private final Field[] reusePoints;
   private final Document reuseDoc;
   private final byte delimChar;
-  // nocommit use CTL to reuse these?
-  private SimpleDateFormat dateTimeParser;
-  private ParsePosition dateTimeParsePosition;
   
   public CSVParser(byte delimChar, long globalOffset, FieldDef[] fields, IndexState indexState, byte[] bytes, int startOffset) {
     this.delimChar = delimChar;
@@ -195,12 +197,7 @@ class CSVParser {
         }
       case "datetime":
         {
-          assert fd.dateTimeFormat != null;
-          Calendar calendar = new GregorianCalendar(TimeZone.getTimeZone("UTC"), Locale.ROOT);
-          calendar.setLenient(false);
-          dateTimeParser = new SimpleDateFormat(fd.dateTimeFormat, Locale.ROOT);
-          dateTimeParser.setCalendar(calendar);          
-          dateTimeParsePosition = new ParsePosition(0);
+          assert fd.dateTimeFormatter != null;
           if (stored) {
             reuseFields[i] = new StoredField(fd.name, 0L);
           }
@@ -225,6 +222,8 @@ class CSVParser {
   public int getBufferUpto() {
     return bufferUpto;
   }
+
+  private static ZoneId bostonZoneID = ZoneId.of("America/Los_Angeles");
 
   private void addOneField(int i, int lastFieldStart) throws ParseException {
     int len = bufferUpto - lastFieldStart - 1;
@@ -368,18 +367,16 @@ class CSVParser {
     case "datetime":
       {
         Field field = reuseFields[i];
+
         String s = new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8);
-        dateTimeParsePosition.setIndex(0);
-        Date date = dateTimeParser.parse(s, dateTimeParsePosition);
-        if (dateTimeParsePosition.getErrorIndex() != -1) {
-          // nocommit more details about why?
-          throw new IllegalArgumentException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\", value \"" + s + "\" as date with format \"" + fields[i].dateTimeFormat + "\"");
+        LocalDate dateTime;
+        try {
+          dateTime = LocalDate.parse(s, fields[i].dateTimeFormatter);
+        } catch (DateTimeParseException dtpe) {
+          throw new IllegalArgumentException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\", value \"" + s + "\" as date with format \"" + fields[i].dateTimeFormat + "\": " + dtpe.getMessage());
         }
-        if (dateTimeParsePosition.getIndex() != s.length()) {
-          // nocommit more details about why?          
-          throw new IllegalArgumentException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\", value \"" + s + "\" as date with format \"" + fields[i].dateTimeFormat + "\"");
-        }
-        long value = date.getTime();
+        //long value = dateTime.atZone(bostonZoneID).toInstant().toEpochMilli();
+        long value = dateTime.atStartOfDay(bostonZoneID).toInstant().toEpochMilli();
         if (field != null) {
           field.setLongValue(value);
           reuseDoc.add(field);

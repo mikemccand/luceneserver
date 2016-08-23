@@ -23,6 +23,7 @@ import java.io.StringReader;
 import java.text.Collator;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -402,7 +403,7 @@ public class RegisterFieldHandler extends Handler {
       values = null;
     }
 
-    return new FieldDef(name, null, "virtual", null, null, null, true, false, null, null, null, false, null, values, null);
+    return new FieldDef(name, null, "virtual", null, null, null, true, false, null, null, null, false, null, values, null, null);
   }
 
   private FieldDef parseOneFieldType(Request r, IndexState state, Map<String,FieldDef> pendingFieldDefs, String name, JSONObject o) throws IOException {
@@ -454,6 +455,7 @@ public class RegisterFieldHandler extends Handler {
     }
 
     String dateTimeFormat = null;
+    DateTimeFormatter dateTimeFormatter = null;
 
     switch(type) {
 
@@ -559,7 +561,7 @@ public class RegisterFieldHandler extends Handler {
 
       // make sure the format is valid:
       try {
-        new SimpleDateFormat(dateTimeFormat);
+        dateTimeFormatter = DateTimeFormatter.ofPattern(dateTimeFormat);
       } catch (IllegalArgumentException iae) {
         f.fail("dateTimeFormat", "could not parse pattern", iae);
       }
@@ -800,7 +802,7 @@ public class RegisterFieldHandler extends Handler {
 
     // nocommit facetsConfig.setRequireDimCount
 
-    return new FieldDef(name, ft, type, facet, pf, dvf, multiValued, usePoints, sim, indexAnalyzer, searchAnalyzer, highlighted, liveValuesIDField, null, dateTimeFormat);
+    return new FieldDef(name, ft, type, facet, pf, dvf, multiValued, usePoints, sim, indexAnalyzer, searchAnalyzer, highlighted, liveValuesIDField, null, dateTimeFormat, dateTimeFormatter);
   }
 
   /** Messy: we need this for indexed-but-not-tokenized
