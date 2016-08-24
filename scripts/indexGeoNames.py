@@ -14,6 +14,8 @@ import urllib.request
 
 LUCENE_SERVER_BASE_VERSION = '0.1.1'
 
+JVM_OPTIONS = '-XX:+AlwaysPreTouch -Xms2g -Xmx2g'
+
 # killall java; ssh 10.17.4.12 killall java; rm -rf /c/taxis; ssh 10.17.4.12 "rm -rf /l/taxis"; python3 -u scripts/indexTaxis.py -rebuild -ip 10.17.4.92 -installPath /c/taxis -replica 10.17.4.12:/l/taxis
 
 # TODO
@@ -69,10 +71,10 @@ def launchServer(host, installDir, port, ip=None):
     cwd = '%s/%s' % (installDir, serverDirName)
 
   if host != LOCALHOST:
-    command = r'ssh %s@%s "cd %s; java -Xms4g -Xmx4g -cp lib/\* org.apache.lucene.server.Server -stateDir %s/state -ipPort %s:%s"' % (USER_NAME, host, cwd, installDir, host, port)
+    command = r'ssh %s@%s "cd %s; java %s -cp lib/\* org.apache.lucene.server.Server -stateDir %s/state -ipPort %s:%s"' % (USER_NAME, host, cwd, JVM_OPTIONS, installDir, host, port)
   else:
     #command = r'cd %s; java -XX:MaxInlineSize=0 -agentlib:yjpagent=sampling -Xms4g -Xmx4g -cp lib/\* org.apache.lucene.server.Server -stateDir %s/state -ipPort %s:%s' % (cwd, installDir, host, port)
-    command = r'cd %s; java -Xms4g -Xmx4g -cp lib/\* org.apache.lucene.server.Server -stateDir %s/state -ipPort %s:%s' % (cwd, installDir, host, port)
+    command = r'cd %s; java %s -cp lib/\* org.apache.lucene.server.Server -stateDir %s/state -ipPort %s:%s' % (cwd, JVM_OPTIONS, installDir, host, port)
 
   if ip is not None:
     command += ' -ipPort %s:%s' % (ip, port)
@@ -309,7 +311,7 @@ def main():
       else:
         # Turn off refreshes to maximize indexing throughput:
         refreshSec = 100000.0
-      send(LOCALHOST, primaryPorts[0], "liveSettings", {'indexName': 'index', 'index.ramBufferSizeMB': 1024., 'maxRefreshSec': refreshSec})
+      send(LOCALHOST, primaryPorts[0], "liveSettings", {'indexName': 'index', 'index.ramBufferSizeMB': 256., 'maxRefreshSec': refreshSec})
 
       send(LOCALHOST, primaryPorts[0], 'registerFields', fields)
       for id, host, installPath, port, binaryPort in replicaPorts:
