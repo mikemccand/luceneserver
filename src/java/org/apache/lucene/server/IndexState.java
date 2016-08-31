@@ -46,6 +46,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -467,7 +468,7 @@ public class IndexState implements Closeable {
   public static class IndexingContext {
 
     /** How many chunks are still indexing. */
-    public final AtomicInteger inFlightChunkCount = new AtomicInteger();
+    public final Phaser inFlightChunks = new Phaser();
 
     /** How many documents were added. */
     public final AtomicInteger addCount = new AtomicInteger();

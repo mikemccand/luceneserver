@@ -104,7 +104,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
                                  FieldDef[] fields, byte[] bytes, Semaphore semaphore) throws InterruptedException {
       this.delimChar = delimChar;
       this.ctx = ctx;
-      ctx.inFlightChunkCount.incrementAndGet();
+      ctx.inFlightChunks.register();
       this.prev = prev;
       this.indexState = indexState;
       this.fields = fields;
@@ -121,7 +121,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
         _indexSplitDoc();
       } finally {
         semaphore.release();
-        ctx.inFlightChunkCount.decrementAndGet();
+        ctx.inFlightChunks.arrive();
       }
     }
         
@@ -368,6 +368,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
     globalOffset += bufferUpto;
     
     ParseAndIndexOneChunk prev = null;
+    int phase = ctx.inFlightChunks.getPhase();
 
     while (done == false && ctx.getError() == null) {
       int count = in.read(buffer, bufferUpto, buffer.length-bufferUpto);
@@ -404,13 +405,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
       prev.setNextStartFragment(new byte[0], 0, 0);
     }
 
-    // nocommit this is ... lameish ... can we just join on these futures?:
-    while (true) {
-      if (ctx.inFlightChunkCount.get() == 0) {
-        break;
-      }
-      Thread.sleep(1);
-    }
+    ctx.inFlightChunks.awaitAdvance(phase);
 
     Throwable t = ctx.getError();
     if (t != null) {
