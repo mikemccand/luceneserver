@@ -52,6 +52,7 @@ luceneTestDeps = ('test-framework',)
 TEST_HEAP = '512m'
 
 printLock = threading.Lock()
+lastRunningPrint = None
 
 def message(s, includeNewline=True):
   with printLock:
@@ -62,9 +63,27 @@ def message(s, includeNewline=True):
 def unescape(s):
   return s.replace('%0A', '\n').replace('%09', '\t')
 
+def addRunning(running, name):
+  running.add(name)
+  printRunning(running, force=True)
+
+def removeRunning(running, name):
+  running.remove(name)
+  printRunning(running, force=True)
+
+def printRunning(running, force=False):
+  global lastRunningPrint
+  with printLock:
+    now = time.time()
+    if force or now - lastRunningPrint > 1.0:
+      l = list(running)
+      l.sort()
+      print('%5.1fs: %s...' % (now - testsStartTime, ', '.join(l)))
+      lastRunningPrint = now
+
 class RunTestsJVM(threading.Thread):
 
-  def __init__(self, id, jobs, classPath, verbose, seed, doPrintOutput, testMethod):
+  def __init__(self, id, jobs, classPath, verbose, seed, doPrintOutput, testMethod, running):
     threading.Thread.__init__(self)
     self.id = id
     self.jobs = jobs
@@ -76,6 +95,7 @@ class RunTestsJVM(threading.Thread):
     self.suiteCount = 0
     self.failCount = 0
     self.doPrintOutput = doPrintOutput
+    self.running = running
 
   def run(self):
     cmd = ['java']
@@ -122,9 +142,10 @@ class RunTestsJVM(threading.Thread):
 
       self.suiteCount += 1
 
-      testSuite = job[25:]
-      message('%s...' % testSuite)
-      events.testSuiteName = testSuite
+      testSuiteName = job[25:]
+      #message('%s...' % testSuiteName)
+      events.testSuiteName = testSuiteName
+      addRunning(self.running, testSuiteName)
 
       p.stdin.write((job + '\n').encode('utf-8'))
       p.stdin.flush()
@@ -184,6 +205,7 @@ class RunTestsJVM(threading.Thread):
           lines = []
         else:
           lines.append(l)
+      removeRunning(self.running, testSuiteName)
 
     # closes stdin, which randomizedrunning detects as the end, then process cleanly shuts down with no zombie:
     p.communicate()
@@ -434,6 +456,8 @@ def compileSourcesAndDeps(jarVersion):
   return jarFileName
 
 def main():
+  global testsStartTime, lastRunningPrint
+  
   global ROOT_DIR
   ROOT_DIR = os.getcwd()
   upto = 1
@@ -578,9 +602,13 @@ def main():
       t0 = time.time()
       jobs = queue.Queue()
 
+      running = set()
+      lastRunningPrint = time.time()
+      testsStartTime = time.time()
+
       jvms = []
       for i in range(jvmCount):
-        jvm = RunTestsJVM(i, jobs, testCP, verbose, None, printOutput, testMethod=testMethod)
+        jvm = RunTestsJVM(i, jobs, testCP, verbose, None, printOutput, testMethod=testMethod, running=running)
         jvm.start()
         jvms.append(jvm)
 
@@ -593,8 +621,16 @@ def main():
       failCount = 0
       testCount = 0
       suiteCount = 0
+      while True:
+        for jvm in jvms:
+          if jvm.isAlive():
+            break
+        else:
+          break
+        time.sleep(0.1)
+        printRunning(running)
+
       for jvm in jvms:
-        jvm.join()
         failCount += jvm.failCount
         testCount += jvm.testCount
         suiteCount += jvm.suiteCount
