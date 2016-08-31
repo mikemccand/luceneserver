@@ -222,9 +222,13 @@ public class RunServer {
       is.read(bytes);
       c.disconnect();
       //System.out.println("PARSE: " + new String(bytes, "UTF-8"));
-      JSONObject result = (JSONObject) JSONValue.parseStrict(new String(bytes, "UTF-8"));
-      //System.out.println("  got: " + result);
-      return result;
+      String jsonString = new String(bytes, "UTF-8");
+      try {
+        return (JSONObject) JSONValue.parseStrict(jsonString);
+      } catch (ParseException pe) {
+        System.out.println("FAILED TO PARSE server response as valid json:\n" + jsonString + "\n");
+        throw pe;
+      }
     } else {
       InputStream is = c.getErrorStream();
       is.read(bytes);
