@@ -115,7 +115,7 @@ public class SendMeFilesHandler extends Handler {
         streamOut.flush();
       }
 
-      // TODO: is there some simple zero-copy way to do this?  we just want to pull bytes from the file and put on the wire
+      // nocommit: is there some low-risk zero-copy way to do this?  we just want to pull bytes from the file and put on the wire
       byte[] buffer = new byte[16384];
       int fileCount = 0;
       long totBytesSent = 0;

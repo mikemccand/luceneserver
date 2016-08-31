@@ -219,7 +219,7 @@ public class RunServer {
     byte[] bytes = new byte[size];
     if (code == 200) {
       InputStream is = c.getInputStream();
-      is.read(bytes);
+      readFully(is, bytes);
       c.disconnect();
       //System.out.println("PARSE: " + new String(bytes, "UTF-8"));
       String jsonString = new String(bytes, "UTF-8");
@@ -231,9 +231,20 @@ public class RunServer {
       }
     } else {
       InputStream is = c.getErrorStream();
-      is.read(bytes);
+      readFully(is, bytes);
       c.disconnect();
       throw new IOException("Server error:\n" + new String(bytes, "UTF-8"));
+    }
+  }
+
+  private static void readFully(InputStream stream, byte[] bytes) throws IOException {
+    int upto = 0;
+    while (upto < bytes.length) {
+      int count = stream.read(bytes, upto, bytes.length-upto);
+      if (count == -1) {
+        throw new IOException("hit end-of-stream after reading " + upto + " bytes of " + bytes.length);
+      }
+      upto += count;
     }
   }
 
@@ -279,12 +290,12 @@ public class RunServer {
     byte[] bytes = new byte[size];
     if (code == 200) {
       InputStream is = c.getInputStream();
-      is.read(bytes);
+      readFully(is, bytes);
       c.disconnect();
       return new String(bytes, "UTF-8");
     } else {
       InputStream is = c.getErrorStream();
-      is.read(bytes);
+      readFully(is, bytes);
       c.disconnect();
       throw new IOException("Server error:\n" + new String(bytes, "UTF-8"));
     }
@@ -305,12 +316,12 @@ public class RunServer {
     if (code == 200) {
       InputStream is = c.getInputStream();
       bytes = new byte[size];
-      is.read(bytes);
+      readFully(is, bytes);
       c.disconnect();
       return (JSONObject) JSONValue.parseStrict(new String(bytes, "UTF-8"));
     } else {
       InputStream is = c.getErrorStream();
-      is.read(bytes);
+      readFully(is, bytes);
       c.disconnect();
       throw new IOException("Server error:\n" + new String(bytes, "UTF-8"));
     }
