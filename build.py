@@ -608,7 +608,7 @@ def main():
 
       jvms = []
       for i in range(jvmCount):
-        jvm = RunTestsJVM(i, jobs, testCP, verbose, None, printOutput, testMethod=testMethod, running=running)
+        jvm = RunTestsJVM(i, jobs, testCP, verbose, seed, printOutput, testMethod=testMethod, running=running)
         jvm.start()
         jvms.append(jvm)
 
