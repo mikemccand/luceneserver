@@ -588,6 +588,8 @@ public class RegisterFieldHandler extends Handler {
 
     case DATE_TIME:
 
+      // nocommit maybe we only accept https://www.ietf.org/rfc/rfc3339.txt
+
       dateTimeFormat = f.getString("dateTimeFormat");
 
       // make sure the format is valid:

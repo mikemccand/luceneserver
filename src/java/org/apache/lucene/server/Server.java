@@ -838,6 +838,7 @@ public class Server {
         }
 
         // nocommit what buffer size?
+        // nocommit don't buffer at all here?  make it explicit when we write the result?
         OutputStream bufferedOut = new BufferedOutputStream(out);
 
         handler.handleBinary(in, dataIn, new OutputStreamDataOutput(bufferedOut), bufferedOut);

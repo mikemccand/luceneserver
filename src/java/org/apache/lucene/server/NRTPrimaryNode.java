@@ -156,6 +156,7 @@ public class NRTPrimaryNode extends PrimaryNode {
             try {
               long nowNS = System.nanoTime();
               boolean done = false;
+              // nocommit find a way not to use available here:
               while (c.sockIn.available() > 0) {
                 byte b = c.in.readByte();
                 if (b == 0) {

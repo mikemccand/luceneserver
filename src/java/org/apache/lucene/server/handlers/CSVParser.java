@@ -270,6 +270,7 @@ class CSVParser {
         Field field = reuseFields[i];
         try {
           value = MathUtil.parseInt(bytes, lastFieldStart, len);
+          //value = Integer.parseInt(new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8));
         } catch (NumberFormatException nfe) {
           throw new NumberFormatException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\" as int: " + nfe.getMessage());
         }
@@ -296,6 +297,7 @@ class CSVParser {
         long value;
         try {
           value = MathUtil.parseLong(bytes, lastFieldStart, len);
+          //value = Long.parseLong(new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8));
         } catch (NumberFormatException nfe) {
           throw new NumberFormatException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\" as long: " + nfe.getMessage());
         }
@@ -322,6 +324,7 @@ class CSVParser {
         float value;
         try {
           value = MathUtil.parseFloat(bytes, lastFieldStart, len);
+          //value = Float.parseFloat(new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8));
         } catch (NumberFormatException nfe) {
           throw new NumberFormatException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\" as float: " + nfe.getMessage());
         }
@@ -348,6 +351,7 @@ class CSVParser {
         double value;
         try {
           value = MathUtil.parseDouble(bytes, lastFieldStart, len);
+          //value = Double.parseDouble(new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8));
         } catch (NumberFormatException nfe) {
           throw new NumberFormatException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\" as double: " + nfe.getMessage());
         }

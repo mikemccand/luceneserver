@@ -14,7 +14,7 @@ import urllib.request
 
 LUCENE_SERVER_BASE_VERSION = '0.1.1'
 
-JVM_OPTIONS = '-XX:+AlwaysPreTouch -Xms2g -Xmx2g'
+JVM_OPTIONS = '-XX:+AlwaysPreTouch -Xms2g -Xmx2g -verbose:gc'
 
 # killall java; ssh 10.17.4.12 killall java; rm -rf /c/taxis; ssh 10.17.4.12 "rm -rf /l/taxis"; python3 -u scripts/indexTaxis.py -rebuild -ip 10.17.4.92 -installPath /c/taxis -replica 10.17.4.12:/l/taxis
 

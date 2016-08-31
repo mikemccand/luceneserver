@@ -156,6 +156,9 @@ public class BulkCSVAddDocumentHandler extends Handler {
 
     /** The chunk after us calls this with its prefix fragment */
     public synchronized void setNextStartFragment(byte[] bytes, int offset, int length) {
+      if (nextStartFragment != null) {
+        throw new IllegalStateException("setNextStartFragment was already called");
+      }
       nextStartFragment = bytes;
       nextStartFragmentOffset = offset;
       nextStartFragmentLength = length;
@@ -396,8 +399,8 @@ public class BulkCSVAddDocumentHandler extends Handler {
       }
     }
 
-    if (ctx.getError() != null) {
-      // force last indexing chunk to finish up:
+    if (done == false) {
+      // we exited loop due to error; force last indexing chunk to finish up:
       prev.setNextStartFragment(new byte[0], 0, 0);
     }
 
