@@ -122,7 +122,9 @@ class RunTestsJVM(threading.Thread):
 
       self.suiteCount += 1
 
-      message('%s...' % job[25:])
+      testSuite = job[25:]
+      message('%s...' % testSuite)
+      events.testSuiteName = testSuite
 
       p.stdin.write((job + '\n').encode('utf-8'))
       p.stdin.flush()
@@ -175,6 +177,8 @@ class RunTestsJVM(threading.Thread):
               i = testCaseName.find('#')
               j = testCaseName.find('(')
               testCaseName = testCaseName[i+1:j]
+              events.testCaseName = testCaseName
+              events.testCaseStartTime = time.time()
             elif event[0] == 'IDLE':
               break
           lines = []
@@ -215,6 +219,11 @@ def fixupReproLine(s):
 
 class ReadEvents:
 
+  testSuiteName = None
+  testCaseName = None
+  testCaseStartTime = None
+  nextHeartBeat = 1.0
+
   def __init__(self, process, fileName):
     self.process = process
     self.fileName = fileName
@@ -233,6 +242,10 @@ class ReadEvents:
       l = self.f.readline().decode('utf-8')
       if l == '' or not l.endswith('\n'):
         time.sleep(.01)
+        now = time.time()
+        if self.testCaseName is not None and now > self.testCaseStartTime + self.nextHeartBeat:
+          print('HEARTBEAT @ %.1f sec: %s.%s' % (now - self.testCaseStartTime, self.testSuiteName, self.testCaseName))
+          self.nextHeartBeat += 1.0
         p = self.process.poll()
         if p is not None:
           raise RuntimeError('process exited with status %s' % str(p))
