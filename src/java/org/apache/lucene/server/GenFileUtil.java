@@ -69,7 +69,7 @@ public abstract class GenFileUtil<T> {
 
     T loaded = null;
 
-    for(String file : dir.listAll()) {
+    for(String file : files) {
       if (file.startsWith(prefix)) {
         long gen = Long.parseLong(file.substring(prefix.length()));
         if (genLoaded == -1 || gen > genLoaded) {
