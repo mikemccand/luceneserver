@@ -20,7 +20,6 @@ package org.apache.lucene.server;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
-import org.apache.lucene.util.TestUtil;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 

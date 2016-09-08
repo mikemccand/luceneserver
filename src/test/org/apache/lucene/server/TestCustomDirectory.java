@@ -17,21 +17,12 @@ package org.apache.lucene.server;
  * limitations under the License.
  */
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.HashSet;
-import java.util.Locale;
-import java.util.Set;
 
 import org.apache.lucene.store.MMapDirectory;
-import org.apache.lucene.util.TestUtil;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-
-import net.minidev.json.JSONObject;
 
 public class TestCustomDirectory extends ServerBaseTestCase {
 
