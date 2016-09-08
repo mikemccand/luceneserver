@@ -1285,8 +1285,6 @@ public class SearchHandler extends Handler {
       }
       q = LatLonPoint.newPolygonQuery(field, polygons);
 
-      // TODO: LatLonPoint.nearest!
-
     } else if (pr.name.equals("ToParentBlockJoinQuery")) {
       Query childQuery = parseQuery(timestampSec, topRequest, state, pr.r.getStruct("childQuery"), field, useBlockJoinCollector, dynamicFields);
       BitSetProducer parentsFilter = new QueryBitSetProducer(parseQuery(timestampSec, topRequest, state, pr.r.getStruct("parentsFilter"), field, useBlockJoinCollector, dynamicFields));
