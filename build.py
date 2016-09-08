@@ -14,8 +14,10 @@ import os
 import urllib.request
 
 deps = [
-  ('org.codehaus.jackson', 'jackson-core-asl', '1.9.13'),
-  ('org.codehaus.jackson', 'jackson-mapper-asl', '1.9.13'),
+  #('org.codehaus.jackson', 'jackson-core-asl', '1.9.13'),
+  #('org.codehaus.jackson', 'jackson-mapper-asl', '1.9.13'),
+  ('com.fasterxml.jackson.core', 'jackson-core', '2.8.2'),
+  #('com.fasterxml.jackson.core', 'jackson-mapper', '2.8.2'),
   ('commons-codec', 'commons-codec', '1.10'),
   ('net.minidev', 'json-smart', '1.2')
   ]
@@ -64,21 +66,23 @@ def unescape(s):
   return s.replace('%0A', '\n').replace('%09', '\t')
 
 def addRunning(running, name):
-  running.add(name)
-  printRunning(running, force=True)
+  running[name] = time.time()
+  #printRunning(running, force=True)
 
 def removeRunning(running, name):
-  running.remove(name)
-  printRunning(running, force=True)
+  del running[name]
+  #printRunning(running, force=True)
 
 def printRunning(running, force=False):
   global lastRunningPrint
   with printLock:
     now = time.time()
     if force or now - lastRunningPrint > 1.0:
-      l = list(running)
-      l.sort()
-      print('%5.1fs: %s...' % (now - testsStartTime, ', '.join(l)))
+      l = list(running.items())
+      # Sort by longest running first:
+      l.sort(key=lambda x: x[1])
+      #print('%5.1fs: %s...' % (now - testsStartTime, ', '.join(['%s (%.1fs)' % (x[0], now-x[1]) for x in l])))
+      print('%5.1fs: %s...' % (now - testsStartTime, ', '.join([x[0] for x in l])))
       lastRunningPrint = now
 
 class RunTestsJVM(threading.Thread):
@@ -266,7 +270,7 @@ class ReadEvents:
         time.sleep(.01)
         now = time.time()
         if self.testCaseName is not None and now > self.testCaseStartTime + self.nextHeartBeat:
-          print('HEARTBEAT @ %.1f sec: %s.%s' % (now - self.testCaseStartTime, self.testSuiteName, self.testCaseName))
+          #print('HEARTBEAT @ %.1f sec: %s.%s' % (now - self.testCaseStartTime, self.testSuiteName, self.testCaseName))
           self.nextHeartBeat += 1.0
         p = self.process.poll()
         if p is not None:
@@ -294,8 +298,12 @@ def run(command):
   p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, close_fds=True)
   out, err = p.communicate()
   if p.returncode != 0:
-    print('\nERROR: command "%s" failed:\n%s' % (command, out.decode('utf-8')))
-    raise RuntimeError('command "%s" failed' % command)
+    if len(command) < 256:
+      s = str(command)
+    else:
+      s = str(command)[:256] + '...'
+    print('\nERROR: command "%s" failed:\n%s' % (s, out.decode('utf-8')))
+    raise RuntimeError('command "%s" failed' % s)
 
 def anyChanges(srcDir, destJAR):
   if not os.path.exists(destJAR):
@@ -576,6 +584,14 @@ def main():
                 raise RuntimeError('test name fragment "%s" is ambiguous, matching at least %s and %s' % (testSubString, testClasses[0], className))
               testClasses.append(className)
 
+      # TODO: generalize this silliness
+      # Get these slow tests to run first:
+      for testCase in ('TestIndexing', 'TestReplication', 'TestServer'):
+        s = 'org.apache.lucene.server.' + testCase
+        if s in testClasses:
+          testClasses.remove(s)
+          testClasses = [s] + testClasses
+
       if len(testClasses) == 0:
         if testSubString is None:
           raise RuntimeError('no tests found (wtf?)')
@@ -602,7 +618,7 @@ def main():
       t0 = time.time()
       jobs = queue.Queue()
 
-      running = set()
+      running = {}
       lastRunningPrint = time.time()
       testsStartTime = time.time()
 

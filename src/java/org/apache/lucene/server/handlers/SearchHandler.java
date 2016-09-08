@@ -1659,8 +1659,10 @@ public class SearchHandler extends Handler {
 
         if (searcher.hasParam("version")) {
           // Searcher is identified by a version, returned by
-          // a prior search.  Apps use this when the user does
-          // a follow-on search (next page, drill down, etc.):
+          // a prior search or by a refresh.  Apps use this when
+          // the user does a follow-on search (next page, drill
+          // down, etc.), or to ensure changes from a refresh
+          // or NRT replication point are reflected:
           version = searcher.getLong("version");
           snapshot = null;
         } else {
@@ -1719,6 +1721,7 @@ public class SearchHandler extends Handler {
                   public void beforeRefresh() {
                   }
 
+                  @Override
                   public void afterRefresh(boolean didRefresh) throws IOException {
                     SearcherAndTaxonomy current = state.acquire();
                     System.out.println("SearchHandler: refresh completed newVersion=" + ((DirectoryReader) current.searcher.getIndexReader()).getVersion());
@@ -1758,7 +1761,7 @@ public class SearchHandler extends Handler {
               // but this searcher has timed out.  App
               // should present a "your session expired" to
               // user:
-              request.fail("searcher", "This searcher has expired.");
+              request.fail("searcher", "This searcher has expired version=" + version + " vs currentVersion=" + currentVersion);
               // Dead code but compiler disagrees:
               s = null;
             }

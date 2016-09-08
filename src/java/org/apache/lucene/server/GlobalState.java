@@ -33,24 +33,35 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.lucene.facet.taxonomy.SearcherTaxonomyManager.SearcherAndTaxonomy;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TimeLimitingCollector;
+import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.server.handlers.DocHandler;
 import org.apache.lucene.server.handlers.Handler;
+import org.apache.lucene.server.handlers.NodeToNodeHandler;
+import org.apache.lucene.server.handlers.Search2Handler;
 import org.apache.lucene.server.plugins.Plugin;
 import org.apache.lucene.util.IOUtils;
 import org.apache.lucene.util.NamedThreadFactory;
+import org.apache.lucene.util.StringHelper;
 
 import net.minidev.json.JSONObject;
 import net.minidev.json.JSONValue;
@@ -94,8 +105,8 @@ public class GlobalState implements Closeable {
 
   // TODO: make these controllable
   // nocommit allow controlling per CSV/json bulk import max concurrency sent into IW?
-  private final static int MAX_INDEXING_THREADS = 10;
-  //private final static int MAX_INDEXING_THREADS = Runtime.getRuntime().availableProcessors();
+  //private final static int MAX_INDEXING_THREADS = 10;
+  private final static int MAX_INDEXING_THREADS = Runtime.getRuntime().availableProcessors();
   //private final static int MAX_INDEXING_THREADS = 1;
 
   final DocHandler docHandler = new DocHandler();
@@ -105,6 +116,8 @@ public class GlobalState implements Closeable {
   private final Map<String,Plugin> plugins = new HashMap<String,Plugin>();
 
   private final static int MAX_BUFFERED_ITEMS = Math.max(100, 2*MAX_INDEXING_THREADS);
+
+  public final SearchQueue searchQueue;
 
   // Seems to be substantially faster than ArrayBlockingQueue at high throughput:  
   final BlockingQueue<Runnable> docsToIndex = new LinkedBlockingQueue<Runnable>(MAX_BUFFERED_ITEMS);
@@ -124,6 +137,67 @@ public class GlobalState implements Closeable {
 
   final Path stateDir;
 
+  // nocommit make this a thread pool :)
+  final Thread searchThread = new Thread() {
+      @Override
+      public void run() {
+        try {
+          _run();
+        } catch (Exception e) {
+          // nocommit this kills our one and only search thread ;)
+          throw new RuntimeException(e);
+        }
+      }
+
+      private void _run() throws Exception {
+        Search2Handler searchHandler = (Search2Handler) getHandler("search2");
+        assert searchHandler != null;
+        
+        while (true) {
+          SearchQueue.QueryAndID query;
+          try {
+            query = searchQueue.takeNextQuery();
+          } catch (RuntimeException re) {
+            if (re.getCause() instanceof InterruptedException) {
+              break;
+            } else { 
+              throw re;
+            }
+          }
+          //System.out.println("N" + StringHelper.idToString(nodeID) + ": run query Q" + query.id);
+
+          IndexState indexState = get(query.indexName);
+          SearcherAndTaxonomy searcher = indexState.acquire();
+          TopDocs hits;
+          try {
+            hits = searcher.searcher.search(new TermQuery(new Term("title", query.text)), 10);
+          } finally {
+            indexState.release(searcher);
+          }
+
+          if (Arrays.equals(query.returnNodeID, nodeID)) {
+            // We are the coordinating node for this query
+            searchHandler.deliverHits(query.id, hits);
+          } else {
+
+            RemoteNodeConnection node = getNodeLink(query.returnNodeID);
+          
+            synchronized(node.c) {
+              node.c.out.writeByte(NodeToNodeHandler.CMD_RECEIVE_HITS);
+              node.c.out.writeBytes(query.id.id, 0, query.id.id.length);
+              node.c.out.writeInt(hits.totalHits);
+              node.c.out.writeInt(hits.scoreDocs.length);
+              for(ScoreDoc hit : hits.scoreDocs) {
+                node.c.out.writeInt(hit.doc);
+                node.c.out.writeInt(Float.floatToIntBits(hit.score));
+              }
+              node.c.flush();
+            }
+          }
+        }
+      }
+    };
+
   // nocommit why not just ls the root dir?
 
   /** This is persisted so on restart we know about all
@@ -140,6 +214,10 @@ public class GlobalState implements Closeable {
 
   public final String nodeName;
 
+  public final List<RemoteNodeConnection> remoteNodes = new CopyOnWriteArrayList<>();
+
+  public final byte[] nodeID = StringHelper.randomId();
+
   /** Sole constructor. */
   public GlobalState(String nodeName, Path stateDir) throws IOException {
     System.out.println("MAX INDEXING THREADS " + MAX_INDEXING_THREADS);
@@ -148,6 +226,21 @@ public class GlobalState implements Closeable {
     if (Files.exists(stateDir) == false) {
       Files.createDirectories(stateDir);
     }
+    searchQueue = new SearchQueue(this);
+  }
+
+  public synchronized void addNodeLink(byte[] nodeID, Connection c) {
+    remoteNodes.add(new RemoteNodeConnection(nodeID, c));
+  }
+
+  public synchronized RemoteNodeConnection getNodeLink(byte[] nodeID) {
+    // nocommit hashmap instead
+    for(RemoteNodeConnection node : remoteNodes) {
+      if (Arrays.equals(nodeID, node.nodeID)) {
+        return node;
+      }
+    }
+    return null;
   }
 
   /** Record a new handler, by methode name (search,
@@ -177,6 +270,7 @@ public class GlobalState implements Closeable {
   }
 
   /** Get the {@link IndexState} by index name. */
+  // nocommit rename to getIndex
   public IndexState get(String name) throws IOException {
     synchronized(indices) {
       IndexState state = indices.get(name);
@@ -195,6 +289,10 @@ public class GlobalState implements Closeable {
       }
       return state;
     }
+  }
+
+  public boolean hasIndex(String name) {
+    return indices.containsKey(name);
   }
 
   /** Remove the specified index. */
@@ -287,6 +385,8 @@ public class GlobalState implements Closeable {
   @Override
   public void close() throws IOException {
     //System.out.println("GlobalState.close: indices=" + indices);
+    searchThread.interrupt();
+    IOUtils.close(remoteNodes);
     IOUtils.close(indices.values());
     indexService.shutdown();
     TimeLimitingCollector.getGlobalTimerThread().stopTimer();

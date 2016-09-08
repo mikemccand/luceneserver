@@ -18,9 +18,12 @@ package org.apache.lucene.server;
  */
 
 import java.io.IOException;
+import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -85,7 +88,7 @@ public class TestIndexing extends ServerBaseTestCase {
 
     String s = sb.toString();
 
-    JSONObject result = sendChunked(s, "bulkAddDocument");
+    JSONObject result = send("bulkAddDocument", new HashMap<>(), new StringReader(s));
     assertEquals(100, result.get("indexedDocumentCount"));
     long indexGen = ((Number) result.get("indexGen")).longValue();
     assertEquals(1, getInt(send("search", "{queryText: 'body:99', searcher: {indexGen: " + indexGen + "}}"), "totalHits"));
@@ -109,7 +112,7 @@ public class TestIndexing extends ServerBaseTestCase {
 
     s = sb.toString();
 
-    result = sendChunked(s, "bulkUpdateDocument");
+    result = send("bulkUpdateDocument", new HashMap<>(), new StringReader(s));
     assertEquals(100, result.get("indexedDocumentCount"));
     indexGen = ((Number) result.get("indexGen")).longValue();
     assertEquals(1, getInt(send("search", "{queryText: 'body:99', searcher: {indexGen: " + indexGen + "}}"), "totalHits"));
@@ -140,7 +143,7 @@ public class TestIndexing extends ServerBaseTestCase {
     String s = sb.toString();
 
     try {
-      sendChunked(s, "bulkAddDocument");
+      send("bulkAddDocument", new HashMap<>(), new StringReader(s));
       fail("did not hit expected exception");
     } catch (IOException ioe) {
       // expected
@@ -208,7 +211,7 @@ public class TestIndexing extends ServerBaseTestCase {
     sb.append("]}");
     String s = sb.toString();
 
-    JSONObject result = sendChunked(s, "bulkAddDocument");
+    JSONObject result = send("bulkAddDocument", new HashMap<>(), new StringReader(s));
     assertEquals(100, result.get("indexedDocumentCount"));
     long indexGen = getLong(result, "indexGen");
     JSONObject r = search("99", indexGen, null, false, true, null, null);
@@ -350,6 +353,18 @@ public class TestIndexing extends ServerBaseTestCase {
     byte[] bytes = server.sendBinary("bulkCSVAddDocument",
                                      ",csv\nid,id2,body\n0,1,some text\n1,2,some more text\n".getBytes(StandardCharsets.UTF_8));
     JSONObject result = parseJSONObject(new String(bytes, StandardCharsets.UTF_8));
+    assertEquals(2, getInt(result, "indexedDocumentCount"));
+    send("stopIndex");
+    send("deleteIndex");
+  }
+
+  public void testIndexCSVBasicHTTP() throws Exception {
+    createIndex("csv");
+    send("registerFields", "{fields: {id: {type: atom, store: true, sort: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
+    send("startIndex");
+    Map<String,Object> params = new HashMap<>();
+    params.put("indexName", "csv");
+    JSONObject result = server.send("bulkCSVAddDocument2", params, new StringReader("id,id2,body\n0,1,some text\n1,2,some more text\n"));
     assertEquals(2, getInt(result, "indexedDocumentCount"));
     send("stopIndex");
     send("deleteIndex");

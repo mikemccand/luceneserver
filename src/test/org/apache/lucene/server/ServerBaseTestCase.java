@@ -23,10 +23,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.Reader;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Enumeration;
+import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -149,7 +152,7 @@ public abstract class ServerBaseTestCase extends LuceneTestCase {
   }
     
   protected static void startServer() throws Exception {
-    server = new RunServer("test", STATE_DIR);
+    server = new RunServer(new Random(random().nextLong()), "test", STATE_DIR);
   }
 
   protected static void createAndStartIndex(String indexName) throws Exception {
@@ -268,8 +271,8 @@ public abstract class ServerBaseTestCase extends LuceneTestCase {
     return server.httpLoad(path);
   }
 
-  protected static JSONObject sendChunked(String body, String request) throws Exception {
-    return server.sendChunked(body, request);
+  protected static JSONObject send(String command, Map<String,Object> params, Reader body) throws Exception {
+    return server.send(command, params, body);
   }
   
   /** Simple xpath-like utility method to jump down and grab

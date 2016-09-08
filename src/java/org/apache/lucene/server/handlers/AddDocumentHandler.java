@@ -52,8 +52,9 @@ import org.apache.lucene.server.IndexState;
 import org.apache.lucene.server.params.*;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.NumericUtils;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.JsonToken;
+
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;

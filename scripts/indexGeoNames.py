@@ -32,6 +32,8 @@ PACKAGE_FILE = os.path.abspath('build/luceneserver-%s-SNAPSHOT.zip' % LUCENE_SER
 
 USER_NAME = getpass.getuser()
 
+BINARY_CSV = False
+
 class BinarySend:
   def __init__(self, host, port, command):
     self.socket = socket.socket()
@@ -50,6 +52,31 @@ class BinarySend:
 
   def close(self):
     self.socket.close()
+
+class ChunkedHTTPSend:
+  def __init__(self, host, port, command, args):
+    self.conn = http.client.HTTPConnection(host, port)
+    url = '/%s' % command
+    if len(args) > 0:
+      url += '?%s' % urllib.parse.urlencode(args)
+    print('URL: %s' % url)
+    self.conn.putrequest('POST', url)
+    self.conn.putheader('Transfer-Encoding', 'chunked')
+    self.conn.endheaders()
+
+  def add(self, data):
+    self.conn.send(("%s\r\n" % hex(len(data))[2:]).encode('UTF-8'))
+    self.conn.send(data)
+    self.conn.send('\r\n'.encode('UTF-8'))
+
+  def finish(self):
+    r = self.conn.getresponse()
+    s = r.read()
+    if r.status != 200:
+      raise RuntimeError('FAILED:\n%s' % s.decode('utf-8'))
+    else:
+      return s.decode('utf-8')
+    self.conn.close()
 
 def launchServer(host, installDir, port, ip=None):
 
@@ -350,25 +377,45 @@ def main():
       doSearch = len(replicaPorts) > 0
 
       tStart = time.time()
-      b1 = BinarySend(LOCALHOST, primaryPorts[1], 'bulkCSVAddDocument')
-      b1.add(b'\tindex\n')
+      if BINARY_CSV:
+        b1 = BinarySend(LOCALHOST, primaryPorts[1], 'bulkCSVAddDocument')
+        b1.add(b'\tindex\n')
+      else:
+        c = ChunkedHTTPSend(LOCALHOST, primaryPorts[0], 'bulkCSVAddDocument2', {'indexName': 'index', 'delimChar': '\t'})
       with open(docSource, 'rb') as f:
-        b1.add(('\t'.join(headers)+'\n').encode('ascii'))
-        csvHeader = f.readline()
-        b1.add(csvHeader)
+        if BINARY_CSV:
+          b1.add(('\t'.join(headers)+'\n').encode('ascii'))
+        else:
+          c.add(('\t'.join(headers)+'\n').encode('ascii'))
         while True:
           bytes = f.read(256*1024)
           if bytes == b'':
             break
-          b1.add(bytes)
-      b1.finish()
+          if BINARY_CSV:
+            b1.add(bytes)
+          else:
+            try:
+              c.add(bytes)
+            except:
+              print('FAILED:')
+              print(c.finish())
+              raise
 
-      status = b1.socket.recv(1)
-      bytes = b1.socket.recv(4)
-      size = struct.unpack('>i', bytes)
-      bytes = b1.socket.recv(size[0])
-      print('Indexing done; status: %s, result: %s' % (status, bytes.decode('utf-8')))
-      b1.close()
+      if BINARY_CSV:
+        b1.finish()
+        status = b1.socket.recv(1)
+        bytes = b1.socket.recv(4)
+        size = struct.unpack('>i', bytes)
+        bytes = b1.socket.recv(size[0])
+        b1.close()
+        result = bytes.decode('utf-8')
+      else:
+        print("done; now finish")
+        c.add(b'')
+        status = '200'
+        result = c.finish()
+        
+      print('Indexing done: %s\n%s' % (status, result))
 
       if False:
         bytes = b2.socket.recv(4)

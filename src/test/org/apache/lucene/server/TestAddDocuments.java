@@ -17,10 +17,13 @@ package org.apache.lucene.server;
  * limitations under the License.
  */
 
+import java.io.StringReader;
+import java.util.HashMap;
 import java.util.Locale;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 
@@ -104,7 +107,7 @@ public class TestAddDocuments extends ServerBaseTestCase {
 
     String s = sb.toString();
 
-    JSONObject result = sendChunked(s, "bulkAddDocuments");
+    JSONObject result = send("bulkAddDocuments", new HashMap<>(), new StringReader(s));
     assertEquals(100, result.get("indexedDocumentBlockCount"));
     long indexGen = ((Number) result.get("indexGen")).longValue();
 

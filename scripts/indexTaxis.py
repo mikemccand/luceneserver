@@ -11,10 +11,12 @@ import threading
 import http.client
 import getpass
 import urllib.request
+import urllib.parse
 
 LUCENE_SERVER_BASE_VERSION = '0.1.1'
 
-JVM_OPTIONS = '-XX:+AlwaysPreTouch -Xms2g -Xmx2g'
+#JVM_OPTIONS = '-XX:+AlwaysPreTouch -Xms2g -Xmx2g'
+JVM_OPTIONS = '-Xms2g -Xmx2g'
 
 # killall java; ssh 10.17.4.12 killall java; rm -rf /c/taxis; ssh 10.17.4.12 "rm -rf /l/taxis"; python3 -u scripts/indexTaxis.py -rebuild -ip 10.17.4.92 -installPath /c/taxis -replica 10.17.4.12:/l/taxis
 
@@ -31,6 +33,8 @@ DEFAULT_PORT = 4000
 PACKAGE_FILE = os.path.abspath('build/luceneserver-%s-SNAPSHOT.zip' % LUCENE_SERVER_BASE_VERSION)
 
 USER_NAME = getpass.getuser()
+
+BINARY_CSV = False
 
 class BinarySend:
   def __init__(self, host, port, command):
@@ -50,6 +54,31 @@ class BinarySend:
 
   def close(self):
     self.socket.close()
+
+class ChunkedHTTPSend:
+  def __init__(self, host, port, command, args):
+    self.conn = http.client.HTTPConnection(host, port)
+    url = '/%s' % command
+    if len(args) > 0:
+      url += '?%s' % urllib.parse.urlencode(args)
+    print('URL: %s' % url)
+    self.conn.putrequest('POST', url)
+    self.conn.putheader('Transfer-Encoding', 'chunked')
+    self.conn.endheaders()
+
+  def add(self, data):
+    self.conn.send(("%s\r\n" % hex(len(data))[2:]).encode('UTF-8'))
+    self.conn.send(data)
+    self.conn.send('\r\n'.encode('UTF-8'))
+
+  def finish(self):
+    r = self.conn.getresponse()
+    s = r.read()
+    if r.status != 200:
+      raise RuntimeError('FAILED:\n%s' % s.decode('utf-8'))
+    else:
+      return s.decode('utf-8')
+    self.conn.close()
 
 def launchServer(host, installDir, port, ip=None):
 
@@ -287,9 +316,6 @@ def main():
     else:
       send(LOCALHOST, primaryPorts[0], 'startIndex', {'indexName': 'index'})
 
-    b1 = BinarySend(LOCALHOST, primaryPorts[1], 'bulkCSVAddDocument')
-    b1.add(b',index\n')
-
     id = 0
     tStart = time.time()
     nextPrint = 250000
@@ -330,9 +356,19 @@ def main():
     if dps is not None:
       dps = float(dps)
 
+    if BINARY_CSV:
+      b1 = BinarySend(LOCALHOST, primaryPorts[1], 'bulkCSVAddDocument')
+      b1.add(b',index\n')
+    else:
+      # nocommit why no errors detected with \t not ,?
+      c = ChunkedHTTPSend(LOCALHOST, primaryPorts[0], 'bulkCSVAddDocument2', {'indexName': 'index', 'delimChar': ','})
+
     with open(docSource, 'rb') as f:
       csvHeader = f.readline()
-      b1.add(csvHeader)
+      if BINARY_CSV:      
+        b1.add(csvHeader)
+      else:
+        c.add(csvHeader)
       while True:
         header = f.readline()
         if len(header) == 0:
@@ -340,7 +376,15 @@ def main():
         byteCount, docCount = (int(x) for x in header.strip().split())
         bytes = f.read(byteCount)
         totBytes += byteCount
-        b1.add(bytes)
+        if BINARY_CSV:      
+          b1.add(bytes)
+        else:
+          try:
+            c.add(bytes)
+          except:
+            print('FAILED:')
+            print(c.finish())
+            raise
         chunkCount += 1
         #print('doc: %s' % doc)
         id += docCount
@@ -363,14 +407,18 @@ def main():
           if expected > now:
             time.sleep(expected-now)
 
-    b1.finish()
-
-    status = b1.socket.recv(1)
-    bytes = b1.socket.recv(4)
-    size = struct.unpack('>i', bytes)
-    bytes = b1.socket.recv(size[0])
-    print('Indexing done; status: %s, result: %s' % (status, bytes.decode('utf-8')))
-    b1.close()
+    if BINARY_CSV:      
+      b1.finish()
+      status = b1.socket.recv(1)
+      bytes = b1.socket.recv(4)
+      size = struct.unpack('>i', bytes)
+      bytes = b1.socket.recv(size[0])
+      b1.close()
+      result = bytes.decode('UTF-8')
+    else:
+      c.add(b'')
+      result = c.finish()
+    print('Indexing done; status: %s, result: %s' % (status, result))
 
     if False:
       bytes = b2.socket.recv(4)

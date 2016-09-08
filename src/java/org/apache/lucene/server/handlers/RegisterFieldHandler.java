@@ -106,6 +106,8 @@ import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 import net.minidev.json.JSONValue;
 
+// nocommit rename to RegisterFieldsHandler:
+
 /** Handles {@code registerFields}. */
 public class RegisterFieldHandler extends Handler {
 
@@ -748,8 +750,7 @@ public class RegisterFieldHandler extends Handler {
     }
 
     if (searchAnalyzer == null) {
-      // nocommit: this does nothing!
-      searchAnalyzer = searchAnalyzer;
+      searchAnalyzer = indexAnalyzer;
     }
 
     String liveValuesIDField;

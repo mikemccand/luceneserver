@@ -27,9 +27,10 @@ import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
 import org.apache.lucene.server.params.*;
 import org.apache.lucene.util.IOUtils;
-import org.codehaus.jackson.JsonFactory;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.JsonToken;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 
 import net.minidev.json.JSONObject;
 
@@ -115,7 +116,7 @@ public class BulkAddDocumentHandler extends Handler {
       count++;
     }
 
-    // nocommit this is ... lameish:
+    // nocommit switch to Phaser:
     while (true) {
       if (ctx.addCount.get() == count) {
         break;

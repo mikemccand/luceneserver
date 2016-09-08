@@ -246,7 +246,7 @@ public class TestServer extends ServerBaseTestCase {
     JSONObject searchState = new JSONObject();
     put(o3, "searcher", "{version: 0}");
     String message = expectThrows(IOException.class, () -> {send("search", o3);}).getMessage();
-    assertTrue(message.contains("search > searcher: This searcher has expired."));
+    assertTrue(message.contains("search > searcher: This searcher has expired"));
   }
 
   public void testMultiValuedString() throws Exception {
@@ -384,10 +384,10 @@ public class TestServer extends ServerBaseTestCase {
     }
   }
 
-  public void testManyIndices() throws Exception {
+  public void testTenIndices() throws Exception {
     stopIndex("index");
     deleteIndex("index");
-    for(int i=0;i<100;i++) {
+    for(int i=0;i<10;i++) {
       createAndStartIndex("index");
       stopIndex("index");
       deleteIndex("index");
@@ -402,7 +402,7 @@ public class TestServer extends ServerBaseTestCase {
     rmDir(dir);
 
     // specify port 0 twice, which tells the OS to pick two free ports:
-    RunServer server = new RunServer("test", dir, Arrays.asList(new String[] {"127.0.0.1:0", "127.0.0.1:0"}));
+    RunServer server = new RunServer(random(), "test", dir, Arrays.asList(new String[] {"127.0.0.1:0", "127.0.0.1:0"}));
     assertEquals(2, server.server.bindIPs.size());
     assertEquals(2, server.server.actualPorts.size());
     assertEquals(2, server.server.actualBinaryPorts.size());

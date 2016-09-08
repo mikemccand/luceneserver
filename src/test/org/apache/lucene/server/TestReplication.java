@@ -17,7 +17,9 @@ package org.apache.lucene.server;
  * limitations under the License.
  */
 
+import java.io.StringReader;
 import java.nio.file.Path;
+import java.util.HashMap;
 
 import org.apache.lucene.document.Document;
 import org.apache.lucene.util.LineFileDocs;
@@ -29,11 +31,11 @@ public class TestReplication extends ServerBaseTestCase {
   public void testBasic() throws Exception {
     Path dir1 = createTempDir("server1");
     rmDir(dir1);
-    RunServer server1 = new RunServer("server1", dir1);
+    RunServer server1 = new RunServer(random(), "server1", dir1);
 
     Path dir2 = createTempDir("server1");
     rmDir(dir2);
-    RunServer server2 = new RunServer("server2", dir2);
+    RunServer server2 = new RunServer(random(), "server2", dir2);
 
     Path primaryPath = createTempDir("indexPrimary");
     rmDir(primaryPath);
@@ -99,11 +101,11 @@ public class TestReplication extends ServerBaseTestCase {
 
     Path dir1 = createTempDir("server1");
     rmDir(dir1);
-    RunServer server1 = new RunServer("server1", dir1);
+    RunServer server1 = new RunServer(random(), "server1", dir1);
 
     Path dir2 = createTempDir("server1");
     rmDir(dir2);
-    RunServer server2 = new RunServer("server2", dir2);
+    RunServer server2 = new RunServer(random(), "server2", dir2);
 
     Path primaryPath = createTempDir("indexPrimary");
     rmDir(primaryPath);
@@ -140,7 +142,7 @@ public class TestReplication extends ServerBaseTestCase {
 
       int id = 0;
       int lastSearchCount = 0;
-      
+
       for(int i=0;i<100;i++) {
         StringBuilder sb = new StringBuilder();
         sb.append("{\"indexName\": \"index\", \"documents\": [");
@@ -159,7 +161,7 @@ public class TestReplication extends ServerBaseTestCase {
         }
         sb.append("]}");
         String s = sb.toString();
-        JSONObject result = server1.sendChunked(s, "bulkAddDocument");
+        JSONObject result = server1.send("bulkAddDocument", new HashMap<String,Object>(), new StringReader(s));
         assertEquals(100, result.get("indexedDocumentCount"));
 
         result = server2.send("search", "{indexName: index, queryText: \"*:*\", retrieveFields: [body]}");

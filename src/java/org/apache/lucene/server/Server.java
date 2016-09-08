@@ -62,6 +62,7 @@ import org.apache.lucene.server.handlers.BuildSuggestHandler;
 import org.apache.lucene.server.handlers.BulkAddDocumentHandler;
 import org.apache.lucene.server.handlers.BulkAddDocumentsHandler;
 import org.apache.lucene.server.handlers.BulkCSVAddDocumentHandler;
+import org.apache.lucene.server.handlers.BulkCSVAddDocumentHandlerNonBinary;
 import org.apache.lucene.server.handlers.BulkUpdateDocumentHandler;
 import org.apache.lucene.server.handlers.BulkUpdateDocumentsHandler;
 import org.apache.lucene.server.handlers.CommitHandler;
@@ -75,14 +76,17 @@ import org.apache.lucene.server.handlers.GetCommitUserDataHandler;
 import org.apache.lucene.server.handlers.Handler;
 import org.apache.lucene.server.handlers.HelpHandler;
 import org.apache.lucene.server.handlers.IndexStatusHandler;
+import org.apache.lucene.server.handlers.LinkNodeHandler;
 import org.apache.lucene.server.handlers.LiveSettingsHandler;
 import org.apache.lucene.server.handlers.LiveValuesHandler;
 import org.apache.lucene.server.handlers.NearestPointsHandler;
 import org.apache.lucene.server.handlers.NewNRTPointHandler;
+import org.apache.lucene.server.handlers.NodeToNodeHandler;
 import org.apache.lucene.server.handlers.RefreshHandler;
 import org.apache.lucene.server.handlers.RegisterFieldHandler;
 import org.apache.lucene.server.handlers.ReleaseSnapshotHandler;
 import org.apache.lucene.server.handlers.RollbackHandler;
+import org.apache.lucene.server.handlers.Search2Handler;
 import org.apache.lucene.server.handlers.SearchHandler;
 import org.apache.lucene.server.handlers.SendMeFilesHandler;
 import org.apache.lucene.server.handlers.SetCommitUserDataHandler;
@@ -96,8 +100,8 @@ import org.apache.lucene.server.handlers.UpdateDocumentHandler;
 import org.apache.lucene.server.handlers.UpdateSuggestHandler;
 import org.apache.lucene.server.handlers.WriteNRTPointHandler;
 import org.apache.lucene.server.params.Param;
-import org.apache.lucene.server.params.PolyType;
 import org.apache.lucene.server.params.PolyType.PolyEntry;
+import org.apache.lucene.server.params.PolyType;
 import org.apache.lucene.server.params.Request;
 import org.apache.lucene.server.params.RequestFailedException;
 import org.apache.lucene.server.params.StructType;
@@ -117,17 +121,12 @@ import net.minidev.json.parser.JSONParser;
 import net.minidev.json.parser.ParseException;
 
 public class Server {
-
-  public static final int BINARY_MAGIC = 0x3414f5c;
-
-  private static final boolean VERBOSE = false;
-
-  public static final int DEFAULT_PORT = 4000;
-
-  public static final String SERVER_VERSION = computeVersion();
-
-  private static String computeVersion() {
-    Package p = Server.class.getPackage();
+public static final int BINARY_MAGIC = 0x3414f5c;
+private static final boolean VERBOSE = false;
+public static final int DEFAULT_PORT = 4000;
+public static final String SERVER_VERSION = computeVersion();
+private static String computeVersion() {
+Package p = Server.class.getPackage();
     String s;
     if (p != null) {
       s = p.getImplementationVersion();
@@ -662,11 +661,13 @@ public class Server {
     globalState.addHandler("deleteDocuments", new DeleteDocumentsHandler(globalState));
     globalState.addHandler("help", new HelpHandler(globalState));
     globalState.addHandler("indexStatus", new IndexStatusHandler(globalState));
+    globalState.addHandler("linkNode", new LinkNodeHandler(globalState));
     globalState.addHandler("liveSettings", new LiveSettingsHandler(globalState));
     globalState.addHandler("liveValues", new LiveValuesHandler(globalState));
     globalState.addHandler("registerFields", new RegisterFieldHandler(globalState));
     globalState.addHandler("releaseSnapshot", new ReleaseSnapshotHandler(globalState));
     globalState.addHandler("search", new SearchHandler(globalState));
+    globalState.addHandler("search2", new Search2Handler(globalState));
     globalState.addHandler("nearestPoints", new NearestPointsHandler(globalState));
     globalState.addHandler("settings", new SettingsHandler(globalState));
     globalState.addHandler("shutdown", new ShutdownHandler(globalState));
@@ -699,6 +700,12 @@ public class Server {
     // TODO: allow CSV update document too:
     // binary protocol for bulk adding CSV encoded documents
     globalState.addHandler("bulkCSVAddDocument", new BulkCSVAddDocumentHandler(globalState));
+    globalState.addHandler("bulkCSVAddDocument2", new BulkCSVAddDocumentHandlerNonBinary(globalState));
+
+    globalState.addHandler("nodeToNode", new NodeToNodeHandler(globalState));
+
+    // Must start after Search2Handler is set:
+    globalState.searchThread.start();
 
     for(String bindIPPort : bindIPPorts) {
       String[] parts = bindIPPort.split(":");
@@ -869,13 +876,19 @@ public class Server {
         String command = new String(bytes, 0, length, StandardCharsets.UTF_8);
         //System.out.println("SVR " + globalState.nodeName + ": binary: command=" + command);
 
+        // nocommit where else should we use no delay?
+        if (command.equals("nodeToNode")) {
+          // We send tiny commands back and forth between the nodes, so we are far more concerned with lower latency than higher throughput:
+          socket.setTcpNoDelay(true);
+        }
+
         Handler handler = globalState.getHandler(command);
         if (handler.binaryRequest() == false) {
           throw new IllegalArgumentException("command " + command + " cannot handle binary requests");
         }
 
         // nocommit what buffer size?
-        // nocommit don't buffer at all here?  make it explicit when we write the result?
+        // nocommit don't buffer at all here!  make it explicit when we write the result!  else the protocol is messy:
         OutputStream bufferedOut = new BufferedOutputStream(out);
 
         handler.handleBinary(in, dataIn, new OutputStreamDataOutput(bufferedOut), bufferedOut);

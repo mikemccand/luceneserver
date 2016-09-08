@@ -21,14 +21,23 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStreamWriter;
+import java.io.Reader;
+import java.io.Writer;
 import java.net.ConnectException;
 import java.net.HttpURLConnection;
 import java.net.Socket;
 import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.CharsetEncoder;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -37,6 +46,7 @@ import org.apache.lucene.store.DataInput;
 import org.apache.lucene.store.DataOutput;
 import org.apache.lucene.store.InputStreamDataInput;
 import org.apache.lucene.store.OutputStreamDataOutput;
+import org.apache.lucene.util.TestUtil;
 
 import net.minidev.json.JSONObject;
 import net.minidev.json.JSONStyle;
@@ -72,11 +82,14 @@ public class RunServer {
 
   public final Server server;
 
-  public RunServer(String name, Path globalStateDir) throws Exception {
-    this(name, globalStateDir, Arrays.asList(new String[] {"127.0.0.1:0"}));
+  private final Random random;
+
+  public RunServer(Random random, String name, Path globalStateDir) throws Exception {
+    this(random, name, globalStateDir, Arrays.asList(new String[] {"127.0.0.1:0"}));
   }
 
-  public RunServer(final String name, final Path globalStateDir, List<String> ipPorts) throws Exception {
+  public RunServer(Random random, final String name, final Path globalStateDir, List<String> ipPorts) throws Exception {
+    this.random = random;
     final CountDownLatch ready = new CountDownLatch(1);
     final Exception[] exc = new Exception[1];
     final AtomicReference<Server> theServer = new AtomicReference<>();
@@ -113,6 +126,10 @@ public class RunServer {
     }
   }
 
+  protected void refresh() throws Exception {
+    send("refresh", "{indexName: " + curIndexName + "}");
+  }
+
   private boolean requiresIndexName(String command) {
     if (command.equals("shutdown")) {
       return false;
@@ -136,7 +153,7 @@ public class RunServer {
     }
     return _send(command, args);
   }
-  
+
   JSONObject _send(String command, String args) throws Exception {
     JSONObject o;
     // we do permissive parsing here so tests can do e.g. {indexName: foo} without the double quotes around all strings:
@@ -299,6 +316,69 @@ public class RunServer {
     }
   }
 
+  /** Sends a chunked HTTP request */
+  public JSONObject send(String command, Map<String,Object> params, Reader body) throws Exception {
+    // TODO: isn't there some java sugar for this already!?
+    StringBuilder url = new StringBuilder("http://localhost:");
+    url.append(port);
+    url.append('/');
+    url.append(command);
+    url.append('?');
+    for(Map.Entry<String,Object> ent : params.entrySet()) {
+      if (ent.getValue() instanceof List) {
+        List<String> values = (List<String>) ent.getValue();
+        for(String value : values) {
+          url.append(ent.getKey());
+          url.append('=');
+          url.append(URLEncoder.encode(value));
+        }
+      } else {
+        url.append(ent.getKey());
+        url.append('=');
+        url.append(URLEncoder.encode((String) ent.getValue()));
+      }
+    }
+    HttpURLConnection c = (HttpURLConnection) new URL(url.toString()).openConnection();
+    c.setUseCaches(false);
+    c.setDoOutput(true);
+    int chunkKB = TestUtil.nextInt(random, 1, 128);
+    c.setChunkedStreamingMode(chunkKB*1024);
+    c.setRequestMethod("POST");
+    c.setRequestProperty("Charset", "UTF-8");
+
+    CharsetEncoder encoder = StandardCharsets.UTF_8.newEncoder()
+      .onMalformedInput(CodingErrorAction.REPORT)
+      .onUnmappableCharacter(CodingErrorAction.REPORT);
+    Writer w = new OutputStreamWriter(c.getOutputStream(), encoder);
+    char[] buffer = new char[2048];
+    while (true) {
+      int count = body.read(buffer);
+      if (count == -1) {
+        break;
+      }
+      assert count > 0;
+      w.write(buffer, 0, count);
+    }
+    w.flush();
+
+    int code = c.getResponseCode();
+    int size = c.getContentLength();
+    byte[] bytes = new byte[size];
+    if (code == 200) {
+      InputStream is = c.getInputStream();
+      readFully(is, bytes);
+      c.disconnect();
+      // nocommit we can't assume it's UTF-8 coming back from the server:
+      return (JSONObject) JSONValue.parseStrict(new String(bytes, "UTF-8"));
+    } else {
+      InputStream is = c.getErrorStream();
+      readFully(is, bytes);
+      c.disconnect();
+      throw new IOException("Server error:\n" + new String(bytes, "UTF-8"));
+    }
+  }
+
+  /*
   public JSONObject sendChunked(String body, String request) throws Exception {
     HttpURLConnection c = (HttpURLConnection) new URL("http://localhost:" + port + "/" + request).openConnection();
     c.setUseCaches(false);
@@ -324,4 +404,5 @@ public class RunServer {
       throw new IOException("Server error:\n" + new String(bytes, "UTF-8"));
     }
   }
+  */
 }

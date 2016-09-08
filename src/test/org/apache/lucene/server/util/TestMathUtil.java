@@ -17,15 +17,16 @@ package org.apache.lucene.server.util;
  * limitations under the License.
  */
 
-import org.apache.lucene.util.BytesRef;
-import org.apache.lucene.util.LuceneTestCase;
-import org.apache.lucene.util.TestUtil;
-
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
+
+import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.lucene.util.TestUtil;
+import org.junit.Ignore;
 
 public class TestMathUtil extends LuceneTestCase {
 
@@ -105,6 +106,15 @@ public class TestMathUtil extends LuceneTestCase {
       double v = Double.parseDouble(encoded);
       checkDouble(v, encoded, 1);
     }
+  }
+
+  @Ignore("1 ulp difference")
+  public void testBigDouble() throws Exception {
+    String s = "-48687525606695076.0";
+    double x1 = Double.parseDouble(s);
+    byte[] bytes = s.getBytes("UTF-8");
+    double x2 = MathUtil.parseDouble(bytes, 0, bytes.length);
+    assertEquals(x1, x2, 0d);
   }
 
   public void testRandomFloats() throws Exception {

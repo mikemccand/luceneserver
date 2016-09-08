@@ -29,7 +29,7 @@ import org.apache.lucene.store.DataOutput;
 import org.apache.lucene.store.InputStreamDataInput;
 import org.apache.lucene.store.OutputStreamDataOutput;
 
-/** Simple point-to-point, non-persistent TCP connection */
+/** Simple point-to-point TCP connection */
 public class Connection implements Closeable {
   public final DataInput in;
   public final DataOutput out;
@@ -45,6 +45,7 @@ public class Connection implements Closeable {
     this.s = new Socket(address.getAddress(), address.getPort());
     this.sockIn = s.getInputStream();
     this.in = new InputStreamDataInput(sockIn);
+    // nocommit don't use BOS (it's trappy: you can forget to flush); do our own buffering above so the protocol is explicit:
     this.bos = new BufferedOutputStream(s.getOutputStream());
     this.out = new OutputStreamDataOutput(bos);
   }

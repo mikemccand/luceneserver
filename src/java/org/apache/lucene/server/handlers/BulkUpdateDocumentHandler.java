@@ -31,9 +31,11 @@ import org.apache.lucene.server.params.Param;
 import org.apache.lucene.server.params.Request;
 import org.apache.lucene.server.params.StringType;
 import org.apache.lucene.server.params.StructType;
-import org.codehaus.jackson.JsonFactory;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.JsonToken;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
+
 import net.minidev.json.JSONObject;
 
 import static org.apache.lucene.server.IndexState.IndexingContext;

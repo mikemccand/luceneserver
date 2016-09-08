@@ -1473,6 +1473,23 @@ public class IndexState implements Closeable {
                                           verbose ? System.out : null, primaryGen);
 
       startSearcherPruningThread(globalState.shutdownNow);
+
+      // Necessary so that the replica "hang onto" all versions sent to it, since the version is sent back to the user on writeNRTPoint
+      addRefreshListener(new RefreshListener() {
+          @Override
+          public void beforeRefresh() {
+          }
+
+          @Override
+          public void afterRefresh(boolean didRefresh) throws IOException {
+            SearcherAndTaxonomy current = acquire();
+            try {
+              slm.record(current.searcher);
+            } finally {
+              release(current);
+            }
+          }
+        });
       success = true;
     } finally {
       if (!success) {

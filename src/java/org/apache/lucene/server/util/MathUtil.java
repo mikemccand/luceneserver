@@ -11,6 +11,8 @@ package org.apache.lucene.server.util;
 
 import java.nio.charset.StandardCharsets;
 
+// TODO: port the algorithms from http://dl.acm.org/citation.cfm?id=2717032
+
 public class MathUtil {
 
   private static final int INT_MAX_DIV10 = Integer.MAX_VALUE / 10;
@@ -221,6 +223,54 @@ public class MathUtil {
   }
 
   /**
+   * Parses the specified char slice as a signed int.
+   */
+  public static int parseInt(char[] chars, int start, int length) {
+    int end = start + length;
+
+    int negMul = -1;
+    int i = start;
+    if (length > 0) {
+      char c = chars[i];
+      if (c == '-') {
+        negMul = 1;
+        i++;
+      } else if (c == '+') {
+        i++;
+      }
+    } else {
+      throw new NumberFormatException("cannot convert empty string to int");
+    }
+
+    int result = 0; // Accumulates negatively (avoid MIN_VALUE overflow).
+    
+    for (; i < end; i++) {
+      char c = chars[i];
+                        
+      int digit =  c - '0';
+            
+      if (digit >= 10 || digit < 0) {
+        throw newNumberFormatException("invalid integer representation", chars, start, length);
+      }
+            
+      int newResult = result * 10 - digit;
+      if (newResult > result) {
+        throw newNumberFormatException("overflow", chars, start, length);
+      }
+      result = newResult;
+    }
+        
+    // Requires one valid digit character and checks for opposite overflow.
+    if ((result == 0) && chars[i-1] != '0') {
+      throw newNumberFormatException("invalid integer representation", chars, start, length);
+    }
+    if ((result == Integer.MIN_VALUE) && negMul == 1) {
+      throw newNumberFormatException("overflow", chars, start, length);
+    }
+    return negMul * result;
+  }
+
+  /**
    * Parses the byte[] slice as a long.
    */
   public static long parseLong(byte[] bytes, int start, int length) {
@@ -270,11 +320,66 @@ public class MathUtil {
   }
 
   /**
-   * Parses the whole specified byte[] slice as a <code>float</code>.
+   * Parses the char[] slice as a long.
+   */
+  public static long parseLong(char[] chars, int start, int length) {
+    final int end = start + length;
+    int i = start;
+    
+    long negMul = -1;
+    if (length > 0) {
+      char c = chars[i];
+      if (c == '-') {
+        negMul = 1;
+        i++;
+      } else if (c == '+') {
+        i++;
+      }
+    } else {
+      throw new NumberFormatException("cannot convert empty string to int");
+    }
+        
+    long result = 0; // Accumulates negatively (avoid MIN_VALUE overflow).
+    for (; i < end; i++) {
+      char c = chars[i];
+            
+      int digit = c - '0';
+            
+      if (digit >= 10 || digit < 0) {
+        throw newNumberFormatException("invalid integer representation", chars, start, length);
+      }
+            
+      long newResult = result * 10 - digit;
+      if (newResult > result) {
+        throw newNumberFormatException("overflow", chars, start, length);
+      }
+      result = newResult;
+    }
+    
+    // Requires one valid digit character and checks for opposite overflow.
+    if ((result == 0) && chars[i-1] != '0') {
+      throw newNumberFormatException("invalid integer representation", chars, start, length);
+    }
+
+    if ((result == Long.MIN_VALUE) && negMul == 1) {
+      throw newNumberFormatException("overflow", chars, start, length);
+    }
+
+    return negMul * result;
+  }
+
+  /**
+   * Parses the specified byte[] slice as a <code>float</code>.
    */
   public static float parseFloat(byte[] bytes, int start, int length) throws NumberFormatException {
-    // TODO: can we make a dedicated (faster) impl?
     return (float) parseDouble(bytes, start, length);
+  }
+
+  /**
+   * Parses the specified char[] slice as a <code>float</code>.
+   */
+  public static float parseFloat(char[] chars, int start, int length) throws NumberFormatException {
+    return (float) parseDouble(chars, start, length);
   }
 
   // nocommit make the exceptions nicer: include the offending string!!
@@ -395,10 +500,144 @@ public class MathUtil {
     return sigNum * toDoublePow10(decimal, exp - fractionLength);
   }
 
+  /**
+   * Parses the specified char[] slice as a <code>double</code>.
+   */
+  public static double parseDouble(char[] chars, int start, int length) throws NumberFormatException {
+    if (length == 0) {
+      throw new NumberFormatException("cannot parse empty string as double");
+    }
+    
+    int end = start + length;
+    int i = start;
+    char c = chars[i];
+
+    // Checks for NaN.
+    if (c == 'N') {
+      if (match("NaN", chars, i, end)) {
+        return Double.NaN;
+      } else {
+        throw newNumberFormatException("cannot parse string as double", chars, start, length);
+      }
+    }
+
+    // Reads sign.
+    double sigNum;
+    if (c == '-') {
+      sigNum = -1D;
+      i++;
+      c = chars[i];
+    } else if (c == '+') {
+      sigNum = 1D;
+      i++;
+      c = chars[i];
+    } else {
+      sigNum = 1D;
+    }
+
+    // Checks for Infinity.
+    if (c == 'I') {
+      if (match("Infinity", chars, i, end)) {
+        return sigNum == -1 ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
+      } else {
+        throw newNumberFormatException("cannot parse string as double", chars, start, length);
+      }
+    }
+
+    // At least one digit or a '.' required.
+    if ((c < '0' || c > '9') && c != '.') {
+      throw newNumberFormatException("leading digit or '.' required", chars, start, length);
+    }
+
+    // Reads decimal and fraction (both merged to a long).
+    long decimal = 0;
+    int decimalPoint = -1;
+    while (true) {
+      int digit = c - '0';
+      if (digit >= 0 && digit < 10) {
+        long tmp = decimal * 10 + digit;
+        if (decimal > LONG_MAX_DIV10 || tmp < decimal) {
+          // we'd overflow here, fall back to BigDecimal method
+          // TODO: improve this: can we detect up front?
+          return Double.parseDouble(new String(chars, start, length));
+        }
+        decimal = tmp;
+      } else if (c == '.' && decimalPoint == -1) {
+        decimalPoint = i;
+      } else {
+        break;
+      }
+
+      if (++i >= end) {
+        break;
+      }
+      c = chars[i];
+    }
+
+    int fractionLength = (decimalPoint >= 0) ? i - decimalPoint - 1 : 0;
+
+    // Reads exponent.
+    int exp = 0;
+    if (i < end) {
+      if (c == 'E' || c == 'e') {
+        c = chars[++i];
+        boolean isNegativeExp = (c == '-');
+        if ((isNegativeExp || (c == '+')) && (++i < end)) {
+          c = chars[i];
+        }
+        if ((c < '0') || (c > '9')) { // At least one digit required.  
+          throw newNumberFormatException("invalid exponent", chars, start, length);
+        }
+        while (true) {
+          int digit = c - '0';
+          if ((digit >= 0) && (digit < 10)) {
+            int tmp = exp * 10 + digit;
+            if ((exp > INT_MAX_DIV10) || (tmp < exp)) {
+              // we'd overflow here, fall back to BigDecimal method
+              // TODO: improve this: can we detect up front?
+              return Double.parseDouble(new String(chars, start, length));
+            }
+            exp = tmp;
+          } else
+            break;
+          if (++i >= end) {
+            break;
+          }
+          c = chars[i];
+        }
+        if (isNegativeExp) {
+          exp = -exp;
+        }
+      } else {
+        throw newNumberFormatException("extra characters", chars, start, length);
+      }
+    }
+
+    return sigNum * toDoublePow10(decimal, exp - fractionLength);
+  }
+
   /** Assumes ascii!! */
   private static boolean match(String s, byte[] bytes, int start, int end) {
-    for (int i = 0; i < s.length(); i++) {
-      if ((start + i >= end) || ((char) bytes[start+i] != s.charAt(i))) {
+    int length = s.length();
+    if (start+length > end) {
+      return false;
+    }
+    for (int i = 0; i < length; i++) {
+      if ((char) bytes[start+i] != s.charAt(i)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private static boolean match(String s, char[] chars, int start, int end) {
+    int length = s.length();
+    if (start+length > end) {
+      return false;
+    }
+    for (int i = 0; i < length; i++) {
+      if (chars[start+i] != s.charAt(i)) {
         return false;
       }
     }
@@ -408,5 +647,9 @@ public class MathUtil {
 
   private static NumberFormatException newNumberFormatException(String message, byte[] bytes, int start, int length) {
     return new NumberFormatException(message + ": \"" + new String(bytes, start, length, StandardCharsets.UTF_8) + "\"");
+  }
+
+  private static NumberFormatException newNumberFormatException(String message, char[] chars, int start, int length) {
+    return new NumberFormatException(message + ": \"" + new String(chars, start, length) + "\"");
   }
 }

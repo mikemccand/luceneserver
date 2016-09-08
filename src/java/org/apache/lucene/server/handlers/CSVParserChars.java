@@ -17,21 +17,28 @@ package org.apache.lucene.server.handlers;
  * limitations under the License.
  */
 
+import java.io.EOFException;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.ParsePosition;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
 
 import org.apache.lucene.document.BinaryDocValuesField;
 import org.apache.lucene.document.BinaryPoint;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.document.DoubleDocValuesField;
 import org.apache.lucene.document.DoublePoint;
 import org.apache.lucene.document.Field;
+import org.apache.lucene.document.FloatDocValuesField;
 import org.apache.lucene.document.FloatPoint;
 import org.apache.lucene.document.IntPoint;
 import org.apache.lucene.document.LongPoint;
@@ -42,49 +49,57 @@ import org.apache.lucene.document.SortedSetDocValuesField;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.index.DocValuesType;
+import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.server.FieldDef;
+import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
 import org.apache.lucene.server.util.MathUtil;
+import org.apache.lucene.store.DataInput;
+import org.apache.lucene.util.ArrayUtil;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.NumericUtils;
+import org.apache.lucene.util.UnicodeUtil;
 
 // TODO:
 //   - multi-valued fields?
 //   - escaping " , \n
 
-class CSVParser {
+class CSVParserChars {
 
-  final static byte NEWLINE = (byte) '\n';
+  final static char NEWLINE = '\n';
   
-  final byte[] bytes;
+  final char[] chars;
   final long globalOffset;
   int bufferUpto;
   int bufferLimit;
   final FieldDef[] fields;
   public final IndexState indexState;
   private int lastDocStart;
+  private final byte[][] reuseByteArrays;
   private final Field[] reuseFields;
   private final Field[] reuseDVs;
   private final Field[] reusePoints;
   private final Document reuseDoc;
-  private final byte delimChar;
+  private final char delimChar;
   // nocommit use CTL to reuse these?
   private SimpleDateFormat dateTimeParser;
   private ParsePosition dateTimeParsePosition;
   
-  public CSVParser(byte delimChar, long globalOffset, FieldDef[] fields, IndexState indexState, byte[] bytes, int startOffset) {
+  public CSVParserChars(char delimChar, long globalOffset, FieldDef[] fields, IndexState indexState, char[] chars, int startOffset) {
     this.delimChar = delimChar;
-    this.bytes = bytes;
+    this.chars = chars;
     this.fields = fields;
     bufferUpto = startOffset;
     this.globalOffset = globalOffset;
     this.indexState = indexState;
     // set up fields for reuse:
     reuseFields = new Field[fields.length];
+    reuseByteArrays = new byte[fields.length][];
     reusePoints = new Field[fields.length];
     reuseDVs = new Field[fields.length];
     reuseDoc = new Document();
     initReuseFields();
+    //System.out.println("CSV: " + fields.length + " fields");
   }
 
   private void initReuseFields() {
@@ -95,6 +110,7 @@ class CSVParser {
       switch(fd.valueType) {
       case ATOM:
         {
+          reuseByteArrays[i] = new byte[16];
           BytesRef br;
           if (fd.usePoints) {
             reusePoints[i] = new BinaryPoint(fd.name, new byte[0]);
@@ -228,9 +244,15 @@ class CSVParser {
         Field field = reuseFields[i];
         BytesRef br = field.binaryValue();
         assert br != null;
+        byte[] bytes = reuseByteArrays[i];
+        assert bytes != null;
+        if (bytes.length < UnicodeUtil.MAX_UTF8_BYTES_PER_CHAR * len) {
+          bytes = ArrayUtil.grow(bytes, UnicodeUtil.MAX_UTF8_BYTES_PER_CHAR * len);
+          reuseByteArrays[i] = bytes;
+        }
         br.bytes = bytes;
-        br.offset = lastFieldStart;
-        br.length = len;
+        br.offset = 0;
+        br.length = UnicodeUtil.UTF16toUTF8(chars, lastFieldStart, len, bytes);
         reuseDoc.add(field);
         Field point = reusePoints[i];
         if (point != null) {
@@ -239,14 +261,14 @@ class CSVParser {
         Field dv = reuseDVs[i];
         if (dv != null) {
           // nocommit not needed?
-          //dv.setBytesValue(br);
+          // dv.setBytesValue(br);
           reuseDoc.add(dv);
         }
         break;
       }
     case TEXT:
       {
-        String s = new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8);
+        String s = new String(chars, lastFieldStart, len);
         Field field = reuseFields[i];
         field.setStringValue(s);
         reuseDoc.add(field);
@@ -257,8 +279,8 @@ class CSVParser {
         int value;
         Field field = reuseFields[i];
         try {
-          value = MathUtil.parseInt(bytes, lastFieldStart, len);
-          //value = Integer.parseInt(new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8));
+          value = MathUtil.parseInt(chars, lastFieldStart, len);
+          //value = Integer.parseInt(new String(chars, lastFieldStart, len));
         } catch (NumberFormatException nfe) {
           throw new NumberFormatException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\" as int: " + nfe.getMessage());
         }
@@ -284,8 +306,8 @@ class CSVParser {
         Field field = reuseFields[i];
         long value;
         try {
-          value = MathUtil.parseLong(bytes, lastFieldStart, len);
-          //value = Long.parseLong(new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8));
+          value = MathUtil.parseLong(chars, lastFieldStart, len);
+          //value = Long.parseLong(new String(chars, lastFieldStart, len));
         } catch (NumberFormatException nfe) {
           throw new NumberFormatException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\" as long: " + nfe.getMessage());
         }
@@ -311,8 +333,8 @@ class CSVParser {
         Field field = reuseFields[i];
         float value;
         try {
-          value = MathUtil.parseFloat(bytes, lastFieldStart, len);
-          //value = Float.parseFloat(new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8));
+          value = MathUtil.parseFloat(chars, lastFieldStart, len);
+          //value = Float.parseFloat(new String(chars, lastFieldStart, len));
         } catch (NumberFormatException nfe) {
           throw new NumberFormatException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\" as float: " + nfe.getMessage());
         }
@@ -338,8 +360,8 @@ class CSVParser {
         Field field = reuseFields[i];
         double value;
         try {
-          value = MathUtil.parseDouble(bytes, lastFieldStart, len);
-          //value = Double.parseDouble(new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8));
+          value = MathUtil.parseDouble(chars, lastFieldStart, len);
+          //value = Double.parseDouble(new String(chars, lastFieldStart, len));
         } catch (NumberFormatException nfe) {
           throw new NumberFormatException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\" as double: " + nfe.getMessage());
         }
@@ -363,7 +385,7 @@ class CSVParser {
     case DATE_TIME:
       {
         Field field = reuseFields[i];
-        String s = new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8);
+        String s = new String(chars, lastFieldStart, len);
         dateTimeParsePosition.setIndex(0);
         Date date = dateTimeParser.parse(s, dateTimeParsePosition);
         if (dateTimeParsePosition.getErrorIndex() != -1) {
@@ -406,9 +428,9 @@ class CSVParser {
     int lastFieldStart = bufferUpto;
     lastDocStart = bufferUpto;
     
-    while (bufferUpto < bytes.length) {
-      byte b = bytes[bufferUpto++];
-      if (b == delimChar) {
+    while (bufferUpto < chars.length) {
+      char c = chars[bufferUpto++];
+      if (c == delimChar) {
 
         if (fieldUpto == fields.length) {
           throw new IllegalArgumentException("doc at offset " + lastDocStart + ": line has too many fields");
@@ -422,7 +444,7 @@ class CSVParser {
         lastFieldStart = bufferUpto;
         fieldUpto++;
 
-      } else if (b == NEWLINE) {
+      } else if (c == NEWLINE) {
 
         if (fieldUpto != fields.length-1) {
           throw new IllegalArgumentException("doc at offset " + lastDocStart + ": line has wrong number of fields: expected " + fields.length + " but saw " + (fieldUpto+1));

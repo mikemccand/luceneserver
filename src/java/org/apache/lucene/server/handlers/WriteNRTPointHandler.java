@@ -21,6 +21,8 @@ import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.lucene.facet.taxonomy.SearcherTaxonomyManager.SearcherAndTaxonomy;
+import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.server.Connection;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
@@ -96,9 +98,14 @@ public class WriteNRTPointHandler extends Handler {
             }
           }
           
-          return "{\"version\": " + version + "}";
+          return "{\"version\": " + version + ", \"didRefresh\": true}";
         } else {
-          return "{\"version\": -1}";
+          SearcherAndTaxonomy s = state.acquire();
+          try {
+            return "{\"version\": " + ((DirectoryReader) s.searcher.getIndexReader()).getVersion() + ", \"didRefresh\": false}";
+          } finally {
+            state.release(s);
+          }
         }
       }
     };
