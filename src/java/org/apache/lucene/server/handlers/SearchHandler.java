@@ -75,7 +75,6 @@ import org.apache.lucene.index.DocValuesType;
 import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexableField;
-import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.ReaderUtil;
 import org.apache.lucene.index.Term;
@@ -96,8 +95,6 @@ import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.Collector;
 import org.apache.lucene.search.ConstantScoreQuery;
 import org.apache.lucene.search.DisjunctionMaxQuery;
-import org.apache.lucene.search.DocIdSet;
-import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.FieldDoc;
 import org.apache.lucene.search.FuzzyQuery;
 import org.apache.lucene.search.IndexSearcher;
@@ -148,16 +145,28 @@ import org.apache.lucene.server.IndexState;
 import org.apache.lucene.server.MyIndexSearcher;
 import org.apache.lucene.server.SVJSONPassageFormatter;
 import org.apache.lucene.server.WholeMVJSONPassageFormatter;
-import org.apache.lucene.server.params.*;
+import org.apache.lucene.server.params.AnyType;
+import org.apache.lucene.server.params.BooleanType;
+import org.apache.lucene.server.params.EnumType;
+import org.apache.lucene.server.params.FloatType;
+import org.apache.lucene.server.params.IntType;
+import org.apache.lucene.server.params.ListType;
+import org.apache.lucene.server.params.LongType;
+import org.apache.lucene.server.params.OrType;
+import org.apache.lucene.server.params.Param;
+import org.apache.lucene.server.params.PolyType;
 import org.apache.lucene.server.params.PolyType.PolyEntry;
+import org.apache.lucene.server.params.Request;
+import org.apache.lucene.server.params.StringType;
+import org.apache.lucene.server.params.StructType;
+import org.apache.lucene.server.params.Type;
+import org.apache.lucene.server.params.WrapType;
 import org.apache.lucene.util.BytesRef;
-import org.apache.lucene.util.FixedBitSet;
 import org.apache.lucene.util.QueryBuilder;
 import org.apache.lucene.util.automaton.LevenshteinAutomata;
 
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
-import net.minidev.json.JSONValue;
 
 // nocommit why no double range faceting?
 

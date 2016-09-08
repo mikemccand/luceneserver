@@ -9,6 +9,7 @@
 	<classpathentry kind="src" path="lucene6x/lucene/core/src/java"/>
 	<classpathentry kind="src" path="lucene6x/lucene/core/src/resources" output="eclipse-build/3"/>
 	<classpathentry kind="src" path="lucene6x/lucene/expressions/src/java"/>
+	<classpathentry kind="src" path="lucene6x/lucene/expressions/src/resources" output="eclipse-build/4"/>
 	<classpathentry kind="src" path="lucene6x/lucene/facet/src/java"/>
 	<classpathentry kind="src" path="lucene6x/lucene/grouping/src/java"/>
 	<classpathentry kind="src" path="lucene6x/lucene/highlighter/src/java"/>
@@ -21,7 +22,7 @@
 	<classpathentry kind="src" path="lucene6x/lucene/sandbox/src/java"/>
 	<classpathentry kind="src" path="lucene6x/lucene/suggest/src/java"/>
 	<classpathentry kind="src" path="lucene6x/lucene/test-framework/src/java"/>
-	<classpathentry kind="src" path="lucene6x/lucene/test-framework/src/resources" output="eclipse-build/4"/>
+	<classpathentry kind="src" path="lucene6x/lucene/test-framework/src/resources" output="eclipse-build/5"/>
 	<classpathentry kind="src" path="src/java"/>
 	<classpathentry kind="src" path="src/test"/>
 	<classpathentry kind="lib" path="lib/commons-codec-1.10.jar"/>

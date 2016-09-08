@@ -20,7 +20,6 @@ package org.apache.lucene.server.handlers;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -28,30 +27,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Semaphore;
 
-import org.apache.lucene.document.BinaryDocValuesField;
-import org.apache.lucene.document.BinaryPoint;
 import org.apache.lucene.document.Document;
-import org.apache.lucene.document.SortedDocValuesField;
-import org.apache.lucene.document.SortedSetDocValuesField;
-import org.apache.lucene.document.StringField;
-import org.apache.lucene.document.TextField;
 import org.apache.lucene.server.FieldDef;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
 import org.apache.lucene.server.Server;
-import org.apache.lucene.server.params.*;
+import org.apache.lucene.server.params.Request;
+import org.apache.lucene.server.params.StructType;
 import org.apache.lucene.store.DataInput;
 import org.apache.lucene.store.DataOutput;
-import org.apache.lucene.util.IOUtils;
-import org.codehaus.jackson.JsonFactory;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.JsonToken;
 
-import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
-
-import static org.apache.lucene.server.IndexState.IndexingContext;
 
 /** Bulk addDocument from CSV encoding */
 

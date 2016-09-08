@@ -18,10 +18,7 @@ package org.apache.lucene.server;
  */
 
 import java.io.Closeable;
-import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -34,7 +31,6 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -63,8 +59,8 @@ import org.apache.lucene.facet.FacetsConfig;
 import org.apache.lucene.facet.taxonomy.CachedOrdinalsReader;
 import org.apache.lucene.facet.taxonomy.DocValuesOrdinalsReader;
 import org.apache.lucene.facet.taxonomy.OrdinalsReader;
-import org.apache.lucene.facet.taxonomy.SearcherTaxonomyManager.SearcherAndTaxonomy;
 import org.apache.lucene.facet.taxonomy.SearcherTaxonomyManager;
+import org.apache.lucene.facet.taxonomy.SearcherTaxonomyManager.SearcherAndTaxonomy;
 import org.apache.lucene.facet.taxonomy.directory.DirectoryTaxonomyWriter;
 import org.apache.lucene.index.ConcurrentMergeScheduler;
 import org.apache.lucene.index.DirectoryReader;
@@ -73,8 +69,8 @@ import org.apache.lucene.index.IndexFileNames;
 import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.KeepOnlyLastCommitDeletionPolicy;
 import org.apache.lucene.index.PersistentSnapshotDeletionPolicy;
@@ -83,12 +79,12 @@ import org.apache.lucene.index.SimpleMergedSegmentWarmer;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.ControlledRealTimeReopenThread;
 import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.ReferenceManager.RefreshListener;
 import org.apache.lucene.search.ReferenceManager;
+import org.apache.lucene.search.ReferenceManager.RefreshListener;
 import org.apache.lucene.search.SearcherFactory;
 import org.apache.lucene.search.SearcherLifetimeManager;
 import org.apache.lucene.search.Sort;
-import org.apache.lucene.search.similarities.ClassicSimilarity;
+import org.apache.lucene.search.similarities.BM25Similarity;
 import org.apache.lucene.search.similarities.PerFieldSimilarityWrapper;
 import org.apache.lucene.search.similarities.Similarity;
 import org.apache.lucene.search.suggest.Lookup;
@@ -107,7 +103,6 @@ import org.apache.lucene.server.params.StringType;
 import org.apache.lucene.server.params.StructType;
 import org.apache.lucene.server.params.Type;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.store.NRTCachingDirectory;
@@ -145,7 +140,7 @@ import net.minidev.json.parser.ParseException;
 
 public class IndexState implements Closeable {
   /** Default {@link Version} for {@code matchVersion}. */
-  public Version matchVersion = Version.LUCENE_6_2_0;
+  public Version matchVersion = Version.LUCENE_6_3_0;
 
   /** Creates directories */
   public DirectoryFactory df = DirectoryFactory.get("FSDirectory");
@@ -380,8 +375,8 @@ public class IndexState implements Closeable {
 
   /** Per-field wrapper that provides the similarity
    *  configured in the FieldDef */
-  final Similarity sim = new PerFieldSimilarityWrapper() {
-      final Similarity defaultSim = new ClassicSimilarity();
+  final Similarity sim = new PerFieldSimilarityWrapper(new BM25Similarity()) {
+      final Similarity defaultSim = new BM25Similarity();
 
       @Override
       public Similarity get(String name) {

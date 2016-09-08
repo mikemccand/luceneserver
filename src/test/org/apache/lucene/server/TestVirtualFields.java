@@ -119,11 +119,11 @@ public class TestVirtualFields extends ServerBaseTestCase {
     assertEquals(0, getInt("hits[1].fields.id"));
 
     // nocommit don't hardwire scores here
-    assertEquals(2.01129f, getFloat("hits[0].fields.scoreboost2"), .0001f);
-    assertEquals(0.625f, getFloat("hits[1].fields.scoreboost2"), .0001f);
+    assertEquals(1.72276068f, getFloat("hits[0].fields.scoreboost2"), .0001f);
+    assertEquals(0.3364663f, getFloat("hits[1].fields.scoreboost2"), .0001f);
 
-    assertEquals(2.01129f, getFloat("hits[0].fields.sortFields.scoreboost2"), .0001f);
-    assertEquals(0.625f, getFloat("hits[1].fields.sortFields.scoreboost2"), .0001f);
+    assertEquals(1.72276068f, getFloat("hits[0].fields.sortFields.scoreboost2"), .0001f);
+    assertEquals(0.3364663f, getFloat("hits[1].fields.sortFields.scoreboost2"), .0001f);
   }
 
   public void testWithScore1() throws Exception {
@@ -150,8 +150,8 @@ public class TestVirtualFields extends ServerBaseTestCase {
     assertEquals(0, getInt("hits[1].fields.id"));
 
     // nocommit don't test actual scores
-    assertEquals(1.005647f, getFloat("hits[0].fields.scoreboost"), .0001f);
-    assertEquals(.3125f, getFloat("hits[1].fields.scoreboost"), .0001f);
+    assertEquals(0.861380339f, getFloat("hits[0].fields.scoreboost"), .0001f);
+    assertEquals(0.16823316f, getFloat("hits[1].fields.scoreboost"), .0001f);
 
     assertEquals(.6931f, getFloat("hits[0].fields.logboost"), .0001f);
     assertEquals(0.0f, getFloat("hits[1].fields.logboost"), .0001f);
@@ -168,8 +168,8 @@ public class TestVirtualFields extends ServerBaseTestCase {
     assertEquals(1, getInt("hits[0].fields.id"));
     assertEquals(0, getInt("hits[1].fields.id"));
 
-    assertEquals(1.00565f, getFloat("hits[0].fields.scoreboost"), .0001f);
-    assertEquals(.3125f, getFloat("hits[1].fields.scoreboost"), .0001f);
+    assertEquals(0.861380339f, getFloat("hits[0].fields.scoreboost"), .0001f);
+    assertEquals(0.16823316f, getFloat("hits[1].fields.scoreboost"), .0001f);
 
     assertEquals(.6931f, getFloat("hits[0].fields.logboost"), .0001f);
     assertEquals(0.0f, getFloat("hits[1].fields.logboost"), .0001f);
@@ -248,8 +248,8 @@ public class TestVirtualFields extends ServerBaseTestCase {
     assertEquals(1, getInt("hits[0].fields.id"));
     assertEquals(0, getInt("hits[1].fields.id"));
 
-    assertEquals(3.0169415f, getFloat("hits[0].fields.scoreboost3"), .0001f);
-    assertEquals(0.9375f, getFloat("hits[1].fields.scoreboost3"), .0001f);
+    assertEquals(2.584141017f, getFloat("hits[0].fields.scoreboost3"), .0001f);
+    assertEquals(0.5046995f, getFloat("hits[1].fields.scoreboost3"), .0001f);
   }
 
   public void testSortedDynamicField() throws Exception {
@@ -262,7 +262,7 @@ public class TestVirtualFields extends ServerBaseTestCase {
     assertEquals(0, getInt("hits[0].fields.id"));
     assertEquals(1, getInt("hits[1].fields.id"));
 
-    assertEquals(0.9375f, getFloat("hits[0].fields.sortFields.scoreboost3"), .0001f);
-    assertEquals(3.016941f, getFloat("hits[1].fields.sortFields.scoreboost3"), .0001f);
+    assertEquals(0.50469947f, getFloat("hits[0].fields.sortFields.scoreboost3"), .0001f);
+    assertEquals(2.5841410f, getFloat("hits[1].fields.sortFields.scoreboost3"), .0001f);
   }
 }

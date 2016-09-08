@@ -19,7 +19,6 @@ package org.apache.lucene.server.handlers;
 
 import java.io.IOException;
 import java.io.Reader;
-import java.io.StringReader;
 import java.text.Collator;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -33,42 +32,27 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 
-import org.apache.lucene.analysis.Analyzer.TokenStreamComponents;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
-import org.apache.lucene.analysis.CharFilter;
-import org.apache.lucene.analysis.LowerCaseFilter;
-import org.apache.lucene.analysis.StopFilter;
 import org.apache.lucene.analysis.TokenFilter;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.Tokenizer;
 import org.apache.lucene.analysis.ar.ArabicAnalyzer;
-import org.apache.lucene.analysis.ar.ArabicStemFilter;
 import org.apache.lucene.analysis.bg.BulgarianAnalyzer;
 import org.apache.lucene.analysis.br.BrazilianAnalyzer;
 import org.apache.lucene.analysis.ca.CatalanAnalyzer;
 import org.apache.lucene.analysis.cjk.CJKAnalyzer;
 import org.apache.lucene.analysis.core.WhitespaceAnalyzer;
-import org.apache.lucene.analysis.core.WhitespaceTokenizer;
 import org.apache.lucene.analysis.de.GermanAnalyzer;
 import org.apache.lucene.analysis.en.EnglishAnalyzer;
-import org.apache.lucene.analysis.en.EnglishMinimalStemFilter;
-import org.apache.lucene.analysis.en.EnglishPossessiveFilter;
-import org.apache.lucene.analysis.en.PorterStemFilter;
 import org.apache.lucene.analysis.eu.BasqueAnalyzer;
 import org.apache.lucene.analysis.hy.ArmenianAnalyzer;
 import org.apache.lucene.analysis.icu.segmentation.DefaultICUTokenizerConfig;
 import org.apache.lucene.analysis.icu.segmentation.ICUTokenizer;
 import org.apache.lucene.analysis.icu.segmentation.ICUTokenizerConfig;
-import org.apache.lucene.analysis.miscellaneous.SetKeywordMarkerFilter;
-import org.apache.lucene.analysis.pattern.PatternTokenizer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.analysis.standard.StandardFilter;
-import org.apache.lucene.analysis.standard.StandardTokenizer;
 import org.apache.lucene.analysis.synonym.SynonymFilter;
-import org.apache.lucene.analysis.synonym.SynonymFilterFactory;
 import org.apache.lucene.analysis.synonym.SynonymMap;
 import org.apache.lucene.analysis.util.CharFilterFactory;
 import org.apache.lucene.analysis.util.ResourceLoader;
@@ -88,18 +72,28 @@ import org.apache.lucene.queries.function.ValueSource;
 import org.apache.lucene.search.similarities.BM25Similarity;
 import org.apache.lucene.search.similarities.ClassicSimilarity;
 import org.apache.lucene.search.similarities.Similarity;
-import org.apache.lucene.search.suggest.analyzing.SuggestStopFilter;
 import org.apache.lucene.server.FieldDef;
 import org.apache.lucene.server.FieldDefBindings;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
-import org.apache.lucene.server.params.*;
+import org.apache.lucene.server.params.BooleanType;
+import org.apache.lucene.server.params.EnumType;
+import org.apache.lucene.server.params.FloatType;
+import org.apache.lucene.server.params.IntType;
+import org.apache.lucene.server.params.ListType;
+import org.apache.lucene.server.params.OrType;
+import org.apache.lucene.server.params.Param;
+import org.apache.lucene.server.params.PolyType;
 import org.apache.lucene.server.params.PolyType.PolyEntry;
+import org.apache.lucene.server.params.Request;
+import org.apache.lucene.server.params.StringType;
+import org.apache.lucene.server.params.StructType;
+import org.apache.lucene.server.params.Type;
+import org.apache.lucene.server.params.WrapType;
 import org.apache.lucene.util.AttributeFactory;
 import org.apache.lucene.util.CharsRef;
 import org.apache.lucene.util.CharsRefBuilder;
-import org.apache.lucene.util.NumericUtils;
 import org.apache.lucene.util.Version;
 
 import com.ibm.icu.lang.UCharacter;
@@ -725,7 +719,7 @@ public class RegisterFieldHandler extends Handler {
         sim = null;
       }
     } else {
-      sim = new ClassicSimilarity();
+      sim = new BM25Similarity();
     }
 
     Analyzer indexAnalyzer;
@@ -747,12 +741,6 @@ public class RegisterFieldHandler extends Handler {
       } else if (searchAnalyzer == null) {
         searchAnalyzer = new StandardAnalyzer();
       }
-      if (indexAnalyzer == null) {
-        f.fail("indexAnalyzer", "either analyzer or indexAnalyzer must be specified for an indexed text field");
-      }
-      if (searchAnalyzer == null) {
-        f.fail("searchAnalyzer", "either analyzer or searchAnalyzer must be specified for an indexed text field");
-      }
     }
 
     if (indexAnalyzer == null) {
@@ -760,6 +748,7 @@ public class RegisterFieldHandler extends Handler {
     }
 
     if (searchAnalyzer == null) {
+      // nocommit: this does nothing!
       searchAnalyzer = searchAnalyzer;
     }
 

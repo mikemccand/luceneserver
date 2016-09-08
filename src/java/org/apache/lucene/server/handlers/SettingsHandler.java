@@ -28,8 +28,6 @@ import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
 import org.apache.lucene.server.params.*;
 import org.apache.lucene.server.params.PolyType.PolyEntry;
-import org.apache.lucene.server.params.Request.PolyResult;
-import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.packed.PackedInts;
 
 import net.minidev.json.JSONValue;

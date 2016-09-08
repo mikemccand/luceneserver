@@ -189,9 +189,6 @@ public class BulkUpdateDocumentHandler extends Handler {
         }
       }
 
-      if (doc == null) {
-        throw new IllegalArgumentException("missing fields");
-      }
       if (updateTerm == null) {
         throw new IllegalArgumentException("missing term");
       }

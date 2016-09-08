@@ -27,7 +27,6 @@ import org.apache.lucene.search.suggest.analyzing.AnalyzingInfixSuggester;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
-import org.apache.lucene.server.handlers.BuildSuggestHandler.LookupHighlightFragment;
 import org.apache.lucene.server.params.*;
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;

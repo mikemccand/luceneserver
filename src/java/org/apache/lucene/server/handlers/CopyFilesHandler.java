@@ -20,31 +20,20 @@ package org.apache.lucene.server.handlers;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.InetAddress;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.lucene.facet.taxonomy.SearcherTaxonomyManager.SearcherAndTaxonomy;
-import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.replicator.nrt.CopyJob.OnceDone;
 import org.apache.lucene.replicator.nrt.CopyJob;
 import org.apache.lucene.replicator.nrt.FileMetaData;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
-import org.apache.lucene.server.params.IntType;
-import org.apache.lucene.server.params.Param;
 import org.apache.lucene.server.params.Request;
-import org.apache.lucene.server.params.StringType;
 import org.apache.lucene.server.params.StructType;
 import org.apache.lucene.store.DataInput;
 import org.apache.lucene.store.DataOutput;
-
-import net.minidev.json.JSONObject;
 
 /*
   Primary/replica communications:
