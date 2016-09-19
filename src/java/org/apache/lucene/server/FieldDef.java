@@ -17,14 +17,24 @@ package org.apache.lucene.server;
  * limitations under the License.
  */
 
+import java.io.Closeable;
+import java.text.ParsePosition;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
+import java.util.Locale;
+import java.util.TimeZone;
+
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.FieldType;
 import org.apache.lucene.index.DocValuesType;
 import org.apache.lucene.queries.function.ValueSource;
 import org.apache.lucene.search.similarities.Similarity;
+import org.apache.lucene.util.CloseableThreadLocal;
 
 /** Defines the type of one field. */
-public class FieldDef {
+public class FieldDef implements Closeable {
   /** Field name. */
   public final String name;
 
@@ -78,6 +88,19 @@ public class FieldDef {
   /** True if this field is indexed as a dimensional point */
   public final boolean usePoints;
 
+  public static final class DateTimeParser {
+    public final SimpleDateFormat parser;
+
+    public final ParsePosition position;
+
+    public DateTimeParser(String format) {
+      parser = new SimpleDateFormat(format, Locale.ROOT);
+      position = new ParsePosition(0);
+    }
+  }
+
+  public final CloseableThreadLocal<DateTimeParser> dateTimeParsers;
+
   /** Sole constructor. */
   public FieldDef(String name, FieldType fieldType, FieldValueType valueType, String faceted,
                   String postingsFormat, String docValuesFormat, boolean multiValued, boolean usePoints,
@@ -89,6 +112,11 @@ public class FieldDef {
       fieldType.freeze();
     }
     this.valueType = valueType;
+    if (valueType == FieldValueType.DATE_TIME) {
+      dateTimeParsers = new CloseableThreadLocal<>();
+    } else {
+      dateTimeParsers = null;
+    }
     this.faceted = faceted;
     this.postingsFormat = postingsFormat;
     this.docValuesFormat = docValuesFormat;
@@ -109,5 +137,25 @@ public class FieldDef {
       fieldTypeNoDV = null;
     }
     this.valueSource = valueSource;
+  }
+
+  public DateTimeParser getDateTimeParser() {
+    Calendar calendar = new GregorianCalendar(TimeZone.getTimeZone("UTC"), Locale.ROOT);
+    calendar.setLenient(false);
+    
+    DateTimeParser parser = dateTimeParsers.get();
+    if (parser == null) {
+      parser = new DateTimeParser(dateTimeFormat);
+      dateTimeParsers.set(parser);
+    }
+
+    return parser;
+  }
+
+  @Override
+  public void close() {
+    if (dateTimeParsers != null) {
+      dateTimeParsers.close();
+    }
   }
 }

@@ -982,6 +982,7 @@ public class IndexState implements Closeable {
         closeables.add((Closeable) suggester);
       }
     }
+    closeables.addAll(fields.values());
     IOUtils.close(closeables);
 
     // nocommit should we remove this instance?  if app

@@ -218,6 +218,33 @@ public class TestIndexing extends ServerBaseTestCase {
     assertEquals(1, ((Integer) r.get("totalHits")).intValue());
   }
 
+  public void testBulkAddDocument2() throws Exception {
+    createAndStartIndex("bulk2");
+    registerFields();
+    StringBuilder sb = new StringBuilder();
+    for(int i=0;i<100;i++) {
+      JSONObject o = new JSONObject();
+      o.put("body", "here is the body " + i);
+      o.put("author", "Mr. " + i);
+      o.put("price", 15.66);
+      o.put("id", ""+i);
+      o.put("date", "01/01/2013");
+      if (i > 0) {
+        sb.append('\n');
+      }
+      sb.append(o.toString());
+    }
+    String s = sb.toString();
+    Map<String,Object> params = new HashMap<>();
+    params.put("indexName", "bulk2");
+    JSONObject result = send("bulkAddDocument2", params, new StringReader(s));
+    assertEquals(100, result.get("indexedDocumentCount"));
+    long indexGen = getLong(result, "indexGen");
+    JSONObject r = send("search", "{indexName: bulk2, searcher: {indexGen: " + indexGen + "}, queryText: \"99\", facets: [{dim: dateFacet, topN: 10}], retrieveFields: [id, date, price, {field: body, highlight: snippets}]}");
+    assertEquals(1, ((Integer) r.get("totalHits")).intValue());
+    send("deleteIndex");
+  }
+
   /** Make sure you get an error if you try to addDocument
    *  after index is stopped */
   public void testAddAfterStop() throws Exception {

@@ -157,6 +157,9 @@ public abstract class ServerBaseTestCase extends LuceneTestCase {
 
   protected static void createAndStartIndex(String indexName) throws Exception {
     createIndex(indexName);
+    if (VERBOSE) {
+      send("settings", "{indexName: " + indexName + ", index.verbose: true}");
+    }
     send("startIndex", "{indexName: " + indexName + "}");
   }
 

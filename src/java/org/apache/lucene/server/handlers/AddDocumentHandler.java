@@ -20,6 +20,7 @@ package org.apache.lucene.server.handlers;
 import java.io.IOException;
 import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -142,6 +143,25 @@ public class AddDocumentHandler extends Handler {
           fail(fd.name, "for int or long field, expected Integer or Long value but got " + o + " of class=" + o.getClass());
         }
         break;
+      case DATE_TIME:
+        // turn date time into msec since epoch:
+        if (!(o instanceof String)) {
+          fail(fd.name, "for date_time field, expected String but got " + o + " of class=" + o.getClass());
+        }
+        String s = (String) o;
+        FieldDef.DateTimeParser parser = fd.getDateTimeParser();
+        parser.position.setIndex(0);
+        Date date = parser.parser.parse(s, parser.position);
+        if (parser.position.getErrorIndex() != -1) {
+          // nocommit more details about why?
+          fail(fd.name, "could not parse \"" + o + "\" as date_time with format \"" + fd.dateTimeFormat + "\"");
+        }
+        if (parser.position.getIndex() != s.length()) {
+          // nocommit more details about why?
+          fail(fd.name, "could not parse \"" + o + "\" as date_time with format \"" + fd.dateTimeFormat + "\"");
+        }
+        o = date.getTime();        
+        break;
       default:
         throw new AssertionError();
       }
@@ -187,7 +207,9 @@ public class AddDocumentHandler extends Handler {
     DocValuesType dvType = fd.fieldType.docValuesType();
     if (dvType == DocValuesType.BINARY ||
         dvType == DocValuesType.SORTED) {
-      assert o instanceof String;
+      if (o instanceof String == false) {
+        fail(fd.name, "expected String but got: " + o);
+      }
       BytesRef br = new BytesRef((String) o);
       if (fd.fieldType.docValuesType() == DocValuesType.BINARY) {
         doc.add(new BinaryDocValuesField(fd.name, br));
@@ -225,7 +247,7 @@ public class AddDocumentHandler extends Handler {
         } else {
           doc.add(new NumericDocValuesField(fd.name, ((Number) o).intValue()));
         }
-      } else if (fd.valueType == FieldDef.FieldValueType.LONG) {
+      } else if (fd.valueType == FieldDef.FieldValueType.LONG || fd.valueType == FieldDef.FieldValueType.DATE_TIME) {
         if (fd.multiValued) {
           doc.add(new SortedNumericDocValuesField(fd.name, ((Number) o).longValue()));
         } else {
@@ -245,7 +267,7 @@ public class AddDocumentHandler extends Handler {
     if (fd.usePoints) {
       if (fd.valueType == FieldDef.FieldValueType.INT) {
         doc.add(new IntPoint(fd.name, ((Number) o).intValue()));
-      } else if (fd.valueType == FieldDef.FieldValueType.LONG) {
+      } else if (fd.valueType == FieldDef.FieldValueType.LONG || fd.valueType == FieldDef.FieldValueType.LONG) {
         doc.add(new LongPoint(fd.name, ((Number) o).longValue()));
       } else if (fd.valueType == FieldDef.FieldValueType.FLOAT) {
         doc.add(new FloatPoint(fd.name, ((Number) o).floatValue()));
@@ -310,7 +332,7 @@ public class AddDocumentHandler extends Handler {
 
   /** Parses the fields, which should look like {field1:
    *  ..., field2: ..., ...} */
-  void parseFields(IndexState state, Document doc, JsonParser p) throws IOException {
+  public void parseFields(IndexState state, Document doc, JsonParser p) throws IOException {
     JsonToken token = p.nextToken();
     if (token != JsonToken.START_OBJECT) {
       throw new IllegalArgumentException("fields should be an object");
@@ -328,6 +350,7 @@ public class AddDocumentHandler extends Handler {
   /** Parse a Document using Jackson's streaming parser
    *  API.  The document should look like {indexName: 'foo',
    *  fields: {..., ...}} */
+  // nocommit why isn't this static?
   Document parseDocument(IndexState state, JsonParser p) throws IOException {
     //System.out.println("parseDocument: " + r);
     JsonToken token = p.nextToken();

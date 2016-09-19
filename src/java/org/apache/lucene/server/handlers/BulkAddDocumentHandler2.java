@@ -17,6 +17,7 @@ package org.apache.lucene.server.handlers;
  * limitations under the License.
  */
 
+import java.io.CharArrayReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -55,17 +56,20 @@ import net.minidev.json.JSONObject;
 
 import static org.apache.lucene.server.IndexState.IndexingContext;
 
-/** Bulk addDocument from CSV encoding */
+/** Bulk addDocument from JSON doc-per-line encoding */
 
-public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
+public class BulkAddDocumentHandler2 extends Handler {
 
   private static StructType TYPE = new StructType();
 
-  /** We break the incoming CSV chars into chunks of this size and send each chunk off to separate threads for parsing and indexing */
+  // nocommit what about \r\n!?
+  private static final char NEWLINE = '\n';
+
+  /** We break the incoming JSON chars into chunks of this size and send each chunk off to separate threads for parsing and indexing */
   private static final int CHUNK_SIZE_KB = 512;
 
   /** Sole constructor. */
-  public BulkCSVAddDocumentHandlerNonBinary(GlobalState state) {
+  public BulkAddDocumentHandler2(GlobalState state) {
     super(state);
   }
 
@@ -81,15 +85,18 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
 
   /** Parses and indexes documents from one chunk of CSV */
   private static class ParseAndIndexOneChunk implements Runnable {
+
+    private static final JsonFactory jsonFactory = new JsonFactory();
+
     /** Shared context across all docs being indexed in this one stream */
     private final IndexState.IndexingContext ctx;
     
     private final IndexState indexState;
-    private final FieldDef[] fields;
     private final char[] chars;
     private final Semaphore semaphore;
+    private final AddDocumentHandler addDocHandler;
 
-    /** Byte starting offset of our chunk in the total incoming byte stream; we use this to locate errors */
+    /** Char starting offset of our chunk in the total incoming char stream; we use this to locate errors */
     private final long globalOffset;
 
     /** The job handling the chunk just before us */
@@ -100,19 +107,17 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
     private char[] nextStartFragment;
     private int nextStartFragmentOffset;
     private int nextStartFragmentLength;
-    private final char delimChar;
     
-    public ParseAndIndexOneChunk(char delimChar, long globalOffset, IndexState.IndexingContext ctx, ParseAndIndexOneChunk prev, IndexState indexState,
-                                 FieldDef[] fields, char[] chars, Semaphore semaphore) throws InterruptedException {
-      this.delimChar = delimChar;
+    public ParseAndIndexOneChunk(long globalOffset, IndexState.IndexingContext ctx, ParseAndIndexOneChunk prev, IndexState indexState,
+                                 char[] chars, Semaphore semaphore, AddDocumentHandler addDocHandler) throws InterruptedException {
       this.ctx = ctx;
       ctx.inFlightChunks.register();
       this.prev = prev;
       this.indexState = indexState;
-      this.fields = fields;
       this.chars = chars;
       this.semaphore = semaphore;
       this.globalOffset = globalOffset;
+      this.addDocHandler = addDocHandler;
       semaphore.acquire();
     }
 
@@ -133,31 +138,43 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
         char[] allChars = new char[endFragmentLength + nextStartFragmentLength];
         System.arraycopy(chars, endFragmentStartOffset, allChars, 0, endFragmentLength);
         System.arraycopy(nextStartFragment, 0, allChars, endFragmentLength, nextStartFragmentLength);
-        CSVParserChars parser = new CSVParserChars(delimChar, globalOffset + endFragmentStartOffset, fields, indexState, allChars, 0);
-        Document doc;
+
+        // TODO: can/should we make a single parser and reuse it?  It's thread private here...
+        JsonParser parser;
         try {
-          doc = parser.nextDoc();
+          parser = jsonFactory.createJsonParser(new CharArrayReader(allChars));
+        } catch (IOException ioe) {
+          throw new RuntimeException(ioe);
+        }
+
+        Document doc = new Document();
+                      
+        try {
+          addDocHandler.parseFields(indexState, doc, parser);
         } catch (Throwable t) {
-          ctx.setError(new IllegalArgumentException("last document starting at offset " + (globalOffset + endFragmentStartOffset) + " is missing the trailing newline"));
+          ctx.setError(t);
           return;
         }
+
+        ctx.addCount.incrementAndGet();
         if (indexState.hasFacets()) {
           try {
             doc = indexState.facetsConfig.build(indexState.taxoWriter, doc);
           } catch (IOException ioe) {
-            ctx.setError(new RuntimeException("document at offset " + (globalOffset + parser.getLastDocStart()) + " hit exception building facets", ioe));
+            ctx.setError(new RuntimeException("document at offset " + (globalOffset + parser.getCurrentLocation().getCharOffset()) + " hit exception building facets", ioe));
             return;
           }
         }
-        ctx.addCount.incrementAndGet();
+
         try {
           indexState.indexDocument(doc);
         } catch (Throwable t) {
           ctx.setError(new RuntimeException("failed to index document at offset " + (globalOffset + endFragmentStartOffset), t));
           return;
         }
+
         // At most one document spans across two chunks:
-        assert parser.getBufferUpto() == allChars.length;
+        assert parser.getCurrentLocation().getCharOffset() == allChars.length;
       }
     }
 
@@ -200,12 +217,11 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
       if (prev != null) {
         upto = 0;
         while (upto < chars.length) {
-          if (chars[upto] == CSVParser.NEWLINE) {
+          if (chars[upto] == NEWLINE) {
             break;
           }
           upto++;
         }
-        //System.out.println("CHUNK @ " + globalOffset + " startFragment=" + upto + " vs len=" + bytes.length);
       } else {
         upto = -1;
       }
@@ -214,6 +230,8 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
 
         // skip the NEWLINE:
         upto++;
+
+        // Give the previous chunk the leading fragment:
         
         if (prev != null) {
           prev.setNextStartFragment(chars, 0, upto);
@@ -228,45 +246,80 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
         // add all documents in this chunk as a block:
         final int[] endOffset = new int[1];
         try {
+          // nocommit what if this Iterable produces 0 docs?  does IW get angry?
           indexState.writer.addDocuments(new Iterable<Document>() {
               @Override
               public Iterator<Document> iterator() {
 
                 // now parse & index whole documents:
 
-                final CSVParserChars parser = new CSVParserChars(delimChar, globalOffset, fields, indexState, chars, startUpto);
                 final boolean hasFacets = indexState.hasFacets();
 
                 return new Iterator<Document>() {
                   private Document nextDoc;
                   private boolean nextSet;
+                  private int upto = startUpto;
                 
                   @Override
                   public boolean hasNext() {
                     if (nextSet == false) {
-                      try {
-                        nextDoc = parser.nextDoc();
-                      } catch (Throwable t) {
-                        ctx.setError(t);
+
+                      // TODO: can we avoid this initial pass?  Would be somewhat hairy: we'd need to hang onto the JSONParser and
+                      // (separately) feed it the last fragment:
+                      int end = upto;
+                      while (end < chars.length && chars[end] != NEWLINE) {
+                        end++;
+                      }
+
+                      if (end == chars.length) {
+                        // nocommit we must assert that there was a trailing newline here.  make test!
+                        endOffset[0] = upto;
                         nextDoc = null;
+                        nextSet = true;
+                        return false;
                       }
-                      if (nextDoc != null) {
-                        ctx.addCount.incrementAndGet();
-                        if (hasFacets) {
-                          try {
-                            nextDoc = indexState.facetsConfig.build(indexState.taxoWriter, nextDoc);
-                          } catch (IOException ioe) {
-                            ctx.setError(new RuntimeException("document at offset " + (globalOffset + parser.getLastDocStart()) + " hit exception building facets", ioe));
-                            nextDoc = null;
-                          }
+
+                      //System.out.println("NOW PARSE: " + new String(chars, upto, end-upto));
+
+                      // TODO: can/should we make a single parser and reuse it?  It's thread private here...
+                      JsonParser parser;
+                      try {
+                        parser = jsonFactory.createJsonParser(new CharArrayReader(chars, upto, end-upto));
+                      } catch (IOException ioe) {
+                        throw new RuntimeException(ioe);
+                      }
+
+                      nextDoc = new Document();
+                      try {
+                        addDocHandler.parseFields(indexState, nextDoc, parser);
+                      } catch (Throwable t) {
+                        nextSet = true;
+                        nextDoc = null;
+                        ctx.setError(t);
+                        return false;
+                      }
+                      //System.out.println("ADD: " + nextDoc);
+
+                      ctx.addCount.incrementAndGet();
+                      if (hasFacets) {
+                        try {
+                          nextDoc = indexState.facetsConfig.build(indexState.taxoWriter, nextDoc);
+                        } catch (IOException ioe) {
+                          nextSet = true;
+                          nextDoc = null;
+                          ctx.setError(new RuntimeException("document at offset " + (globalOffset + parser.getCurrentLocation().getCharOffset()) + " hit exception building facets", ioe));
+                          return false;
                         }
-                        // nocommit: live field values
-                      } else {
-                        endOffset[0] = parser.getLastDocStart();
                       }
+                      // nocommit: live field values
                       nextSet = true;
+
+                      // skip NEWLINE:
+                      upto = end+1;
+                      return true;
+                    } else {
+                      return nextDoc != null;
                     }
-                    return nextDoc != null;
                   }
 
                   @Override
@@ -300,22 +353,6 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
 
   @Override
   public String handleStreamed(Reader reader, Map<String,List<String>> params) throws Exception {
-    char delimChar;
-    List<String> delims = params.get("delimChar");
-    if (delims != null) {
-      if (delims.size() != 1) {
-        throw new IllegalArgumentException("delim parameter should only be specified once; got: " + delims);
-      }
-      if (delims.get(0).length() != 1) {
-        throw new IllegalArgumentException("delim must be comma or tab character; got: " + delims.get(0));
-      }
-      delimChar = delims.get(0).charAt(0);
-      if (delimChar != ',' && delimChar != '\t') {
-        throw new IllegalArgumentException("delim must be comma or tab character; got: " + delims.get(0));
-      }
-    } else {
-      delimChar = ',';
-    }
 
     if (params.get("indexName") == null) {
       throw new IllegalArgumentException("required parameter \"indexName\" is missing");
@@ -335,39 +372,7 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
       throw new IllegalArgumentException("index \"" + indexName + "\" isn't started: cannot index documents");
     }
     
-    // parse fields header and lookup fields:
-    List<FieldDef> fieldsList = new ArrayList<>();
-    StringBuilder curField = new StringBuilder();
-    long globalOffset = 0;
-
-    char[] buffer = new char[1024];
-    int bufferUpto = 0;
-    int bufferLimit = 0;
-    while (true) {
-      if (bufferUpto == bufferLimit) {
-        globalOffset += bufferLimit;
-        bufferLimit = reader.read(buffer, 0, buffer.length);
-        if (bufferLimit == -1) {
-          throw new IllegalArgumentException("hit end while parsing header");
-        }
-        bufferUpto = 0;
-      }
-      char c = buffer[bufferUpto++];
-      if (c == delimChar) {
-        fieldsList.add(indexState.getField(curField.toString()));
-        curField.setLength(0);
-      } else if (c == CSVParserChars.NEWLINE) {
-        fieldsList.add(indexState.getField(curField.toString()));
-        break;
-      } else {
-        curField.append(c);
-      }
-    }
-
-    FieldDef[] fields = fieldsList.toArray(new FieldDef[fieldsList.size()]);
-
     IndexState.IndexingContext ctx = new IndexState.IndexingContext();
-    char[] bufferOld = buffer;
 
     // nocommit tune this .. core count?
 
@@ -379,28 +384,28 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
     boolean done = false;
 
     // create first chunk buffer, and carry over any leftovers from the header processing:
-    buffer = new char[CHUNK_SIZE_KB*1024/2];
-    System.arraycopy(bufferOld, bufferUpto, buffer, 0, bufferLimit-bufferUpto);
-    bufferUpto = bufferLimit - bufferUpto;
+    char[] buffer = new char[CHUNK_SIZE_KB*1024/2];
+    int bufferUpto = 0;
 
-    globalOffset += bufferUpto;
+    long globalOffset = 0;
     
     ParseAndIndexOneChunk prev = null;
     int phase = ctx.inFlightChunks.getPhase();
+
+    AddDocumentHandler addDocHandler = (AddDocumentHandler) globalState.getHandler("addDocument");
 
     while (done == false && ctx.getError() == null) {
       int count = reader.read(buffer, bufferUpto, buffer.length-bufferUpto);
       if (count == -1 || bufferUpto + count == buffer.length) {
         if (count != -1) {
           bufferUpto += count;
-        }
-        if (bufferUpto < buffer.length) {
+        } else if (bufferUpto < buffer.length) {
           char[] realloc = new char[bufferUpto];
           System.arraycopy(buffer, 0, realloc, 0, bufferUpto);
           buffer = realloc;
         }
         // NOTE: This ctor will stall when it tries to acquire the semaphore if we already have too many in-flight indexing chunks:
-        prev = new ParseAndIndexOneChunk(delimChar, globalOffset, ctx, prev, indexState, fields, buffer, semaphore);
+        prev = new ParseAndIndexOneChunk(globalOffset, ctx, prev, indexState, buffer, semaphore, addDocHandler);
         globalState.indexService.submit(prev);
         if (count == -1) {
           // the end
@@ -440,7 +445,7 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
 
   @Override
   public String getTopDoc() {
-    return "Add more than one document in a single request, encoded as CSV.";
+    return "Add more than one document in a single request, encoded as doc-per-line JSON.";
   }
 
   @Override

@@ -68,9 +68,6 @@ class CSVParser {
   private final Field[] reusePoints;
   private final Document reuseDoc;
   private final byte delimChar;
-  // nocommit use CTL to reuse these?
-  private SimpleDateFormat dateTimeParser;
-  private ParsePosition dateTimeParsePosition;
   
   public CSVParser(byte delimChar, long globalOffset, FieldDef[] fields, IndexState indexState, byte[] bytes, int startOffset) {
     this.delimChar = delimChar;
@@ -183,11 +180,6 @@ class CSVParser {
       case DATE_TIME:
         {
           assert fd.dateTimeFormat != null;
-          Calendar calendar = new GregorianCalendar(TimeZone.getTimeZone("UTC"), Locale.ROOT);
-          calendar.setLenient(false);
-          dateTimeParser = new SimpleDateFormat(fd.dateTimeFormat, Locale.ROOT);
-          dateTimeParser.setCalendar(calendar);          
-          dateTimeParsePosition = new ParsePosition(0);
           if (stored) {
             reuseFields[i] = new StoredField(fd.name, 0L);
           }
@@ -364,13 +356,14 @@ class CSVParser {
       {
         Field field = reuseFields[i];
         String s = new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8);
-        dateTimeParsePosition.setIndex(0);
-        Date date = dateTimeParser.parse(s, dateTimeParsePosition);
-        if (dateTimeParsePosition.getErrorIndex() != -1) {
+        FieldDef.DateTimeParser parser = fields[i].getDateTimeParser();
+        parser.position.setIndex(0);
+        Date date = parser.parser.parse(s, parser.position);
+        if (parser.position.getErrorIndex() != -1) {
           // nocommit more details about why?
           throw new IllegalArgumentException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\", value \"" + s + "\" as date with format \"" + fields[i].dateTimeFormat + "\"");
         }
-        if (dateTimeParsePosition.getIndex() != s.length()) {
+        if (parser.position.getIndex() != s.length()) {
           // nocommit more details about why?          
           throw new IllegalArgumentException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\", value \"" + s + "\" as date with format \"" + fields[i].dateTimeFormat + "\"");
         }

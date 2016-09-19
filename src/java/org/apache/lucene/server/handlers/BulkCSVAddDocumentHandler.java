@@ -123,13 +123,19 @@ public class BulkCSVAddDocumentHandler extends Handler {
         try {
           doc = parser.nextDoc();
         } catch (Throwable t) {
-          ctx.setError(t);
-          return;
-        }
-        if (doc == null) {
           ctx.setError(new IllegalArgumentException("last document starting at offset " + (globalOffset + endFragmentStartOffset) + " is missing the trailing newline"));
           return;
         }
+
+        if (indexState.hasFacets()) {
+          try {
+            doc = indexState.facetsConfig.build(indexState.taxoWriter, doc);
+          } catch (IOException ioe) {
+            ctx.setError(new RuntimeException("document at offset " + (globalOffset + parser.getLastDocStart()) + " hit exception building facets", ioe));
+            return;
+          }
+        }
+        
         ctx.addCount.incrementAndGet();
         try {
           indexState.indexDocument(doc);

@@ -32,7 +32,12 @@ PACKAGE_FILE = os.path.abspath('build/luceneserver-%s-SNAPSHOT.zip' % LUCENE_SER
 
 USER_NAME = getpass.getuser()
 
-BINARY_CSV = False
+USE_JSON = False
+
+BINARY_CSV = True
+
+ITERS = 1
+#ITERS = 5
 
 class BinarySend:
   def __init__(self, host, port, command):
@@ -65,6 +70,7 @@ class ChunkedHTTPSend:
     self.conn.endheaders()
 
   def add(self, data):
+    #print('send:\n%s' % data)
     self.conn.send(("%s\r\n" % hex(len(data))[2:]).encode('UTF-8'))
     self.conn.send(data)
     self.conn.send('\r\n'.encode('UTF-8'))
@@ -236,7 +242,11 @@ def main():
     print('mkdir %s on %s' % (path, host))
     run('ssh %s@%s mkdir -p %s' % (USER_NAME, host, path))
 
-  docSource = '/l/data/geonames.20160818.csv'
+  if USE_JSON:
+    docSource = '/l/data/geonames.20160818.json.ls.blocks'
+  else:
+    docSource = '/l/data/geonames.20160818.csv'
+
   if not os.path.exists(docSource):
     # Not Mike's home computer!
     docSource = 'data/geonames.csv'
@@ -276,7 +286,7 @@ def main():
           {
             'name': {'type': 'text'},
             'asciiname': {'type': 'text'},
-            'geonameid': {'type': 'atom', 'search': True, 'store': True, 'sort': True},
+            'geonameid': {'type': 'long', 'search': True, 'store': True, 'sort': True},
             'elevation': {'type': 'int', 'search': True, 'sort': True},
             'feature_class': {'type': 'atom', 'sort': True},
             'latitude': {'type': 'double', 'search': True, 'sort': True},
@@ -305,7 +315,7 @@ def main():
   if len(replicas) != 0:
     print('Done launch replicas')
 
-  headers = ['geonameid',
+  csvHeaders = ['geonameid',
              'name',
              'asciiname',
              'alternatenames',
@@ -326,7 +336,7 @@ def main():
              'modification_date']
 
   try:
-    for iter in range(5):
+    for iter in range(1):
       print('\niter %s:' % iter)
 
       send(LOCALHOST, primaryPorts[0], 'createIndex', {'indexName': 'index', 'rootDir': '%s/server0/index' % primaryInstallPath})
@@ -377,31 +387,55 @@ def main():
       doSearch = len(replicaPorts) > 0
 
       tStart = time.time()
-      if BINARY_CSV:
+      if USE_JSON:
+        c = ChunkedHTTPSend(LOCALHOST, primaryPorts[0], 'bulkAddDocument2', {'indexName': 'index'})
+      elif BINARY_CSV:
         b1 = BinarySend(LOCALHOST, primaryPorts[1], 'bulkCSVAddDocument')
         b1.add(b'\tindex\n')
       else:
         c = ChunkedHTTPSend(LOCALHOST, primaryPorts[0], 'bulkCSVAddDocument2', {'indexName': 'index', 'delimChar': '\t'})
       with open(docSource, 'rb') as f:
-        if BINARY_CSV:
-          b1.add(('\t'.join(headers)+'\n').encode('ascii'))
+        if USE_JSON:
+          docCount = 0
+        elif BINARY_CSV:
+          b1.add(('\t'.join(csvHeaders)+'\n').encode('ascii'))
         else:
-          c.add(('\t'.join(headers)+'\n').encode('ascii'))
+          c.add(('\t'.join(csvHeaders)+'\n').encode('ascii'))
         while True:
-          bytes = f.read(256*1024)
-          if bytes == b'':
-            break
-          if BINARY_CSV:
-            b1.add(bytes)
-          else:
+          if USE_JSON:
+            b = f.read(8)
+            if len(b) == 0:
+              break
+            count, length = struct.unpack('ii', b)
+            #print('read %d bytes, %d count' % (length, count))
+            data = f.read(length)
             try:
-              c.add(bytes)
+              c.add(data)
             except:
               print('FAILED:')
               print(c.finish())
               raise
+            docCount += count
+          else:
+            bytes = f.read(256*1024)
+            if bytes == b'':
+              break
+            if BINARY_CSV:
+              b1.add(bytes)
+            else:
+              try:
+                c.add(bytes)
+              except:
+                print('FAILED:')
+                print(c.finish())
+                raise
 
-      if BINARY_CSV:
+      if USE_JSON:
+        print("done; now finish")
+        c.add(b'')
+        status = '200'
+        result = c.finish()
+      elif BINARY_CSV:
         b1.finish()
         status = b1.socket.recv(1)
         bytes = b1.socket.recv(4)
@@ -416,6 +450,7 @@ def main():
         result = c.finish()
         
       print('Indexing done: %s\n%s' % (status, result))
+      print('  index size: %s' % os.popen('du -shc install/server0/index/index').read().strip())
 
       if False:
         bytes = b2.socket.recv(4)
@@ -430,10 +465,14 @@ def main():
       dps = id / indexingTime
       print('  %.1f docs/sec for %.1f sec' % (dps, indexingTime))
 
-      print('  rollback...')
-      send(LOCALHOST, primaryPorts[0], 'rollback', {'indexName': 'index'})
+      if False:
+        print('  rollback...')
+        send(LOCALHOST, primaryPorts[0], 'rollback', {'indexName': 'index'})
+        send(LOCALHOST, primaryPorts[0], 'deleteIndex', {'indexName': 'index'})
+      else:
+        print('  commit...')
+        send(LOCALHOST, primaryPorts[0], 'commit', {'indexName': 'index'})
       print('  done')
-      send(LOCALHOST, primaryPorts[0], 'deleteIndex', {'indexName': 'index'})
 
   finally:
     # nocommit why is this leaving leftover files?  it should close all open indices gracefully?
