@@ -1012,7 +1012,6 @@ public class RegisterFieldHandler extends Handler {
     // nocommit how to allow the SPI name and separately
     // also a fully qualified class name ...
     factoryArgs.put("class", className);
-    //factoryArgs.put("luceneMatchVersion", matchVersion.toString());
 
     ResourceLoader resources = state.resourceLoader;
     RAMResourceLoaderWrapper ramResources = null;

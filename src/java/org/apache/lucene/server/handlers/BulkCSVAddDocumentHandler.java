@@ -118,11 +118,17 @@ public class BulkCSVAddDocumentHandler extends Handler {
         byte[] allBytes = new byte[endFragmentLength + nextStartFragmentLength];
         System.arraycopy(bytes, endFragmentStartOffset, allBytes, 0, endFragmentLength);
         System.arraycopy(nextStartFragment, 0, allBytes, endFragmentLength, nextStartFragmentLength);
+        System.out.println("LAST: " + new String(allBytes, StandardCharsets.UTF_8));
         CSVParser parser = new CSVParser(delimChar, globalOffset + endFragmentStartOffset, fields, indexState, allBytes, 0);
         Document doc;
         try {
           doc = parser.nextDoc();
         } catch (Throwable t) {
+          ctx.setError(new IllegalArgumentException("last document starting at offset " + (globalOffset + endFragmentStartOffset) + " failed to parse", t));
+          return;
+        }
+
+        if (doc == null) {
           ctx.setError(new IllegalArgumentException("last document starting at offset " + (globalOffset + endFragmentStartOffset) + " is missing the trailing newline"));
           return;
         }

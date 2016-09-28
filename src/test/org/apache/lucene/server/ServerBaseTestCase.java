@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -186,6 +187,10 @@ public abstract class ServerBaseTestCase extends LuceneTestCase {
     // testing we want to minimize sleep time:
     send("liveSettings", "{indexName: " + indexName + ", minRefreshSec: 0.001}");
     server.curIndexName = indexName;
+  }
+
+  protected static byte[] toUTF8(String s) {
+    return s.getBytes(StandardCharsets.UTF_8);
   }
 
   protected static void shutdownServer() throws Exception {

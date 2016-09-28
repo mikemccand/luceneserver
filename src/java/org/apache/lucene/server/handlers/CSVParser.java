@@ -213,6 +213,7 @@ class CSVParser {
     assert len > 0;
 
     // nocommit need to handle escaping!
+    // nocommit need to handle multi-valued!
     
     switch(fields[i].valueType) {
     case ATOM:

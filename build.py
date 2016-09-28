@@ -316,7 +316,11 @@ def anyChanges(srcDir, destJAR):
       if fileName.startswith('.#'):
         # emacs silliness
         continue
-      if os.path.getmtime('%s/%s' % (root, fileName)) > t1:
+      path = '%s/%s' % (root, fileName)
+      if not os.path.exists(path):
+        # silly corner case: if you copy over a lucene clone to another env and symlink into your .ivy2 cache breaks:
+        return True
+      if os.path.getmtime(path) > t1:
         return True
 
   return False

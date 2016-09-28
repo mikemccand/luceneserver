@@ -4,3 +4,15 @@ forbidden APIs
 upgrade jackson
 
 server docs hosted somewhere
+
+mv src/java -> src, src/test -> srctest
+
+make sure if a doc fails to index that we log its fields+values
+
+reindex api?
+
+parallel reader "create new column" api?
+
+rolling restart
+
+long running tasks?

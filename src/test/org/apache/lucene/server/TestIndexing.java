@@ -294,7 +294,7 @@ public class TestIndexing extends ServerBaseTestCase {
       send("settings", "{normsFormat: NoSuchNormsFormat}");
       fail("did not hit exception");
     } catch (IOException ioe) {
-      assertTrue(ioe.getMessage().contains("unrecognized value \"NoSuchNormsFormat\""));
+      assertContains(ioe.getMessage(), "unrecognized value \"NoSuchNormsFormat\"");
     }
   }
 
@@ -304,7 +304,7 @@ public class TestIndexing extends ServerBaseTestCase {
     // replaces the last 'o' in foo with illegal UTF-8 byte:
     bytes[bytes.length-3] = (byte) 0xff;
     Exception e = expectThrows(IOException.class, () -> server.sendRaw("createIndex", bytes));
-    assertTrue(e.toString().contains("MalformedInputException"));
+    assertContains(e.toString(), "MalformedInputException");
   }
 
   public void testNormsFormat() throws Exception {
@@ -339,7 +339,7 @@ public class TestIndexing extends ServerBaseTestCase {
     JSONObject result = send("settings", "{indexName: sorted}");
     assertEquals("[{\"field\":\"id\"}]", result.get("indexSort").toString());
     Exception e = expectThrows(IOException.class, () -> {send("settings", "{indexSort: [{field: id2}]}");});
-    assertTrue(e.getMessage().contains("java.lang.IllegalStateException: index \"sorted\": cannot change index sort"));
+    assertContains(e.getMessage(), "java.lang.IllegalStateException: index \"sorted\": cannot change index sort");
     send("startIndex");
     for(int i=200;i>=0;i--) {
       send("addDocument", "{fields: {id: \"" + i + "\"}}");
@@ -374,11 +374,11 @@ public class TestIndexing extends ServerBaseTestCase {
   // nocommit test error handling in csv inputs
   
   public void testIndexCSVBasic() throws Exception {
-    createIndex("csv");
+    createIndex();
     send("registerFields", "{fields: {id: {type: atom, store: true, sort: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
     send("startIndex");
     byte[] bytes = server.sendBinary("bulkCSVAddDocument",
-                                     ",csv\nid,id2,body\n0,1,some text\n1,2,some more text\n".getBytes(StandardCharsets.UTF_8));
+                                     toUTF8("," + server.curIndexName + "\nid,id2,body\n0,1,some text\n1,2,some more text\n"));
     JSONObject result = parseJSONObject(new String(bytes, StandardCharsets.UTF_8));
     assertEquals(2, getInt(result, "indexedDocumentCount"));
     send("stopIndex");
@@ -386,11 +386,11 @@ public class TestIndexing extends ServerBaseTestCase {
   }
 
   public void testIndexCSVBasicHTTP() throws Exception {
-    createIndex("csv");
+    createIndex();
     send("registerFields", "{fields: {id: {type: atom, store: true, sort: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
     send("startIndex");
     Map<String,Object> params = new HashMap<>();
-    params.put("indexName", "csv");
+    params.put("indexName", server.curIndexName);
     JSONObject result = server.send("bulkCSVAddDocument2", params, new StringReader("id,id2,body\n0,1,some text\n1,2,some more text\n"));
     assertEquals(2, getInt(result, "indexedDocumentCount"));
     send("stopIndex");
@@ -398,64 +398,64 @@ public class TestIndexing extends ServerBaseTestCase {
   }
 
   public void testIllegalIndexCSVTooManyFields() throws Exception {
-    createIndex("csv");
+    createIndex();
     send("registerFields", "{fields: {id: {type: atom, store: true, sort: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
     send("startIndex");
     Throwable t = expectThrows(IOException.class, () -> {
         server.sendBinary("bulkCSVAddDocument",
-                          ",csv\nid,id2,body\n0,1,some text,boo\n1,2,some more text\n".getBytes(StandardCharsets.UTF_8));
+                          toUTF8("," + server.curIndexName + "\nid,id2,body\n0,1,some text,boo\n1,2,some more text\n"));
       });
-    assertTrue(t.getMessage().contains("doc at offset 0: line has wrong number of fields: expected 3 but saw 4"));
+    assertContains(t.getMessage(), "doc at offset 0: line has wrong number of fields: expected 3 but saw 4");
     send("stopIndex");
     send("deleteIndex");
   }
 
   public void testIllegalIndexCSVTooFewFields() throws Exception {
-    createIndex("csv");
+    createIndex();
     send("registerFields", "{fields: {id: {type: atom, store: true, sort: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
     send("startIndex");
     Throwable t = expectThrows(IOException.class, () -> {
         server.sendBinary("bulkCSVAddDocument",
-                          ",csv\nid,id2,body\n0,1\n1,2,some more text\n".getBytes(StandardCharsets.UTF_8));
+                          toUTF8("," + server.curIndexName + "\nid,id2,body\n0,1\n1,2,some more text\n"));
       });
-    assertTrue(t.getMessage().contains("doc at offset 0: line has wrong number of fields: expected 3 but saw 2"));
+    assertContains(t.getMessage(), "doc at offset 0: line has wrong number of fields: expected 3 but saw 2");
     send("stopIndex");
     send("deleteIndex");
   }
 
   public void testIllegalIndexCSVMissingTrailingNewline() throws Exception {
-    createIndex("csv");
+    createIndex();
     send("registerFields", "{fields: {id: {type: atom, store: true, sort: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
     send("startIndex");
     Throwable t = expectThrows(IOException.class, () -> {
         server.sendBinary("bulkCSVAddDocument",
-                          ",csv\nid,id2,body\n0,1,some text\n1,2,some more text".getBytes(StandardCharsets.UTF_8));
+                          toUTF8("," + server.curIndexName + "\nid,id2,body\n0,1,some text\n1,2,some more text"));
       });
-    assertTrue(t.getMessage().contains("last document starting at offset 46 is missing the trailing newline"));
+    assertContains(t.getMessage(), "last document starting at offset 46 is missing the trailing newline");
     send("stopIndex");
     send("deleteIndex");
   }
 
   public void testIllegalIndexCSVBadInt() throws Exception {
-    createIndex("csv");
+    createIndex();
     send("registerFields", "{fields: {count: {type: int, search: true}, id: {type: atom, store: true, sort: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
     send("startIndex");
     Throwable t = expectThrows(IOException.class, () -> {
         server.sendBinary("bulkCSVAddDocument",
-                          ",csv\ncount,id2,body\n0,1,some text\n118371391723487213472,2,some more text".getBytes(StandardCharsets.UTF_8));
+                          toUTF8("," + server.curIndexName + "\ncount,id2,body\n0,1,some text\n118371391723487213472,2,some more text"));
       });
-    assertTrue(t.getMessage().contains("doc at offset 66: could not parse field \"count\" as int: overflow: \"118371391723487213472\""));
+    assertContains(t.getMessage(), "doc at offset 66: could not parse field \"count\" as int: overflow: \"118371391723487213472\"");
     send("stopIndex");
     send("deleteIndex");
   }
 
   public void testIllegalIndexCSVBadLong() throws Exception {
-    createIndex("csv");
+    createIndex();
     send("registerFields", "{fields: {count: {type: long, search: true}, id: {type: atom, store: true, sort: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
     send("startIndex");
     Throwable t = expectThrows(IOException.class, () -> {
         server.sendBinary("bulkCSVAddDocument",
-                          ",csv\ncount,id2,body\n0,1,some text\n118371391723487213472,2,some more text".getBytes(StandardCharsets.UTF_8));
+                          toUTF8("," + server.curIndexName + "\ncount,id2,body\n0,1,some text\n118371391723487213472,2,some more text"));
       });
     assertContains(t.getMessage(), "doc at offset 66: could not parse field \"count\" as long: overflow: \"118371391723487213472\"");
     send("stopIndex");
@@ -463,12 +463,12 @@ public class TestIndexing extends ServerBaseTestCase {
   }
 
   public void testIllegalIndexCSVBadFloat() throws Exception {
-    createIndex("csv");
+    createIndex();
     send("registerFields", "{fields: {count: {type: float, search: true}, id: {type: atom, store: true, sort: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
     send("startIndex");
     Throwable t = expectThrows(IOException.class, () -> {
         server.sendBinary("bulkCSVAddDocument",
-                          ",csv\ncount,id2,body\n0,1,some text\n1183x71391723487213472,2,some more text".getBytes(StandardCharsets.UTF_8));
+                          toUTF8("," + server.curIndexName + "\ncount,id2,body\n0,1,some text\n1183x71391723487213472,2,some more text"));
       });
     assertContains(t.getMessage(), "doc at offset 67: could not parse field \"count\" as float: extra characters: \"1183x71391723487213472\"");
     send("stopIndex");
@@ -476,12 +476,12 @@ public class TestIndexing extends ServerBaseTestCase {
   }
 
   public void testIllegalIndexCSVBadDouble() throws Exception {
-    createIndex("csv");
+    createIndex();
     send("registerFields", "{fields: {count: {type: double, search: true}, id: {type: atom, store: true, sort: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
     send("startIndex");
     Throwable t = expectThrows(IOException.class, () -> {
         server.sendBinary("bulkCSVAddDocument",
-                          ",csv\ncount,id2,body\n0,1,some text\n1183x71391723487213472,2,some more text".getBytes(StandardCharsets.UTF_8));
+                          toUTF8("," + server.curIndexName + "\ncount,id2,body\n0,1,some text\n1183x71391723487213472,2,some more text"));
       });
     assertContains(t.getMessage(), "doc at offset 67: could not parse field \"count\" as double: extra characters: \"1183x71391723487213472\"");
     send("stopIndex");

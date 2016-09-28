@@ -119,7 +119,7 @@ import net.minidev.json.parser.ParseException;
 
 /** Holds all state associated with one index.  On startup
  *  and on creating a new index, the index loads its state
- *  but does not start itself.  At this point, setting can
+ *  but does not start itself.  At this point, settings can
  *  be changed, and then the index must be {@link #start}ed
  *  before it can be used for indexing and searching, at
  *  which point only live settings may be changed.
@@ -139,8 +139,6 @@ import net.minidev.json.parser.ParseException;
  */
 
 public class IndexState implements Closeable {
-  /** Default {@link Version} for {@code matchVersion}. */
-  public Version matchVersion = Version.LUCENE_6_3_0;
 
   /** Creates directories */
   public DirectoryFactory df = DirectoryFactory.get("FSDirectory");
@@ -890,16 +888,7 @@ public class IndexState implements Closeable {
 
       Type type = p.type;
 
-      if (paramName.equals("matchVersion")) {
-        Object value = ent.getValue();
-        try {
-          type.validate(value);
-        } catch (IllegalArgumentException iae) {
-          r.fail(paramName, iae.toString());
-        }
-        matchVersion = RegisterFieldHandler.getVersion((String) value);
-        it.remove();
-      } else if (type instanceof StringType || type instanceof IntType || type instanceof LongType || type instanceof FloatType || type instanceof BooleanType) {
+      if (type instanceof StringType || type instanceof IntType || type instanceof LongType || type instanceof FloatType || type instanceof BooleanType) {
         Object value = ent.getValue();
         try {
           type.validate(value);
@@ -1006,7 +995,7 @@ public class IndexState implements Closeable {
 
   /** Live setting: set the maximum refresh time (seconds), which is the
    *  amount of time before we reopen the searcher
-   *  proactively (when no search client is waiting). */
+   *  proactively (when no search client is waiting for a specific index generation). */
   public synchronized void setMaxRefreshSec(double max) {
     maxRefreshSec = max;
     liveSettingsSaveState.put("maxRefreshSec", max);
