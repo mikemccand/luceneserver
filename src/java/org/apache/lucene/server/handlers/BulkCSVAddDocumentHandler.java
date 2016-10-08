@@ -33,6 +33,8 @@ import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
 import org.apache.lucene.server.Server;
+import org.apache.lucene.server.ShardState.IndexingContext;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.Request;
 import org.apache.lucene.server.params.StructType;
 import org.apache.lucene.store.DataInput;
@@ -67,9 +69,9 @@ public class BulkCSVAddDocumentHandler extends Handler {
   /** Parses and indexes documents from one chunk of CSV */
   private static class ParseAndIndexOneChunk implements Runnable {
     /** Shared context across all docs being indexed in this one stream */
-    private final IndexState.IndexingContext ctx;
+    private final ShardState.IndexingContext ctx;
     
-    private final IndexState indexState;
+    private final ShardState shardState;
     private final FieldDef[] fields;
     private final byte[] bytes;
     private final Semaphore semaphore;
@@ -87,13 +89,13 @@ public class BulkCSVAddDocumentHandler extends Handler {
     private int nextStartFragmentLength;
     private final byte delimChar;
     
-    public ParseAndIndexOneChunk(byte delimChar, long globalOffset, IndexState.IndexingContext ctx, ParseAndIndexOneChunk prev, IndexState indexState,
+    public ParseAndIndexOneChunk(byte delimChar, long globalOffset, ShardState.IndexingContext ctx, ParseAndIndexOneChunk prev, ShardState shardState,
                                  FieldDef[] fields, byte[] bytes, Semaphore semaphore) throws InterruptedException {
       this.delimChar = delimChar;
       this.ctx = ctx;
       ctx.inFlightChunks.register();
       this.prev = prev;
-      this.indexState = indexState;
+      this.shardState = shardState;
       this.fields = fields;
       this.bytes = bytes;
       this.semaphore = semaphore;
@@ -119,7 +121,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
         System.arraycopy(bytes, endFragmentStartOffset, allBytes, 0, endFragmentLength);
         System.arraycopy(nextStartFragment, 0, allBytes, endFragmentLength, nextStartFragmentLength);
         System.out.println("LAST: " + new String(allBytes, StandardCharsets.UTF_8));
-        CSVParser parser = new CSVParser(delimChar, globalOffset + endFragmentStartOffset, fields, indexState, allBytes, 0);
+        CSVParser parser = new CSVParser(delimChar, globalOffset + endFragmentStartOffset, fields, allBytes, 0);
         Document doc;
         try {
           doc = parser.nextDoc();
@@ -133,9 +135,9 @@ public class BulkCSVAddDocumentHandler extends Handler {
           return;
         }
 
-        if (indexState.hasFacets()) {
+        if (shardState.indexState.hasFacets()) {
           try {
-            doc = indexState.facetsConfig.build(indexState.taxoWriter, doc);
+            doc = shardState.indexState.facetsConfig.build(shardState.taxoWriter, doc);
           } catch (IOException ioe) {
             ctx.setError(new RuntimeException("document at offset " + (globalOffset + parser.getLastDocStart()) + " hit exception building facets", ioe));
             return;
@@ -144,7 +146,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
         
         ctx.addCount.incrementAndGet();
         try {
-          indexState.indexDocument(doc);
+          shardState.indexDocument(doc);
         } catch (Throwable t) {
           ctx.setError(new RuntimeException("failed to index document at offset " + (globalOffset + endFragmentStartOffset), t));
           return;
@@ -220,14 +222,14 @@ public class BulkCSVAddDocumentHandler extends Handler {
         // add all documents in this chunk as a block:
         final int[] endOffset = new int[1];
         try {
-          indexState.writer.addDocuments(new Iterable<Document>() {
+          shardState.writer.addDocuments(new Iterable<Document>() {
               @Override
               public Iterator<Document> iterator() {
 
                 // now parse & index whole documents:
 
-                final CSVParser parser = new CSVParser(delimChar, globalOffset, fields, indexState, bytes, startUpto);
-                final boolean hasFacets = indexState.hasFacets();
+                final CSVParser parser = new CSVParser(delimChar, globalOffset, fields, bytes, startUpto);
+                final boolean hasFacets = shardState.indexState.hasFacets();
 
                 return new Iterator<Document>() {
                   private Document nextDoc;
@@ -246,7 +248,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
                         ctx.addCount.incrementAndGet();
                         if (hasFacets) {
                           try {
-                            nextDoc = indexState.facetsConfig.build(indexState.taxoWriter, nextDoc);
+                            nextDoc = shardState.indexState.facetsConfig.build(shardState.taxoWriter, nextDoc);
                           } catch (IOException ioe) {
                             ctx.setError(new RuntimeException("document at offset " + (globalOffset + parser.getLastDocStart()) + " hit exception building facets", ioe));
                             nextDoc = null;
@@ -345,9 +347,11 @@ public class BulkCSVAddDocumentHandler extends Handler {
       }
     }
 
+    ShardState shardState = indexState.getShard(0);
+
     FieldDef[] fields = fieldsList.toArray(new FieldDef[fieldsList.size()]);
 
-    IndexState.IndexingContext ctx = new IndexState.IndexingContext();
+    IndexingContext ctx = new IndexingContext();
     byte[] bufferOld = buffer;
 
     // nocommit tune this .. core count?
@@ -381,7 +385,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
           buffer = realloc;
         }
         // NOTE: This ctor will stall when it tries to acquire the semaphore if we already have too many in-flight indexing chunks:
-        prev = new ParseAndIndexOneChunk(delimChar, globalOffset, ctx, prev, indexState, fields, buffer, semaphore);
+        prev = new ParseAndIndexOneChunk(delimChar, globalOffset, ctx, prev, shardState, fields, buffer, semaphore);
         globalState.indexService.submit(prev);
         if (count == -1) {
           // the end
@@ -415,7 +419,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
       out.writeBytes(bytes, 0, bytes.length);
     } else {
       JSONObject o = new JSONObject();
-      o.put("indexGen", indexState.writer.getMaxCompletedSequenceNumber());
+      o.put("indexGen", shardState.writer.getMaxCompletedSequenceNumber());
       o.put("indexedDocumentCount", ctx.addCount.get());
 
       byte[] bytes = o.toString().getBytes(StandardCharsets.UTF_8);

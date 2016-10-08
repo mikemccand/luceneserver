@@ -25,6 +25,7 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.*;
 import org.apache.lucene.util.IOUtils;
 
@@ -34,11 +35,13 @@ import com.fasterxml.jackson.core.JsonToken;
 
 import net.minidev.json.JSONObject;
 
-import static org.apache.lucene.server.IndexState.IndexingContext;
+import static org.apache.lucene.server.ShardState.IndexingContext;
 
 /** Reads more than one { ... } request in a single
  *  connection, but each request must be separated by at
  *  least one whitespace char. */
+
+// nocommit removeme?
 
 public class BulkAddDocumentHandler extends Handler {
 
@@ -91,6 +94,7 @@ public class BulkAddDocumentHandler extends Handler {
     }
 
     IndexState state = globalState.get(parser.getText());
+    ShardState shardState = state.getShard(0);
     state.verifyStarted(null);
     if (parser.nextToken() != JsonToken.FIELD_NAME) {
       throw new IllegalArgumentException("expected documents next");
@@ -112,7 +116,7 @@ public class BulkAddDocumentHandler extends Handler {
       if (doc == null) {
         break;
       }
-      globalState.indexService.submit(state.getAddDocumentJob(count, null, doc, ctx));
+      globalState.indexService.submit(shardState.getAddDocumentJob(count, null, doc, ctx));
       count++;
     }
 
@@ -130,7 +134,7 @@ public class BulkAddDocumentHandler extends Handler {
     }
 
     JSONObject o = new JSONObject();
-    o.put("indexGen", state.writer.getMaxCompletedSequenceNumber());
+    o.put("indexGen", shardState.writer.getMaxCompletedSequenceNumber());
     o.put("indexedDocumentCount", count);
     return o.toString();
   }

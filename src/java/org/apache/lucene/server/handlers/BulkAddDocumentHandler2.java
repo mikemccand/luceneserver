@@ -41,6 +41,7 @@ import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
 import org.apache.lucene.server.Server;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.*;
 import org.apache.lucene.store.DataInput;
 import org.apache.lucene.store.DataOutput;
@@ -54,9 +55,7 @@ import com.fasterxml.jackson.core.JsonToken;
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 
-import static org.apache.lucene.server.IndexState.IndexingContext;
-
-/** Bulk addDocument from JSON doc-per-line encoding */
+/** Bulk addDocument from JSON single-doc-per-line encoding */
 
 public class BulkAddDocumentHandler2 extends Handler {
 
@@ -89,7 +88,7 @@ public class BulkAddDocumentHandler2 extends Handler {
     private static final JsonFactory jsonFactory = new JsonFactory();
 
     /** Shared context across all docs being indexed in this one stream */
-    private final IndexState.IndexingContext ctx;
+    private final ShardState.IndexingContext ctx;
     
     private final IndexState indexState;
     private final char[] chars;
@@ -108,7 +107,7 @@ public class BulkAddDocumentHandler2 extends Handler {
     private int nextStartFragmentOffset;
     private int nextStartFragmentLength;
     
-    public ParseAndIndexOneChunk(long globalOffset, IndexState.IndexingContext ctx, ParseAndIndexOneChunk prev, IndexState indexState,
+    public ParseAndIndexOneChunk(long globalOffset, ShardState.IndexingContext ctx, ParseAndIndexOneChunk prev, IndexState indexState,
                                  char[] chars, Semaphore semaphore, AddDocumentHandler addDocHandler) throws InterruptedException {
       this.ctx = ctx;
       ctx.inFlightChunks.register();
@@ -133,6 +132,7 @@ public class BulkAddDocumentHandler2 extends Handler {
     }
         
     private void _indexSplitDoc() {
+      ShardState shardState = indexState.getShard(0);
       int endFragmentLength = chars.length - endFragmentStartOffset;
       if (endFragmentLength + nextStartFragmentLength > 0) {
         char[] allChars = new char[endFragmentLength + nextStartFragmentLength];
@@ -159,7 +159,7 @@ public class BulkAddDocumentHandler2 extends Handler {
         ctx.addCount.incrementAndGet();
         if (indexState.hasFacets()) {
           try {
-            doc = indexState.facetsConfig.build(indexState.taxoWriter, doc);
+            doc = indexState.facetsConfig.build(shardState.taxoWriter, doc);
           } catch (IOException ioe) {
             ctx.setError(new RuntimeException("document at offset " + (globalOffset + parser.getCurrentLocation().getCharOffset()) + " hit exception building facets", ioe));
             return;
@@ -167,7 +167,7 @@ public class BulkAddDocumentHandler2 extends Handler {
         }
 
         try {
-          indexState.indexDocument(doc);
+          shardState.indexDocument(doc);
         } catch (Throwable t) {
           ctx.setError(new RuntimeException("failed to index document at offset " + (globalOffset + endFragmentStartOffset), t));
           return;
@@ -212,6 +212,8 @@ public class BulkAddDocumentHandler2 extends Handler {
 
     private void _run() {
 
+      ShardState shardState = indexState.getShard(0);
+
       // find the start of our first document:
       int upto;
       if (prev != null) {
@@ -247,7 +249,7 @@ public class BulkAddDocumentHandler2 extends Handler {
         final int[] endOffset = new int[1];
         try {
           // nocommit what if this Iterable produces 0 docs?  does IW get angry?
-          indexState.writer.addDocuments(new Iterable<Document>() {
+          shardState.writer.addDocuments(new Iterable<Document>() {
               @Override
               public Iterator<Document> iterator() {
 
@@ -303,7 +305,7 @@ public class BulkAddDocumentHandler2 extends Handler {
                       ctx.addCount.incrementAndGet();
                       if (hasFacets) {
                         try {
-                          nextDoc = indexState.facetsConfig.build(indexState.taxoWriter, nextDoc);
+                          nextDoc = indexState.facetsConfig.build(shardState.taxoWriter, nextDoc);
                         } catch (IOException ioe) {
                           nextSet = true;
                           nextDoc = null;
@@ -366,13 +368,14 @@ public class BulkAddDocumentHandler2 extends Handler {
 
     // Make sure the index does in fact exist
     IndexState indexState = globalState.get(indexName);
+    ShardState shardState = indexState.getShard(0);
 
     // Make sure the index is started:
     if (indexState.isStarted() == false) {
       throw new IllegalArgumentException("index \"" + indexName + "\" isn't started: cannot index documents");
     }
     
-    IndexState.IndexingContext ctx = new IndexState.IndexingContext();
+    ShardState.IndexingContext ctx = new ShardState.IndexingContext();
 
     // nocommit tune this .. core count?
 
@@ -437,7 +440,7 @@ public class BulkAddDocumentHandler2 extends Handler {
       return null;
     } else {
       JSONObject o = new JSONObject();
-      o.put("indexGen", indexState.writer.getMaxCompletedSequenceNumber());
+      o.put("indexGen", shardState.writer.getMaxCompletedSequenceNumber());
       o.put("indexedDocumentCount", ctx.addCount.get());
       return o.toString();
     }

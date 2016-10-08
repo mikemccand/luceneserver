@@ -661,6 +661,12 @@ public class Request {
     return bad(param, message, null);
   }
 
+  /** Throws a {@link RequestFailedException} with the
+   *  provided message and root cause. */
+  public RequestFailedException bad(String message, Throwable cause) {
+    return bad(null, message, cause);
+  }
+
   /** Constructs the exception to throw representing this failure */
   public RequestFailedException bad(String param, String reason, Throwable cause) {
     StringBuilder sb = new StringBuilder();

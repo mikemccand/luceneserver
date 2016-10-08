@@ -31,11 +31,13 @@ import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
 import org.apache.lucene.server.MyIndexSearcher;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.BooleanType; 
 import org.apache.lucene.server.params.Param; 
 import org.apache.lucene.server.params.Request; 
 import org.apache.lucene.server.params.StringType; 
 import org.apache.lucene.server.params.StructType; 
+
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 
@@ -70,10 +72,12 @@ public class CreateSnapshotHandler extends Handler {
   }
 
   @Override
-  public FinishRequest handle(final IndexState state, Request r, Map<String,List<String>> params) throws Exception {
-    state.verifyStarted(r);
+  public FinishRequest handle(final IndexState indexState, Request r, Map<String,List<String>> params) throws Exception {
+    indexState.verifyStarted(r);
 
-    if (!state.hasCommit()) {
+    final ShardState shardState = indexState.getShard(0);
+
+    if (!indexState.hasCommit()) {
       r.fail("this index has no commits; please call commit first");
     }
 
@@ -83,36 +87,36 @@ public class CreateSnapshotHandler extends Handler {
     return new FinishRequest() {
       @Override
       public String finish() throws IOException {
-        IndexCommit c = state.snapshots.snapshot();
-        IndexCommit tc = state.taxoSnapshots.snapshot();
-        long stateGen = state.incRefLastCommitGen();
+        IndexCommit c = shardState.snapshots.snapshot();
+        IndexCommit tc = shardState.taxoSnapshots.snapshot();
+        long stateGen = indexState.incRefLastCommitGen();
 
         JSONObject result = new JSONObject();
         
-        SegmentInfos sis = SegmentInfos.readCommit(state.origIndexDir, c.getSegmentsFileName());
-        state.snapshotGenToVersion.put(c.getGeneration(), sis.getVersion());
+        SegmentInfos sis = SegmentInfos.readCommit(shardState.origIndexDir, c.getSegmentsFileName());
+        shardState.snapshotGenToVersion.put(c.getGeneration(), sis.getVersion());
 
         if (openSearcher) {
           // nocommit share w/ SearchHandler's method:
           // TODO: this "reverse-NRT" is silly ... we need a reader
           // pool somehow:
-          SearcherAndTaxonomy s2 = state.acquire();
+          SearcherAndTaxonomy s2 = shardState.acquire();
           try {
             // This returns a new reference to us, which
             // is decRef'd in the finally clause after
             // search is done:
             long t0 = System.nanoTime();
             IndexReader r = DirectoryReader.openIfChanged((DirectoryReader) s2.searcher.getIndexReader(), c);
-            IndexSearcher s = new MyIndexSearcher(r, state);
+            IndexSearcher s = new MyIndexSearcher(r, shardState);
             try {
-              state.slm.record(s);
+              shardState.slm.record(s);
             } finally {
               s.getIndexReader().decRef();
             }
             long t1 = System.nanoTime();
             result.put("newSnapshotSearcherOpenMS", ((t1-t0)/1000000.0));
           } finally {
-            state.release(s2);
+            shardState.release(s2);
           }
         }
 

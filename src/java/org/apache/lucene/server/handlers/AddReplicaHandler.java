@@ -27,6 +27,7 @@ import java.util.Map;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.Request;
 import org.apache.lucene.server.params.StructType;
 import org.apache.lucene.store.DataInput;
@@ -49,8 +50,9 @@ public class AddReplicaHandler extends Handler {
   @Override
   public void handleBinary(InputStream streamIn, DataInput in, DataOutput out, OutputStream streamOut) throws Exception {
     String indexName = in.readString();
-    IndexState state = globalState.get(indexName);
-    if (state.isPrimary() == false) {
+    IndexState indexState = globalState.get(indexName);
+    ShardState shardState = indexState.getShard(0);
+    if (shardState.isPrimary() == false) {
       throw new IllegalArgumentException("index \"" + indexName + "\" was not started or is not a primary");
     }
 
@@ -66,7 +68,7 @@ public class AddReplicaHandler extends Handler {
 
     InetSocketAddress replicaAddress = new InetSocketAddress(InetAddress.getByAddress(bytes), port);
     System.out.println("AddReplicaHandler: now add ID=" + replicaID + " address=" + replicaAddress);
-    state.nrtPrimaryNode.addReplica(replicaID, replicaAddress);
+    shardState.nrtPrimaryNode.addReplica(replicaID, replicaAddress);
   }
 
   @Override

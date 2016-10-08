@@ -28,6 +28,7 @@ import org.apache.lucene.index.IndexCommit;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.*;
 
 import net.minidev.json.JSONObject;
@@ -56,8 +57,10 @@ public class GetCommitUserDataHandler extends Handler {
   }
   
   @Override
-  public FinishRequest handle(final IndexState state, final Request r, Map<String,List<String>> params) throws Exception {
+  public FinishRequest handle(final IndexState indexState, final Request r, Map<String,List<String>> params) throws Exception {
 
+    final ShardState shardState = indexState.getShard(0);
+    
     return new FinishRequest() {
       @Override
       public String finish() throws IOException, InterruptedException {
@@ -65,22 +68,22 @@ public class GetCommitUserDataHandler extends Handler {
         Map<String,String> userData;
         if (r.hasParam("searcher")) {
           // Specific searcher version:
-          SearcherAndTaxonomy s = SearchHandler.getSearcherAndTaxonomy(r, state, null);
+          SearcherAndTaxonomy s = SearchHandler.getSearcherAndTaxonomy(r, shardState, null);
           try {
             DirectoryReader dr = (DirectoryReader) s.searcher.getIndexReader();
             searcherVersion = dr.getVersion();
             IndexCommit commit = dr.getIndexCommit();
             userData = commit.getUserData();
           } finally {
-            state.release(s);
+            shardState.release(s);
           }
 
         } else {
           // Just use current IndexWriter:
           searcherVersion = -1;
-          state.verifyStarted(r);
+          indexState.verifyStarted(r);
           userData = new HashMap<String,String>();
-          for(Map.Entry<String,String> ent : state.writer.getLiveCommitData()) {
+          for(Map.Entry<String,String> ent : shardState.writer.getLiveCommitData()) {
             userData.put(ent.getKey(), ent.getValue());
           }
         }

@@ -33,6 +33,7 @@ import org.apache.lucene.search.TopFieldDocs;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.FloatType;
 import org.apache.lucene.server.params.IntType;
 import org.apache.lucene.server.params.ListType;
@@ -76,9 +77,9 @@ public class NearestPointsHandler extends Handler {
   }
 
   @Override
-  public FinishRequest handle(final IndexState state, final Request r, Map<String,List<String>> params) throws Exception {
-
-    state.verifyStarted(r);
+  public FinishRequest handle(final IndexState indexState, final Request r, Map<String,List<String>> params) throws Exception {
+    final ShardState shardState = indexState.getShard(0);
+    indexState.verifyStarted(r);
 
     List<String> retrieveFields;
     if (r.hasParam("retrieveFields")) {
@@ -99,7 +100,7 @@ public class NearestPointsHandler extends Handler {
     final String resultString;      
 
     // Pull the searcher we will use
-    final SearcherAndTaxonomy s = SearchHandler.getSearcherAndTaxonomy(r, state, diagnostics);
+    final SearcherAndTaxonomy s = SearchHandler.getSearcherAndTaxonomy(r, shardState, diagnostics);
     try {
       TopFieldDocs hits = LatLonPoint.nearest(s.searcher, fieldName, lat, lon, count);
 
@@ -137,7 +138,7 @@ public class NearestPointsHandler extends Handler {
       // but under-the-hood all these methods just call
       // s.getIndexReader().decRef(), which is what release
       // does:
-      state.release(s);
+      shardState.release(s);
     }
 
     return new FinishRequest() {

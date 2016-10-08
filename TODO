@@ -1,3 +1,6 @@
+hmm what to do about "index gen" and "searcher version" now that I am sharding!?  i guess it must become a... list?
+
+rename state -> globalState
 
 forbidden APIs
 
@@ -15,4 +18,124 @@ parallel reader "create new column" api?
 
 rolling restart
 
+task management api?
+
 long running tasks?
+
+  - remove live field values
+  - lucene server / luceneserver
+    - index aliases
+    - require _source field?  so reindex is always possible ... but tricky because i must link to "the csv header used" if it's a csv source
+    - get facets working w/ NRT replication in lucene server 
+    - rolling upgrade?
+    - federated
+    - reindex api?
+    - shards
+      - what about suggesters?
+      - how to handle index gen?
+    - deletion of old data
+      - hmm: maybe use LogByteSizeMP?  and then, i can prune individual segments?
+    - force merge closed shards, then close IW?
+    - should snapshots really hold settings too?
+    - curious: spillover shards can be closed as soon as the next spillover happens: powerful
+    - index subdir should be random uid, not the index name (ES had problems here)
+    - have something like IMC
+    - make sure i fully exposed sorted set dv facets
+      - maybe add hierarchy?
+    - get IW 1, IW 2, ... working
+    - clean per-segment caching for facet counts
+    - rolling upgrades
+      - reindex api
+      - upgrade index api
+    - hmm "we don't cache aggregations": can lucene cache facet counts and post-aggreggate?
+    - live similarity updating?
+    - switch bulk json protocol over to one-doc-per-line too, and use fast bulk thread splitter
+    - csv escaping
+    - get csv working correctly when one doc spans multiple chunks
+    - accept cbor too
+    - how to index a binary field when CSV import is via http?
+    - index aliases?
+    - reindex api?  should i store _source?
+    - reserve internal field names (leading _?)
+    - add op to collapse indices together
+    - make a larger scale distributed search test
+      - 5 shards :)
+    - where else to disable nagle's
+    - distributed search
+      - test across N machines
+      - distributed term stats
+      - separate fetch phase
+    - get this controlled RT working with replication too
+      - really i just need indexGen -> searcherVersion mapping?  and incoming query just maps indexGen to searcherVersion
+    - get live field values working w/ replication
+    - MAKE TEST lucene server: concurrent close index while searching
+    - node lock, to ensure only one node is running "here"?
+    - geo names
+      - get copy field working
+    - add ./build.py beast
+    - "suddenly add a whole new field" fork an index idea (TestDemoParallelLeafReader)
+    - source field, reindexing?
+    - upgrade process how?
+    - persistent http connections b/w nodes
+    - go open issue about the double rounding difference
+    - no automatic routing of documents to shards: user simply adds to whichever index
+      - this is nice because load can be reduced by splitting docs out to the indices that are more lightly loaded right now
+      - and we can make new shards any time
+    - node to node security
+    - the strongly timestamp'd case
+      - time based indices
+      - append only
+      - new index every X time
+      - time range filter should only query indices having that time range
+      - index sorting
+      - optimizing index over time (simon's cool ES change)
+    - searching N indices and merging
+    - reducing load by changing which node is primary
+    - ttl?
+    - es limitations
+      - rolling upgrade
+    - does lucene server also have a _field_names?  opt in?
+    - be smart about range searching, if the index or segment's values are outside of the range...
+    - link to the docs from github, i guess running @ jirasearch?
+      - improve the docs!
+    - cold/hot indices
+    - simon's mapping of big index down to 1 segment over time ... oh, N shards down to 1
+    - resharding
+    - maybe open up allowed "overage backlog" in flushing new segments???
+    - binary format for adding docs?
+    - ES distributed problems
+      - single node being bad dragging down whole cluster
+    - ugh: include indexTaxis.py in release!
+      - make it "aware" when it's in a release unzip
+    - hrm: merges fall behind w/ replication
+      - should i prioritize merges as fifo?
+    - settings that take units?
+    - measure replica NRT latency
+    - compare json bulk import vs csv
+    - test nrt replication
+    - taxis
+      - why is stored fields there?
+      - investigate StreamTokenizer?
+      - is 1 gb buffer really better?
+      - RUN RAW LUCENE
+      - test building full index, and then adding replica!
+      - test index sorting lucene
+      - replication
+    - try index sorting
+    - upgrade jirasearch, switch to SimpleQP
+    - persistent http/1.1 connections
+    - diffs vs ES
+      - anal checking of settings, request params, etc.
+      - ES combines "flush" and "refresh"; uwe's issue about NOT wanting to refresh
+      - crazy slow restart time for ES to "recover"
+      - sharing field/document instances
+      - using addDocuments
+      - streaming bulk index API, client is single threaded
+      - faster double parsing
+      - CSV not json
+      - no version map
+      - no xlog
+      - no periodic fsync
+      - no added id field, _type, _version, _source, _all
+      - IW can pick single segment to write to disk at a time, but ES writes them all, or refreshes
+      - 512 KB chunks go into the per-thread queue, not single docs

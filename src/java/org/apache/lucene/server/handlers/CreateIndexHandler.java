@@ -53,7 +53,7 @@ public class CreateIndexHandler extends Handler {
   }
 
   @Override
-  public FinishRequest handle(final IndexState state, final Request r, Map<String,List<String>> params) throws Exception {
+  public FinishRequest handle(final IndexState indexState, final Request r, Map<String,List<String>> params) throws Exception {
     final String indexName = r.getString("indexName");
     if (!IndexState.isSimpleName(indexName)) {
       r.fail("indexName", "invalid indexName \"" + indexName + "\": must be [a-zA-Z_][a-zA-Z0-9]*");
@@ -68,12 +68,16 @@ public class CreateIndexHandler extends Handler {
     return new FinishRequest() {
       @Override
       public String finish() throws Exception {
+        IndexState indexState;
         try {
-          globalState.createIndex(indexName, rootDir);
+          indexState = globalState.createIndex(indexName, rootDir);
         } catch (IllegalArgumentException iae) {
-          r.fail("invalid indexName \"" + indexName + "\": " + iae.toString(), iae);
+          throw r.bad("invalid indexName \"" + indexName + "\": " + iae.toString(), iae);
         }
-
+        // Create the first shard
+        System.out.println("NOW ADD SHARD 0");
+        indexState.addShard(0, true);
+        System.out.println("DONE ADD SHARD 0");
         return "{}";
       }
     };

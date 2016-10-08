@@ -26,6 +26,7 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.*;
 import org.apache.lucene.util.IOUtils;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -34,7 +35,7 @@ import com.fasterxml.jackson.core.JsonToken;
 
 import net.minidev.json.JSONObject;
 
-import static org.apache.lucene.server.IndexState.IndexingContext;
+import static org.apache.lucene.server.ShardState.IndexingContext;
 
 /** Reads more than one { ... } request in a single
  *  connection, but each request must be separated by at
@@ -97,14 +98,16 @@ public class BulkAddDocumentsHandler extends Handler {
       throw new IllegalArgumentException("indexName should be string");
     }
 
-    IndexState state = globalState.get(parser.getText());
-    state.verifyStarted(null);
+    IndexState indexState = globalState.get(parser.getText());
+    indexState.verifyStarted(null);
     if (parser.nextToken() != JsonToken.FIELD_NAME) {
       throw new IllegalArgumentException("expected documents next");
     }
     if (!parser.getText().equals("documents")) {
       throw new IllegalArgumentException("expected documents after indexName");
     }
+
+    ShardState shardState = indexState.getShard(0);
 
     if (parser.nextToken() != JsonToken.START_ARRAY) {
       throw new IllegalArgumentException("documents should be a list");
@@ -150,14 +153,14 @@ public class BulkAddDocumentsHandler extends Handler {
 
           // Parse each child:
           while (true) {
-            Document doc = addDocHandler.parseDocument(state, parser);
+            Document doc = addDocHandler.parseDocument(indexState, parser);
             if (doc == null) {
               break;
             }
             children.add(doc);
           }
         } else if (f.equals("parent")) {
-          parent = addDocHandler.parseDocument(state, parser);
+          parent = addDocHandler.parseDocument(indexState, parser);
         } else {
           throw new IllegalArgumentException("unrecognized field name \"" + f + "\"");
         }
@@ -173,7 +176,7 @@ public class BulkAddDocumentsHandler extends Handler {
       // Parent is last:
       children.add(parent);
 
-      globalState.indexService.submit(state.getAddDocumentsJob(count, null, children, ctx));
+      globalState.indexService.submit(shardState.getAddDocumentsJob(count, null, children, ctx));
       count++;
     }
 
@@ -191,7 +194,7 @@ public class BulkAddDocumentsHandler extends Handler {
     }
 
     JSONObject o = new JSONObject();
-    o.put("indexGen", state.writer.getMaxCompletedSequenceNumber());
+    o.put("indexGen", shardState.writer.getMaxCompletedSequenceNumber());
     o.put("indexedDocumentBlockCount", count);
     return o.toString();
   }

@@ -130,7 +130,7 @@ public abstract class GenFileUtil<T> {
       saveOne(out, o);
       success = true;
     } finally {
-      if (!success) {
+      if (success == false) {
         IOUtils.closeWhileHandlingException(out);
         try {
           dir.deleteFile(fileName);
@@ -141,6 +141,8 @@ public abstract class GenFileUtil<T> {
         IOUtils.close(out);
       }
     }
+
+    // nocommit must fsync and fynsc dir here
 
     dir.sync(Collections.singletonList(fileName));
     if (nextWriteGen > 0 && canDelete(nextWriteGen-1)) {

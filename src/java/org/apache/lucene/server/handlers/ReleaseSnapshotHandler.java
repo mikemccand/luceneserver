@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.Param; 
 import org.apache.lucene.server.params.Request; 
 import org.apache.lucene.server.params.StringType; 
@@ -52,8 +53,8 @@ public class ReleaseSnapshotHandler extends Handler {
   }
 
   @Override
-  public FinishRequest handle(final IndexState state, final Request r, Map<String,List<String>> params) throws Exception {
-
+  public FinishRequest handle(final IndexState indexState, final Request r, Map<String,List<String>> params) throws Exception {
+    final ShardState shardState = indexState.getShard(0);
     final IndexState.Gens gens = new IndexState.Gens(r, "id");
 
     return new FinishRequest() {
@@ -63,13 +64,13 @@ public class ReleaseSnapshotHandler extends Handler {
         // SearcherLifetimeManager pruning thread will drop
         // the searcher (if it's old enough) next time it
         // wakes up:
-        state.snapshots.release(gens.indexGen);
-        state.writer.deleteUnusedFiles();
-        state.snapshotGenToVersion.remove(gens.indexGen);
+        shardState.snapshots.release(gens.indexGen);
+        shardState.writer.deleteUnusedFiles();
+        shardState.snapshotGenToVersion.remove(gens.indexGen);
 
-        state.taxoSnapshots.release(gens.taxoGen);
-        state.taxoInternalWriter.deleteUnusedFiles();
-        state.decRef(gens.stateGen);
+        shardState.taxoSnapshots.release(gens.taxoGen);
+        shardState.taxoInternalWriter.deleteUnusedFiles();
+        indexState.decRef(gens.stateGen);
 
         return "{}";
       }

@@ -489,6 +489,9 @@ public class TestIndexing extends ServerBaseTestCase {
   }
 
   public void testOnlySettings() throws Exception {
+    if (VERBOSE) {
+      System.out.println("TEST: testOnlySettings start");
+    }
     for(int i=0;i<2;i++) {
       server.curIndexName = "settings";
       if (VERBOSE) {

@@ -27,6 +27,7 @@ import org.apache.lucene.replicator.nrt.CopyState;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.Request;
 import org.apache.lucene.server.params.StructType;
 import org.apache.lucene.store.DataInput;
@@ -67,12 +68,13 @@ public class SendMeFilesHandler extends Handler {
   public void handleBinary(InputStream streamIn, DataInput in, DataOutput out, OutputStream streamOut) throws Exception {
     // which index we will send files from
     String indexName = in.readString();
-    IndexState state = globalState.get(indexName);
+    IndexState indexState = globalState.get(indexName);
+    ShardState shardState = indexState.getShard(0);
 
     // TODO: we could also allow replica to copy files from another replica, or a peer-to-peer multicast, or something?
 
     // make sure this index was started as a primary:
-    if (state.isPrimary() == false) {
+    if (shardState.isPrimary() == false) {
       throw new IllegalArgumentException("index \"" + indexName + "\" is not a primary or was not started yet");
     }
 
@@ -86,7 +88,7 @@ public class SendMeFilesHandler extends Handler {
       copyState = null;
     } else if (b == 1) {
       // Caller does not have CopyState; we pull the latest NRT point:
-      copyState = state.nrtPrimaryNode.getCopyState();
+      copyState = shardState.nrtPrimaryNode.getCopyState();
       Thread.currentThread().setName("send-R" + replicaID + "-" + copyState.version);
     } else {
       // Protocol error:
@@ -120,7 +122,7 @@ public class SendMeFilesHandler extends Handler {
 
         //System.out.println("SendMe: now read file " + fileName + " from fpStart=" + fpStart);
 
-        try (IndexInput file = state.indexDir.openInput(fileName, IOContext.DEFAULT)) {
+        try (IndexInput file = shardState.indexDir.openInput(fileName, IOContext.DEFAULT)) {
           long len = file.length();
           //message("fetch " + fileName + ": send len=" + len);
           out.writeVLong(len);
@@ -142,15 +144,15 @@ public class SendMeFilesHandler extends Handler {
 
       streamOut.flush();
       
-      state.nrtPrimaryNode.message("top: done fetch files for R" + replicaID + ": sent " + fileCount + " files; sent " + totBytesSent + " bytes");
+      shardState.nrtPrimaryNode.message("top: done fetch files for R" + replicaID + ": sent " + fileCount + " files; sent " + totBytesSent + " bytes");
     } catch (Throwable t) {
       // nocommit narrow the throwable we catch here
       //t.printStackTrace(System.out);
-      state.nrtPrimaryNode.message("top: exception during fetch: " + t.getMessage() + "; now close socket");
+      shardState.nrtPrimaryNode.message("top: exception during fetch: " + t.getMessage() + "; now close socket");
     } finally {
       if (copyState != null) {
-        state.nrtPrimaryNode.message("top: fetch: now release CopyState");
-        state.nrtPrimaryNode.releaseCopyState(copyState);
+        shardState.nrtPrimaryNode.message("top: fetch: now release CopyState");
+        shardState.nrtPrimaryNode.releaseCopyState(copyState);
       }
     }
   }

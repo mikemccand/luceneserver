@@ -39,7 +39,8 @@ public class SearchQueue {
     this.globalState = globalState;
   }
 
-  public synchronized void addNewQuery(QueryID queryID, String indexName, String text, byte[] returnNodeID) {
+  /** Enroll a new query into the queue */
+  public synchronized void addNewQuery(QueryID queryID, String indexName, int shardOrd, String text, byte[] returnNodeID) {
     //System.out.println("ADD NEW QUERY: " + StringHelper.idToString(id) + " text=" + text);
     QueryAndID query = queryQueue.remove(queryID);
     if (query != null) {
@@ -49,7 +50,7 @@ public class SearchQueue {
       query.text = text;
       queryDone.add(query);
     } else {
-      queryQueue.put(queryID, new QueryAndID(queryID, indexName, text, returnNodeID));
+      queryQueue.put(queryID, new QueryAndID(queryID, indexName, shardOrd, text, returnNodeID));
       notify();
     }
   }
@@ -59,7 +60,7 @@ public class SearchQueue {
     if (query == null) {
       // this is a new query (we haven't yet heard about it); in this case we enroll the query in the queue as taken; when the addQuery is
       // finally called, we see that it was already taken and move to the done queue
-      query = new QueryAndID(queryID, null, null, null);
+      query = new QueryAndID(queryID, null, 0, null, null);
       query.state = 1;
       query.nodeID = remoteNodeID;
       queryQueue.put(queryID, query);
@@ -92,12 +93,11 @@ public class SearchQueue {
       // First find a query and mark it as taken, but do not remove from the queue yet, until we've convinced all other nodes that it's ours:
       QueryAndID theQuery = null;
 
-      // nocommit factor all this out into separate QueryQueue class:
       synchronized (this) {
         // nocommit make it FIFO (LinkedHashMap?) instead:
         for(QueryAndID query : queryQueue.values()) {
           // nocommit maybe also validate that the indexGen/searcherVersion is present on this node:
-          if (query.state == 0 && globalState.hasIndex(query.indexName)) {
+          if (query.state == 0 && globalState.hasIndex(query.indexName, query.shardOrd)) {
             theQuery = query;
             query.state = 2;
             break;
@@ -140,6 +140,7 @@ public class SearchQueue {
   public static class QueryAndID {
     public final QueryID id;
     public final String indexName;
+    public final int shardOrd;
     public String text;
     // 0 = unclaimed
     // 1 = remote node claimed
@@ -151,8 +152,9 @@ public class SearchQueue {
 
     public volatile byte[] returnNodeID;
 
-    public QueryAndID(QueryID id, String indexName, String text, byte[] returnNodeID) {
+    public QueryAndID(QueryID id, String indexName, int shardOrd, String text, byte[] returnNodeID) {
       this.indexName = indexName;
+      this.shardOrd = shardOrd;
       this.id = id;
       this.text = text;
       this.returnNodeID = returnNodeID;

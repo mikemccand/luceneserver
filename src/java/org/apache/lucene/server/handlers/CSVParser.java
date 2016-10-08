@@ -61,7 +61,7 @@ class CSVParser {
   int bufferUpto;
   int bufferLimit;
   final FieldDef[] fields;
-  public final IndexState indexState;
+  //public final IndexState indexState;
   private int lastDocStart;
   private final Field[] reuseFields;
   private final Field[] reuseDVs;
@@ -69,13 +69,13 @@ class CSVParser {
   private final Document reuseDoc;
   private final byte delimChar;
   
-  public CSVParser(byte delimChar, long globalOffset, FieldDef[] fields, IndexState indexState, byte[] bytes, int startOffset) {
+  public CSVParser(byte delimChar, long globalOffset, FieldDef[] fields, byte[] bytes, int startOffset) {
     this.delimChar = delimChar;
     this.bytes = bytes;
     this.fields = fields;
     bufferUpto = startOffset;
     this.globalOffset = globalOffset;
-    this.indexState = indexState;
+    //this.indexState = indexState;
     // set up fields for reuse:
     reuseFields = new Field[fields.length];
     reusePoints = new Field[fields.length];
@@ -357,7 +357,9 @@ class CSVParser {
       {
         Field field = reuseFields[i];
         String s = new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8);
+        System.out.println("DATE TIME " + s);
         FieldDef.DateTimeParser parser = fields[i].getDateTimeParser();
+        System.out.println("  parser=" + parser);
         parser.position.setIndex(0);
         Date date = parser.parser.parse(s, parser.position);
         if (parser.position.getErrorIndex() != -1) {
@@ -369,6 +371,7 @@ class CSVParser {
           throw new IllegalArgumentException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\", value \"" + s + "\" as date with format \"" + fields[i].dateTimeFormat + "\"");
         }
         long value = date.getTime();
+        System.out.println("  value=" + value);
         if (field != null) {
           field.setLongValue(value);
           reuseDoc.add(field);

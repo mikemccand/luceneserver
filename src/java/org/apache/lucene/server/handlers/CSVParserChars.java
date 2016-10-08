@@ -73,7 +73,6 @@ class CSVParserChars {
   int bufferUpto;
   int bufferLimit;
   final FieldDef[] fields;
-  public final IndexState indexState;
   private int lastDocStart;
   private final byte[][] reuseByteArrays;
   private final Field[] reuseFields;
@@ -82,13 +81,12 @@ class CSVParserChars {
   private final Document reuseDoc;
   private final char delimChar;
   
-  public CSVParserChars(char delimChar, long globalOffset, FieldDef[] fields, IndexState indexState, char[] chars, int startOffset) {
+  public CSVParserChars(char delimChar, long globalOffset, FieldDef[] fields, char[] chars, int startOffset) {
     this.delimChar = delimChar;
     this.chars = chars;
     this.fields = fields;
     bufferUpto = startOffset;
     this.globalOffset = globalOffset;
-    this.indexState = indexState;
     // set up fields for reuse:
     reuseFields = new Field[fields.length];
     reuseByteArrays = new byte[fields.length][];

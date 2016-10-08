@@ -26,6 +26,7 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.ListType;
 import org.apache.lucene.server.params.Param;
 import org.apache.lucene.server.params.Request;
@@ -38,7 +39,7 @@ import com.fasterxml.jackson.core.JsonToken;
 
 import net.minidev.json.JSONObject;
 
-import static org.apache.lucene.server.IndexState.IndexingContext;
+import static org.apache.lucene.server.ShardState.IndexingContext;
 
 /** Handles {@code bulkUpdateDocument}. */
 public class BulkUpdateDocumentHandler extends Handler {
@@ -103,8 +104,10 @@ public class BulkUpdateDocumentHandler extends Handler {
       throw new IllegalArgumentException("indexName should be string");
     }
 
-    IndexState state = globalState.get(parser.getText());
-    state.verifyStarted(null);
+    IndexState indexState = globalState.get(parser.getText());
+    indexState.verifyStarted(null);
+
+    ShardState shardState = indexState.getShard(0);
 
     if (parser.nextToken() != JsonToken.FIELD_NAME) {
       throw new IllegalArgumentException("expected documents next");
@@ -164,7 +167,7 @@ public class BulkUpdateDocumentHandler extends Handler {
               }
               field = parser.getText();
               // Ensure field is valid:
-              state.getField(field);
+              indexState.getField(field);
             } else if (f2.equals("term")) {
               if (parser.nextToken() != JsonToken.VALUE_STRING) {
                 throw new IllegalArgumentException("missing string value");
@@ -176,11 +179,11 @@ public class BulkUpdateDocumentHandler extends Handler {
           }
           updateTerm = new Term(field, term);
         } else if (f.equals("fields")) {
-          addDocHandler.parseFields(state, doc, parser);
+          addDocHandler.parseFields(indexState, doc, parser);
         } else {
           boolean handled = false;
           for(AddDocumentHandler.PostHandle postHandle : addDocHandler.postHandlers) {
-            if (postHandle.invoke(state, f, parser, doc)) {
+            if (postHandle.invoke(indexState, f, parser, doc)) {
               handled = true;
               break;
             }
@@ -196,7 +199,7 @@ public class BulkUpdateDocumentHandler extends Handler {
       }
 
       // TODO: this is dup'd code ... share better w/ AddDocHandler
-      globalState.indexService.submit(state.getAddDocumentJob(count, updateTerm, doc, ctx));
+      globalState.indexService.submit(shardState.getAddDocumentJob(count, updateTerm, doc, ctx));
       count++;
     }
     
@@ -209,7 +212,7 @@ public class BulkUpdateDocumentHandler extends Handler {
     }
 
     JSONObject o = new JSONObject();
-    o.put("indexGen", state.writer.getMaxCompletedSequenceNumber());
+    o.put("indexGen", shardState.writer.getMaxCompletedSequenceNumber());
     o.put("indexedDocumentCount", count);
     return o.toString();
   }

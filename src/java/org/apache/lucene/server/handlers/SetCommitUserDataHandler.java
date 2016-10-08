@@ -25,7 +25,9 @@ import java.util.Map;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.*;
+
 import net.minidev.json.JSONObject;
 
 /** Handles {@code setCommitUserData}. */
@@ -51,7 +53,8 @@ public class SetCommitUserDataHandler extends Handler {
   }
   
   @Override
-  public FinishRequest handle(final IndexState state, Request r, Map<String,List<String>> params) throws Exception {
+  public FinishRequest handle(final IndexState indexState, Request r, Map<String,List<String>> params) throws Exception {
+    final ShardState shardState = indexState.getShard(0);
 
     final Map<String,String> userData = new HashMap<String,String>();
     for(Map.Entry<String,Object> ent : ((JSONObject) r.getAndRemoveRaw("userData")).entrySet()) {
@@ -64,7 +67,7 @@ public class SetCommitUserDataHandler extends Handler {
     return new FinishRequest() {
       @Override
       public String finish() throws IOException {
-        state.writer.setLiveCommitData(userData.entrySet());
+        shardState.writer.setLiveCommitData(userData.entrySet());
         return "{}";
       }
     };

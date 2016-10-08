@@ -53,8 +53,6 @@ import org.apache.lucene.util.StringHelper;
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 
-import static org.apache.lucene.server.IndexState.IndexingContext;
-
 /** Holds a persistent binary connection to another node in the cluster; this is the receiving end of the LinkNodeHandler. */
 
 public class NodeToNodeHandler extends Handler {
@@ -109,7 +107,7 @@ public class NodeToNodeHandler extends Handler {
           String indexName = dataIn.readString();
           String queryText = dataIn.readString();
           // TODO: index names/patterns
-          globalState.searchQueue.addNewQuery(new QueryID(queryID), indexName, queryText, remoteNodeID);
+          globalState.searchQueue.addNewQuery(new QueryID(queryID), indexName, 0, queryText, remoteNodeID);
         }
         break;
 

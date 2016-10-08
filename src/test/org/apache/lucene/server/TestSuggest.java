@@ -134,6 +134,7 @@ public class TestSuggest extends ServerBaseTestCase {
     assertEquals(1, getInt("count"));
 
     for(int i=0;i<2;i++) {
+      System.out.println("TEST: i=" + i);
       send("suggestLookup", "{text: lost, suggestName: suggestnrt}");
       assertEquals(15, getLong("results[0].weight"));
       assertEquals("love <font color=red>lost</font>", toString(getArray("results[0].key")));

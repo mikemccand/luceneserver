@@ -228,7 +228,7 @@ public class Search2Handler extends Handler {
       queryIDs.add(queryID);
 
       // Enroll the query in the distributed queue:
-      globalState.searchQueue.addNewQuery(queryID, indexName, queryText, globalState.nodeID);
+      globalState.searchQueue.addNewQuery(queryID, indexName, 0, queryText, globalState.nodeID);
 
       // nocommit move this into addNewQuery
       for(RemoteNodeConnection node : globalState.remoteNodes) {

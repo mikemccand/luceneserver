@@ -41,13 +41,13 @@ public class MyIndexSearcher extends IndexSearcher {
   public final Map<String,SortedSetDocValuesReaderState> ssdvStates;
 
   /** Sole constructor. */
-  public MyIndexSearcher(IndexReader r, IndexState state) throws IOException {
+  public MyIndexSearcher(IndexReader r, ShardState state) throws IOException {
     super(r);
 
     ssdvStates = new HashMap<String,SortedSetDocValuesReaderState>();
-    for (FieldDef field : state.getAllFields().values()) {
+    for (FieldDef field : state.indexState.getAllFields().values()) {
       if ("sortedSetDocValues".equals(field.faceted)) {
-        String indexFieldName = state.facetsConfig.getDimConfig(field.name).indexFieldName;
+        String indexFieldName = state.indexState.facetsConfig.getDimConfig(field.name).indexFieldName;
         if (ssdvStates.containsKey(indexFieldName) == false) {
           // TODO: log how long this took
           ssdvStates.put(indexFieldName, new DefaultSortedSetDocValuesReaderState(r, indexFieldName));

@@ -1,7 +1,5 @@
 package org.apache.lucene.server.handlers;
 
-import static org.apache.lucene.server.handlers.RegisterFieldHandler.ANALYZER_TYPE;
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -37,8 +35,8 @@ import org.apache.lucene.facet.taxonomy.SearcherTaxonomyManager.SearcherAndTaxon
 import org.apache.lucene.search.suggest.DocumentDictionary;
 import org.apache.lucene.search.suggest.DocumentValueSourceDictionary;
 import org.apache.lucene.search.suggest.InputIterator;
-import org.apache.lucene.search.suggest.Lookup;
 import org.apache.lucene.search.suggest.Lookup.LookupResult; // javadocs
+import org.apache.lucene.search.suggest.Lookup;
 import org.apache.lucene.search.suggest.analyzing.AnalyzingInfixSuggester;
 import org.apache.lucene.search.suggest.analyzing.AnalyzingSuggester;
 import org.apache.lucene.search.suggest.analyzing.FuzzySuggester;
@@ -46,11 +44,12 @@ import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.FromFileTermFreqIterator;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.BooleanType;
 import org.apache.lucene.server.params.IntType;
 import org.apache.lucene.server.params.Param;
-import org.apache.lucene.server.params.PolyType;
 import org.apache.lucene.server.params.PolyType.PolyEntry;
+import org.apache.lucene.server.params.PolyType;
 import org.apache.lucene.server.params.Request;
 import org.apache.lucene.server.params.StringType;
 import org.apache.lucene.server.params.StructType;
@@ -63,6 +62,8 @@ import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 import net.minidev.json.JSONValue;
 import net.minidev.json.parser.ParseException;
+
+import static org.apache.lucene.server.handlers.RegisterFieldHandler.ANALYZER_TYPE;
 
 /** Handles {@code buildSuggest}. */
 public class BuildSuggestHandler extends Handler {
@@ -127,7 +128,8 @@ public class BuildSuggestHandler extends Handler {
   }
 
   /** Load all previously built suggesters. */
-  public void load(IndexState state, JSONObject saveState) throws IOException {
+  public void load(IndexState indexState, JSONObject saveState) throws IOException {
+    ShardState shardState = indexState.getShard(0);
     for(Map.Entry<String,Object> ent : saveState.entrySet()) {
       String suggestName = ent.getKey();
 
@@ -135,8 +137,7 @@ public class BuildSuggestHandler extends Handler {
       String jsonOrig = params.toString();
 
       Request r = new Request(null, null, params, TYPE);
-      // Must consume these up front since getSuggester
-      // won't:
+      // Must consume these up front since getSuggester won't:
       r.getString("suggestName");
       Request source = r.getStruct("source");
       if (source.hasParam("localFile")) {
@@ -158,17 +159,18 @@ public class BuildSuggestHandler extends Handler {
           source.getString("payloadField");
         }
       }
-      Lookup suggester = getSuggester(state, suggestName, r);
+      Lookup suggester = getSuggester(indexState, suggestName, r);
       assert !Request.anythingLeft(params);
 
       if ((suggester instanceof AnalyzingInfixSuggester) == false) {
-        try (IndexInput in = state.origIndexDir.openInput("suggest." + suggestName, IOContext.DEFAULT)) {
+        // nocommit store suggesters 1 dir up:
+        try (IndexInput in = shardState.origIndexDir.openInput("suggest." + suggestName, IOContext.DEFAULT)) {
           suggester.load(in);
         }
       }
 
       try {
-        state.addSuggest(suggestName, (JSONObject) JSONValue.parseStrict(jsonOrig));
+        indexState.addSuggest(suggestName, (JSONObject) JSONValue.parseStrict(jsonOrig));
       } catch (ParseException pe) {
         // BUG
         throw new RuntimeException(pe);
@@ -176,14 +178,16 @@ public class BuildSuggestHandler extends Handler {
     }
   }
 
-  private Lookup getSuggester(IndexState state, String suggestName, Request r) throws IOException {
+  private Lookup getSuggester(IndexState indexState, String suggestName, Request r) throws IOException {
 
     Request.PolyResult pr = r.getPoly("class");
 
-    Lookup oldSuggester = state.suggesters.get(suggestName);
+    ShardState shardState = indexState.getShard(0);
+
+    Lookup oldSuggester = indexState.suggesters.get(suggestName);
     if (oldSuggester != null && oldSuggester instanceof Closeable) {
       ((Closeable) oldSuggester).close();
-      state.suggesters.remove(suggestName);
+      indexState.suggesters.remove(suggestName);
     }
     
     String impl = pr.name;
@@ -194,10 +198,10 @@ public class BuildSuggestHandler extends Handler {
     // nocommit allow passing a field name, and we use that
     // field name's analyzer?
     if (r.hasParam("analyzer")) {
-      indexAnalyzer = queryAnalyzer = RegisterFieldHandler.getAnalyzer(state, r, "analyzer");
+      indexAnalyzer = queryAnalyzer = RegisterFieldHandler.getAnalyzer(indexState, r, "analyzer");
     } else {
-      indexAnalyzer = RegisterFieldHandler.getAnalyzer(state, r, "indexAnalyzer");
-      queryAnalyzer = RegisterFieldHandler.getAnalyzer(state, r, "queryAnalyzer");
+      indexAnalyzer = RegisterFieldHandler.getAnalyzer(indexState, r, "indexAnalyzer");
+      queryAnalyzer = RegisterFieldHandler.getAnalyzer(indexState, r, "queryAnalyzer");
     }
     if (indexAnalyzer == null) {
       r.fail("analyzer", "analyzer or indexAnalyzer must be specified");
@@ -215,7 +219,7 @@ public class BuildSuggestHandler extends Handler {
       if (r.getBoolean("exactFirst")) {
         options |= AnalyzingSuggester.EXACT_FIRST;
       }
-      suggester = new FuzzySuggester(state.origIndexDir, "FuzzySuggester",
+      suggester = new FuzzySuggester(shardState.origIndexDir, "FuzzySuggester",
                                      indexAnalyzer, queryAnalyzer,
                                      options,
                                      r.getInt("maxSurfaceFormsPerAnalyzedForm"),
@@ -234,12 +238,12 @@ public class BuildSuggestHandler extends Handler {
       if (r.getBoolean("exactFirst")) {
         options |= AnalyzingSuggester.EXACT_FIRST;
       }
-      suggester = new AnalyzingSuggester(state.origIndexDir, "AnalyzingSuggester",
+      suggester = new AnalyzingSuggester(shardState.origIndexDir, "AnalyzingSuggester",
                                          indexAnalyzer, queryAnalyzer, options,
                                          r.getInt("maxSurfaceFormsPerAnalyzedForm"),
                                          r.getInt("maxGraphExpansions"), true);
     } else if (impl.equals("InfixSuggester")) {
-      suggester = new AnalyzingInfixSuggester(state.df.open(state.rootDir.resolve("suggest." + suggestName + ".infix")),
+      suggester = new AnalyzingInfixSuggester(indexState.df.open(indexState.rootDir.resolve("suggest." + suggestName + ".infix")),
                                               indexAnalyzer,
                                               queryAnalyzer,
                                               AnalyzingInfixSuggester.DEFAULT_MIN_PREFIX_CHARS,
@@ -310,7 +314,7 @@ public class BuildSuggestHandler extends Handler {
       assert false;
     }
 
-    state.suggesters.put(suggestName, suggester);
+    indexState.suggesters.put(suggestName, suggester);
 
     return suggester;
   }
@@ -390,8 +394,9 @@ public class BuildSuggestHandler extends Handler {
 
   @SuppressWarnings("unchecked")
   @Override
-  public FinishRequest handle(final IndexState state, final Request r, Map<String,List<String>> params) throws Exception {
+  public FinishRequest handle(final IndexState indexState, final Request r, Map<String,List<String>> params) throws Exception {
 
+    ShardState shardState = indexState.getShard(0);
     final String jsonOrig = r.toString();
 
     final String suggestName = r.getString("suggestName");
@@ -399,7 +404,7 @@ public class BuildSuggestHandler extends Handler {
       r.fail("suggestName", "invalid suggestName \"" + suggestName + "\": must be [a-zA-Z_][a-zA-Z0-9]*");
     }
 
-    final Lookup suggester = getSuggester(state, suggestName, r);
+    final Lookup suggester = getSuggester(indexState, suggestName, r);
 
     Request source = r.getStruct("source");
 
@@ -423,15 +428,15 @@ public class BuildSuggestHandler extends Handler {
       }
     } else {
 
-      state.verifyStarted(r);
+      indexState.verifyStarted(r);
 
       // Pull suggestions from stored docs:
       if (source.hasParam("searcher")) {
         // Specific searcher version:
-        searcher = SearchHandler.getSearcherAndTaxonomy(source, state, null);
+        searcher = SearchHandler.getSearcherAndTaxonomy(source, shardState, null);
       } else {
         // Just use current searcher version:
-        searcher = state.acquire();
+        searcher = shardState.acquire();
       }
       String suggestField = source.getString("suggestField");
 
@@ -465,7 +470,7 @@ public class BuildSuggestHandler extends Handler {
         
         dict = new DocumentValueSourceDictionary(searcher.searcher.getIndexReader(),
                                                  suggestField,
-                                                 expr.getValueSource(state.exprBindings),
+                                                 expr.getValueSource(indexState.exprBindings),
                                                  payloadField);
       }
 
@@ -490,25 +495,23 @@ public class BuildSuggestHandler extends Handler {
             ((Closeable) iterator0).close();
           }
           if (searcher != null) {
-            state.release(searcher);
+            shardState.release(searcher);
           }
         }
 
         boolean success = false;
-        try(IndexOutput out = state.origIndexDir.createOutput("suggest." + suggestName, IOContext.DEFAULT)) {
+        try(IndexOutput out = shardState.origIndexDir.createOutput("suggest." + suggestName, IOContext.DEFAULT)) {
           // nocommit look @ return value
           suggester.store(out);
           success = true;
         } finally {
           if (success == false) {
-            state.origIndexDir.deleteFile("suggest." + suggestName);
+            shardState.origIndexDir.deleteFile("suggest." + suggestName);
           }
         }
 
-        //System.out.println("buildSuggest: now add suggestName=" + suggestName + " to IndexState.name=" + state.name);
-
         try {
-          state.addSuggest(suggestName, (JSONObject) JSONValue.parseStrict(jsonOrig));
+          indexState.addSuggest(suggestName, (JSONObject) JSONValue.parseStrict(jsonOrig));
         } catch (ParseException pe) {
           // BUG
           throw new RuntimeException(pe);

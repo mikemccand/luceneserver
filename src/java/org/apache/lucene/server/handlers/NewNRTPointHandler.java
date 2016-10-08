@@ -25,6 +25,8 @@ import java.util.Map;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.ShardState;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.Param;
 import org.apache.lucene.server.params.Request;
 import org.apache.lucene.server.params.StringType;
@@ -67,12 +69,13 @@ public class NewNRTPointHandler extends Handler {
 
     String indexName = in.readString();
     IndexState state = globalState.get(indexName);
-    if (state.isReplica() == false) {
+    ShardState shardState = state.getShard(0);
+    if (shardState.isReplica() == false) {
       throw new IllegalArgumentException("index \"" + indexName + "\" is not a replica or was not started yet");
     }
 
     long version = in.readVLong();
     long newPrimaryGen = in.readVLong();
-    state.nrtReplicaNode.newNRTPoint(newPrimaryGen, version);
+    shardState.nrtReplicaNode.newNRTPoint(newPrimaryGen, version);
   }
 }

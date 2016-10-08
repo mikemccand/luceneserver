@@ -26,6 +26,7 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.EnumType;
 import org.apache.lucene.server.params.IntType;
 import org.apache.lucene.server.params.LongType;
@@ -65,7 +66,9 @@ public class StartIndexHandler extends Handler {
   }
 
   @Override
-  public FinishRequest handle(final IndexState state, final Request r, Map<String,List<String>> params) throws Exception {
+  public FinishRequest handle(final IndexState indexState, final Request r, Map<String,List<String>> params) throws Exception {
+    final ShardState shardState = indexState.getShard(0);
+    
     final String mode = r.getEnum("mode");
     final long primaryGen;
     final String primaryAddress;
@@ -89,22 +92,22 @@ public class StartIndexHandler extends Handler {
       public String finish() throws Exception {
         long t0 = System.nanoTime();
         if (mode.equals("primary")) {
-          state.startPrimary(primaryGen);
+          shardState.startPrimary(primaryGen);
         } else if (mode.equals("replica")) {
           // nocommit can we use "caller ID" instead somehow?  rob says this is much better!
-          state.startReplica(new InetSocketAddress(primaryAddress, primaryPort), primaryGen);
+          shardState.startReplica(new InetSocketAddress(primaryAddress, primaryPort), primaryGen);
         } else {
-          state.start();
+          indexState.start();
         }
         JSONObject result = new JSONObject();
-        SearcherAndTaxonomy s = state.acquire();
+        SearcherAndTaxonomy s = shardState.acquire();
         try {
           IndexReader r = s.searcher.getIndexReader();
           result.put("maxDoc", r.maxDoc());
           result.put("numDocs", r.numDocs());
           result.put("segments", r.toString());
         } finally {
-          state.release(s);
+          shardState.release(s);
         }
         long t1 = System.nanoTime();
         result.put("startTimeMS", ((t1-t0)/1000000.0));

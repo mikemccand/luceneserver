@@ -40,6 +40,7 @@ import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
 import org.apache.lucene.server.Server;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.*;
 import org.apache.lucene.store.DataInput;
 import org.apache.lucene.store.DataOutput;
@@ -52,8 +53,6 @@ import com.fasterxml.jackson.core.JsonToken;
 
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
-
-import static org.apache.lucene.server.IndexState.IndexingContext;
 
 /** Bulk addDocument from CSV encoding */
 
@@ -82,9 +81,9 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
   /** Parses and indexes documents from one chunk of CSV */
   private static class ParseAndIndexOneChunk implements Runnable {
     /** Shared context across all docs being indexed in this one stream */
-    private final IndexState.IndexingContext ctx;
+    private final ShardState.IndexingContext ctx;
     
-    private final IndexState indexState;
+    private final ShardState shardState;
     private final FieldDef[] fields;
     private final char[] chars;
     private final Semaphore semaphore;
@@ -102,13 +101,13 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
     private int nextStartFragmentLength;
     private final char delimChar;
     
-    public ParseAndIndexOneChunk(char delimChar, long globalOffset, IndexState.IndexingContext ctx, ParseAndIndexOneChunk prev, IndexState indexState,
+    public ParseAndIndexOneChunk(char delimChar, long globalOffset, ShardState.IndexingContext ctx, ParseAndIndexOneChunk prev, ShardState shardState,
                                  FieldDef[] fields, char[] chars, Semaphore semaphore) throws InterruptedException {
       this.delimChar = delimChar;
       this.ctx = ctx;
       ctx.inFlightChunks.register();
       this.prev = prev;
-      this.indexState = indexState;
+      this.shardState = shardState;
       this.fields = fields;
       this.chars = chars;
       this.semaphore = semaphore;
@@ -128,12 +127,13 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
     }
         
     private void _indexSplitDoc() {
+      IndexState indexState = shardState.indexState;
       int endFragmentLength = chars.length - endFragmentStartOffset;
       if (endFragmentLength + nextStartFragmentLength > 0) {
         char[] allChars = new char[endFragmentLength + nextStartFragmentLength];
         System.arraycopy(chars, endFragmentStartOffset, allChars, 0, endFragmentLength);
         System.arraycopy(nextStartFragment, 0, allChars, endFragmentLength, nextStartFragmentLength);
-        CSVParserChars parser = new CSVParserChars(delimChar, globalOffset + endFragmentStartOffset, fields, indexState, allChars, 0);
+        CSVParserChars parser = new CSVParserChars(delimChar, globalOffset + endFragmentStartOffset, fields, allChars, 0);
         Document doc;
         try {
           doc = parser.nextDoc();
@@ -143,7 +143,7 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
         }
         if (indexState.hasFacets()) {
           try {
-            doc = indexState.facetsConfig.build(indexState.taxoWriter, doc);
+            doc = indexState.facetsConfig.build(shardState.taxoWriter, doc);
           } catch (IOException ioe) {
             ctx.setError(new RuntimeException("document at offset " + (globalOffset + parser.getLastDocStart()) + " hit exception building facets", ioe));
             return;
@@ -151,7 +151,7 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
         }
         ctx.addCount.incrementAndGet();
         try {
-          indexState.indexDocument(doc);
+          shardState.indexDocument(doc);
         } catch (Throwable t) {
           ctx.setError(new RuntimeException("failed to index document at offset " + (globalOffset + endFragmentStartOffset), t));
           return;
@@ -195,6 +195,8 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
 
     private void _run() {
 
+      IndexState indexState = shardState.indexState;
+
       // find the start of our first document:
       int upto;
       if (prev != null) {
@@ -228,13 +230,13 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
         // add all documents in this chunk as a block:
         final int[] endOffset = new int[1];
         try {
-          indexState.writer.addDocuments(new Iterable<Document>() {
+          shardState.writer.addDocuments(new Iterable<Document>() {
               @Override
               public Iterator<Document> iterator() {
 
                 // now parse & index whole documents:
 
-                final CSVParserChars parser = new CSVParserChars(delimChar, globalOffset, fields, indexState, chars, startUpto);
+                final CSVParserChars parser = new CSVParserChars(delimChar, globalOffset, fields, chars, startUpto);
                 final boolean hasFacets = indexState.hasFacets();
 
                 return new Iterator<Document>() {
@@ -254,7 +256,7 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
                         ctx.addCount.incrementAndGet();
                         if (hasFacets) {
                           try {
-                            nextDoc = indexState.facetsConfig.build(indexState.taxoWriter, nextDoc);
+                            nextDoc = indexState.facetsConfig.build(shardState.taxoWriter, nextDoc);
                           } catch (IOException ioe) {
                             ctx.setError(new RuntimeException("document at offset " + (globalOffset + parser.getLastDocStart()) + " hit exception building facets", ioe));
                             nextDoc = null;
@@ -334,6 +336,8 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
     if (indexState.isStarted() == false) {
       throw new IllegalArgumentException("index \"" + indexName + "\" isn't started: cannot index documents");
     }
+
+    ShardState shardState = indexState.getShard(0);
     
     // parse fields header and lookup fields:
     List<FieldDef> fieldsList = new ArrayList<>();
@@ -366,7 +370,7 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
 
     FieldDef[] fields = fieldsList.toArray(new FieldDef[fieldsList.size()]);
 
-    IndexState.IndexingContext ctx = new IndexState.IndexingContext();
+    ShardState.IndexingContext ctx = new ShardState.IndexingContext();
     char[] bufferOld = buffer;
 
     // nocommit tune this .. core count?
@@ -400,7 +404,7 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
           buffer = realloc;
         }
         // NOTE: This ctor will stall when it tries to acquire the semaphore if we already have too many in-flight indexing chunks:
-        prev = new ParseAndIndexOneChunk(delimChar, globalOffset, ctx, prev, indexState, fields, buffer, semaphore);
+        prev = new ParseAndIndexOneChunk(delimChar, globalOffset, ctx, prev, shardState, fields, buffer, semaphore);
         globalState.indexService.submit(prev);
         if (count == -1) {
           // the end
@@ -432,7 +436,7 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
       return null;
     } else {
       JSONObject o = new JSONObject();
-      o.put("indexGen", indexState.writer.getMaxCompletedSequenceNumber());
+      o.put("indexGen", shardState.writer.getMaxCompletedSequenceNumber());
       o.put("indexedDocumentCount", ctx.addCount.get());
       return o.toString();
     }

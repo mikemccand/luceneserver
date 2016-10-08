@@ -382,4 +382,8 @@ public class NRTPrimaryNode extends PrimaryNode {
       }
     }
   }
+
+  public void setRAMBufferSizeMB(double mb) {
+    writer.getConfig().setRAMBufferSizeMB(mb);
+  }
 }

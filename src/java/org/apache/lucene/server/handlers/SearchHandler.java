@@ -144,6 +144,7 @@ import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
 import org.apache.lucene.server.MyIndexSearcher;
 import org.apache.lucene.server.SVJSONPassageFormatter;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.WholeMVJSONPassageFormatter;
 import org.apache.lucene.server.params.AnyType;
 import org.apache.lucene.server.params.BooleanType;
@@ -154,8 +155,8 @@ import org.apache.lucene.server.params.ListType;
 import org.apache.lucene.server.params.LongType;
 import org.apache.lucene.server.params.OrType;
 import org.apache.lucene.server.params.Param;
-import org.apache.lucene.server.params.PolyType;
 import org.apache.lucene.server.params.PolyType.PolyEntry;
+import org.apache.lucene.server.params.PolyType;
 import org.apache.lucene.server.params.Request;
 import org.apache.lucene.server.params.StringType;
 import org.apache.lucene.server.params.StructType;
@@ -866,7 +867,9 @@ public class SearchHandler extends Handler {
     SimpleDateFormat dateTimeFormat = new SimpleDateFormat(fd.dateTimeFormat, Locale.ROOT);
     dateTimeFormat.setCalendar(calendar);
     Date date = new Date(value);
-    return dateTimeFormat.format(date);
+    String result = dateTimeFormat.format(date);
+    System.out.println("MSEC TO DATE: value=" + value + " s=" + result);
+    return result;
   }
 
   /** NOTE: this is a slow method, since it makes many objects just to parse one date/time value */
@@ -1592,7 +1595,7 @@ public class SearchHandler extends Handler {
   }
 
   /** Returns a ref. */
-  private static SearcherAndTaxonomy openSnapshotReader(IndexState state, IndexState.Gens snapshot, JSONObject diagnostics) throws IOException {
+  private static SearcherAndTaxonomy openSnapshotReader(ShardState state, IndexState.Gens snapshot, JSONObject diagnostics) throws IOException {
     // TODO: this "reverse-NRT" is ridiculous: we acquire
     // the latest reader, and from that do a reopen to an
     // older snapshot ... this is inefficient if multiple
@@ -1628,7 +1631,7 @@ public class SearchHandler extends Handler {
   /** Returns the requested searcher + taxoReader, either
    *  by indexGen, snapshot, version or just the current
    *  (latest) one. */
-  public static SearcherAndTaxonomy getSearcherAndTaxonomy(Request request, IndexState state, JSONObject diagnostics) throws InterruptedException, IOException {
+  public static SearcherAndTaxonomy getSearcherAndTaxonomy(Request request, ShardState state, JSONObject diagnostics) throws InterruptedException, IOException {
     // Figure out which searcher to use:
     //final long searcherVersion;
     //final IndexState.Gens searcherSnapshot;
@@ -1938,9 +1941,11 @@ public class SearchHandler extends Handler {
 
   static void fillFacetResults(Request r, SearcherAndTaxonomy s, FacetsCollector drillDowns,
                                FacetsCollector[] drillSideways, String[] drillSidewaysDims,
-                               IndexState state, JSONArray facetResults,
+                               ShardState shardState, JSONArray facetResults,
                                Map<String,FieldDef> dynamicFields) throws IOException {
 
+    IndexState indexState = shardState.indexState;
+    
     Map<String,FacetsCollector> dsDimMap = new HashMap<String,FacetsCollector>();
     if (drillSidewaysDims != null) {
       for(int i=0;i<drillSidewaysDims.length;i++) {
@@ -2034,7 +2039,7 @@ public class SearchHandler extends Handler {
         if (c == null) {
           c = drillDowns;
         }
-        SortedSetDocValuesFacetCounts facets = new SortedSetDocValuesFacetCounts(getSSDVState(s, state, r, fd), c);
+        SortedSetDocValuesFacetCounts facets = new SortedSetDocValuesFacetCounts(getSSDVState(s, indexState, r, fd), c);
         facetResult = facets.getTopChildren(r2.getInt("topN"), fd.name, new String[0]);
       } else {
 
@@ -2082,19 +2087,18 @@ public class SearchHandler extends Handler {
           // This dimension was used in
           // drill-down; compute its facet counts from the
           // drill-sideways collector:
-          String indexFieldName = state.facetsConfig.getDimConfig(fd.name).indexFieldName;
+          String indexFieldName = indexState.facetsConfig.getDimConfig(fd.name).indexFieldName;
           if (useCachedOrds) {
-            facets = new TaxonomyFacetCounts(state.getOrdsCache(indexFieldName),
+            facets = new TaxonomyFacetCounts(shardState.getOrdsCache(indexFieldName),
                                              s.taxonomyReader,
-                                             state.facetsConfig, 
+                                             indexState.facetsConfig, 
                                              c);
           } else if (fd.faceted.equals("sortedSetDocValues")) {
-            facets = new SortedSetDocValuesFacetCounts(getSSDVState(s, state, r, fd),
-                                                       c);
+            facets = new SortedSetDocValuesFacetCounts(getSSDVState(s, indexState, r, fd), c);
           } else {
             facets = new FastTaxonomyFacetCounts(indexFieldName,
                                                  s.taxonomyReader,
-                                                 state.facetsConfig, 
+                                                 indexState.facetsConfig, 
                                                  c);
           }
         } else {
@@ -2103,7 +2107,7 @@ public class SearchHandler extends Handler {
 
           // See if we already computed facet
           // counts for this indexFieldName:
-          String indexFieldName = state.facetsConfig.getDimConfig(fd.name).indexFieldName;
+          String indexFieldName = indexState.facetsConfig.getDimConfig(fd.name).indexFieldName;
           Map<String,Facets> facetsMap;
           if (fd.faceted.equals("sortedSetDocValues")) {
             facetsMap = indexFieldNameToSSDVFacets;
@@ -2113,17 +2117,17 @@ public class SearchHandler extends Handler {
           facets = facetsMap.get(indexFieldName);
           if (facets == null) {
             if (useCachedOrds) {
-              facets = new TaxonomyFacetCounts(state.getOrdsCache(indexFieldName),
+              facets = new TaxonomyFacetCounts(shardState.getOrdsCache(indexFieldName),
                                                s.taxonomyReader,
-                                               state.facetsConfig, 
+                                               indexState.facetsConfig, 
                                                c);
             } else if (fd.faceted.equals("sortedSetDocValues")) {
-              facets = new SortedSetDocValuesFacetCounts(getSSDVState(s, state, r, fd),
+              facets = new SortedSetDocValuesFacetCounts(getSSDVState(s, indexState, r, fd),
                                                          c);
             } else {
               facets = new FastTaxonomyFacetCounts(indexFieldName,
                                                    s.taxonomyReader,
-                                                   state.facetsConfig, 
+                                                   indexState.facetsConfig,
                                                    drillDowns);
             }
             facetsMap.put(indexFieldName, facets);
@@ -2157,11 +2161,12 @@ public class SearchHandler extends Handler {
 
   /** Parses any virtualFields, which define dynamic
    *  (expression) fields for this one request. */
-  private static Map<String,FieldDef> getDynamicFields(IndexState state, Request r) {
+  private static Map<String,FieldDef> getDynamicFields(ShardState shardState, Request r) {
+    IndexState indexState = shardState.indexState;
     Map<String,FieldDef> dynamicFields;
     if (r.hasParam("virtualFields")) {
       dynamicFields = new HashMap<String,FieldDef>();
-      dynamicFields.putAll(state.getAllFields());
+      dynamicFields.putAll(indexState.getAllFields());
       Bindings bindings = new FieldDefBindings(dynamicFields);
       for(Object o : r.getList("virtualFields")) {
         Request oneField = (Request) o;
@@ -2204,7 +2209,7 @@ public class SearchHandler extends Handler {
         }
       }
     } else {
-      dynamicFields = state.getAllFields();
+      dynamicFields = indexState.getAllFields();
     }
 
     return dynamicFields;
@@ -2212,9 +2217,11 @@ public class SearchHandler extends Handler {
 
   @SuppressWarnings("unchecked")
   @Override
-  public FinishRequest handle(final IndexState state, final Request r, Map<String,List<String>> params) throws Exception {
+  public FinishRequest handle(final IndexState indexState, final Request r, Map<String,List<String>> params) throws Exception {
 
-    state.verifyStarted(r);
+    ShardState shardState = indexState.getShard(0);
+
+    indexState.verifyStarted(r);
 
     final Map<ToParentBlockJoinQuery,BlockJoinQueryChild> useBlockJoinCollector = new HashMap<ToParentBlockJoinQuery,BlockJoinQueryChild>();
 
@@ -2232,9 +2239,9 @@ public class SearchHandler extends Handler {
 
     JSONObject diagnostics = new JSONObject();
 
-    final Map<String,FieldDef> dynamicFields = getDynamicFields(state, r);
+    final Map<String,FieldDef> dynamicFields = getDynamicFields(shardState, r);
 
-    Query q = extractQuery(state, r, timestampSec, useBlockJoinCollector, dynamicFields);
+    Query q = extractQuery(indexState, r, timestampSec, useBlockJoinCollector, dynamicFields);
 
     final Set<String> fields;
     final Map<String,FieldHighlightConfig> highlightFields;
@@ -2323,7 +2330,7 @@ public class SearchHandler extends Handler {
       highlightFields = null;
     }
 
-    HighlighterConfig highlighter = getHighlighter(state, r, highlightFields);
+    HighlighterConfig highlighter = getHighlighter(indexState, r, highlightFields);
 
     diagnostics.put("parsedQuery", q.toString());
 
@@ -2335,7 +2342,7 @@ public class SearchHandler extends Handler {
     final String resultString;
 
     // Pull the searcher we will use
-    final SearcherAndTaxonomy s = getSearcherAndTaxonomy(r, state, diagnostics);
+    final SearcherAndTaxonomy s = getSearcherAndTaxonomy(r, shardState, diagnostics);
 
     final Query queryOrig = q;
 
@@ -2358,7 +2365,7 @@ public class SearchHandler extends Handler {
       // in-order collectors
       //Weight w = s.createNormalizedWeight(q2);
 
-      DrillDownQuery ddq = addDrillDowns(timestampSec, state, r, q, dynamicFields);
+      DrillDownQuery ddq = addDrillDowns(timestampSec, indexState, r, q, dynamicFields);
 
       diagnostics.put("drillDownQuery", q.toString());
 
@@ -2375,7 +2382,7 @@ public class SearchHandler extends Handler {
       if (r.hasParam("sort")) {
         sortRequest = r.getStruct("sort");
         sortFieldNames = new ArrayList<String>();
-        sort = parseSort(timestampSec, state, sortRequest.getList("fields"), sortFieldNames, dynamicFields);
+        sort = parseSort(timestampSec, indexState, sortRequest.getList("fields"), sortFieldNames, dynamicFields);
       } else {
         sortRequest = null;
         sort = null;
@@ -2392,7 +2399,7 @@ public class SearchHandler extends Handler {
           r.fail("grouping", "cannot do both grouping and ToParentBlockJoinQuery with returnChildHits=true");
         }
         grouping = r.getStruct("grouping");
-        groupField = state.getField(grouping, "field");
+        groupField = indexState.getField(grouping, "field");
 
         // Make sure the group-by field was indexed with group=true:
         if (groupField.fieldType.docValuesType() == null) {
@@ -2400,7 +2407,7 @@ public class SearchHandler extends Handler {
         }
 
         if (grouping.hasParam("sort")) {
-          groupSort = parseSort(timestampSec, state, grouping.getList("sort"), null, dynamicFields);
+          groupSort = parseSort(timestampSec, indexState, grouping.getList("sort"), null, dynamicFields);
         } else {
           groupSort = Sort.RELEVANCE;
         }
@@ -2478,8 +2485,6 @@ public class SearchHandler extends Handler {
       JSONObject result = new JSONObject();
       result.put("diagnostics", diagnostics);
 
-      final IndexState indexState = state;
-
       if (r.hasParam("facets")) {
 
         final JSONArray facetResults = new JSONArray();
@@ -2487,7 +2492,7 @@ public class SearchHandler extends Handler {
 
         // Always use drill sideways; it downgrades to a
         // "normal" query if there were no drilldowns:
-        DrillSideways ds = new DrillSideways(s.searcher, state.facetsConfig, s.taxonomyReader) {
+        DrillSideways ds = new DrillSideways(s.searcher, indexState.facetsConfig, s.taxonomyReader) {
 
             private FacetsCollector getCollector(String dim, Map<String,FacetsCollector> dsMap, FacetsCollector drillDowns) {
               FacetsCollector c = dsMap.get(dim);
@@ -2500,7 +2505,7 @@ public class SearchHandler extends Handler {
 
             @Override
             protected Facets buildFacetsResult(FacetsCollector drillDowns, FacetsCollector[] drillSideways, String[] drillSidewaysDims) throws IOException {
-              fillFacetResults(r, s, drillDowns, drillSideways, drillSidewaysDims, indexState, facetResults, dynamicFields);
+              fillFacetResults(r, s, drillDowns, drillSideways, drillSidewaysDims, shardState, facetResults, dynamicFields);
               return null;
             }
 
@@ -2749,7 +2754,7 @@ public class SearchHandler extends Handler {
               if (fields != null || highlightFields != null) {
                 JSONObject o7 = new JSONObject();
                 o6.put("fields", o7);
-                fillFields(state, highlighter, s.searcher, o7, hit, fields, highlights, hitIndex, sort, sortFieldNames, dynamicFields);
+                fillFields(indexState, highlighter, s.searcher, o7, hit, fields, highlights, hitIndex, sort, sortFieldNames, dynamicFields);
               }
 
               hitIndex++;
@@ -2793,7 +2798,7 @@ public class SearchHandler extends Handler {
               JSONObject o4 = new JSONObject();
               o3.put("fields", o4);
               ScoreDoc sd = new ScoreDoc(group.groupValue.intValue(), group.score);
-              fillFields(state, highlighter, s.searcher, o4, sd, fields, highlights, hitIndex, sort, sortFieldNames, dynamicFields);
+              fillFields(indexState, highlighter, s.searcher, o4, sd, fields, highlights, hitIndex, sort, sortFieldNames, dynamicFields);
             }
             hitIndex++;
 
@@ -2828,7 +2833,7 @@ public class SearchHandler extends Handler {
               if (fields != null || highlightFields != null) {
                 JSONObject o7 = new JSONObject();
                 o6.put("fields", o7);
-                fillFields(state, highlighter, s.searcher, o7, hit, fields, highlights, hitIndex, child.sort, child.sortFieldNames, dynamicFields);
+                fillFields(indexState, highlighter, s.searcher, o7, hit, fields, highlights, hitIndex, child.sort, child.sortFieldNames, dynamicFields);
               }
 
               hitIndex++;
@@ -2857,7 +2862,7 @@ public class SearchHandler extends Handler {
           if (fields != null || highlightFields != null) {
             JSONObject o4 = new JSONObject();
             o3.put("fields", o4);
-            fillFields(state, highlighter, s.searcher, o4, hit, fields, highlights, hitIndex, sort, sortFieldNames, dynamicFields);
+            fillFields(indexState, highlighter, s.searcher, o4, hit, fields, highlights, hitIndex, sort, sortFieldNames, dynamicFields);
           }
         }
       }
@@ -2900,7 +2905,7 @@ public class SearchHandler extends Handler {
       // but under-the-hood all these methods just call
       // s.getIndexReader().decRef(), which is what release
       // does:
-      state.release(s);
+      shardState.release(s);
     }
 
     return new FinishRequest() {

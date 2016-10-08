@@ -202,6 +202,8 @@ class RunTestsJVM(threading.Thread):
               i = testCaseName.find('#')
               j = testCaseName.find('(')
               testCaseName = testCaseName[i+1:j]
+              if self.doPrintOutput:
+                message('\nNOTE: start test case %s' % testCaseName)
               events.testCaseName = testCaseName
               events.testCaseStartTime = time.time()
             elif event[0] == 'IDLE':
@@ -353,7 +355,7 @@ def compileChangedSources(srcPath, destPath, classPath):
           changedSources.append('%s/%s' % (root, fileName))
 
   if len(changedSources) > 0:
-    cmd = ['javac', '-d', destPath]
+    cmd = ['javac', '-Xmaxerrs', '10000', '-d', destPath]
     cmd.append('-cp')
     cmd.append(':'.join(classPath))
     cmd.extend(changedSources)

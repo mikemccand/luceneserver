@@ -25,11 +25,13 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.ListType;
 import org.apache.lucene.server.params.Param;
 import org.apache.lucene.server.params.Request;
 import org.apache.lucene.server.params.StringType;
 import org.apache.lucene.server.params.StructType;
+
 import net.minidev.json.JSONObject;
 
 /** Handles {@code deleteDocuments}. */
@@ -57,7 +59,8 @@ public class DeleteDocumentsHandler extends Handler {
   }
 
   @Override
-  public FinishRequest handle(final IndexState state, final Request r, Map<String,List<String>> params) throws Exception {
+  public FinishRequest handle(final IndexState indexState, final Request r, Map<String,List<String>> params) throws Exception {
+    final ShardState shardState = indexState.getShard(0);
     final String field = r.getString("field");
     final List<Object> ids = r.getList("values");
     final Term[] terms = new Term[ids.size()];
@@ -66,14 +69,14 @@ public class DeleteDocumentsHandler extends Handler {
       // pass binary data via json...?  byte array?
       terms[i] = new Term(field, (String) ids.get(i));
     }
-    state.verifyStarted(r);
+    indexState.verifyStarted(r);
 
     return new FinishRequest() {
       @Override
       public String finish() throws IOException {
-        state.writer.deleteDocuments(terms);
+        shardState.writer.deleteDocuments(terms);
         JSONObject o = new JSONObject();
-        o.put("indexGen", state.writer.getMaxCompletedSequenceNumber());
+        o.put("indexGen", shardState.writer.getMaxCompletedSequenceNumber());
         return o.toString();
       }
     };

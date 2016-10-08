@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.*;
 
 /** Handles {@code commit}. */
@@ -48,11 +49,12 @@ public class CommitHandler extends Handler {
   }
   
   @Override
-  public FinishRequest handle(final IndexState state, Request r, Map<String,List<String>> params) throws Exception {
+  public FinishRequest handle(final IndexState indexState, Request r, Map<String,List<String>> params) throws Exception {
+    final ShardState shardState = indexState.getShard(0);
     return new FinishRequest() {
       @Override
       public String finish() throws IOException {
-        long gen = state.commit();
+        long gen = indexState.commit();
         return "{\"indexGen\": " + gen + "}";
       }
     };

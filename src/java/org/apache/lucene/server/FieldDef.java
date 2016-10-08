@@ -95,6 +95,7 @@ public class FieldDef implements Closeable {
 
     public DateTimeParser(String format) {
       parser = new SimpleDateFormat(format, Locale.ROOT);
+      parser.setTimeZone(TimeZone.getTimeZone("UTC"));
       position = new ParsePosition(0);
     }
   }

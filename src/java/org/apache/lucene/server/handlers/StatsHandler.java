@@ -28,6 +28,7 @@ import org.apache.lucene.search.SearcherLifetimeManager;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.Param;
 import org.apache.lucene.server.params.Request;
 import org.apache.lucene.server.params.StringType;
@@ -56,7 +57,8 @@ public class StatsHandler extends Handler {
   }
 
   @Override
-  public FinishRequest handle(final IndexState state, final Request r, Map<String,List<String>> params) throws Exception {
+  public FinishRequest handle(final IndexState indexState, final Request r, Map<String,List<String>> params) throws Exception {
+    final ShardState shardState = indexState.getShard(0);
     return new FinishRequest() {
       @Override
       public String finish() throws IOException {
@@ -71,7 +73,7 @@ public class StatsHandler extends Handler {
         // "new"
 
         // Doesn't actually prune; just gathers stats
-        state.slm.prune(new SearcherLifetimeManager.Pruner() {
+        shardState.slm.prune(new SearcherLifetimeManager.Pruner() {
             @Override
             public boolean doPrune(double ageSec, IndexSearcher searcher) {
               JSONObject s = new JSONObject();
@@ -85,12 +87,12 @@ public class StatsHandler extends Handler {
         JSONObject taxo = new JSONObject();
         result.put("taxonomy", taxo);
         
-        SearcherAndTaxonomy s = state.acquire();
+        SearcherAndTaxonomy s = shardState.acquire();
         try {
           taxo.put("segments", s.taxonomyReader.toString());
           taxo.put("numOrds", s.taxonomyReader.getSize());
         } finally {
-          state.release(s);
+          shardState.release(s);
         }
 
         // nocommit cached filters from index searchers?

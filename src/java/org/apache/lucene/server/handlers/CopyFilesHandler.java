@@ -30,6 +30,7 @@ import org.apache.lucene.replicator.nrt.FileMetaData;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.Request;
 import org.apache.lucene.server.params.StructType;
 import org.apache.lucene.store.DataInput;
@@ -143,7 +144,8 @@ public class CopyFilesHandler extends Handler {
 
     String indexName = in.readString();
     IndexState state = globalState.get(indexName);
-    if (state.isReplica() == false) {
+    ShardState shardState = state.getShard(0);
+    if (shardState.isReplica() == false) {
       throw new IllegalArgumentException("index \"" + indexName + "\" is not a replica or was not started yet");
     }
 
@@ -153,7 +155,7 @@ public class CopyFilesHandler extends Handler {
     Map<String,FileMetaData> files = readFilesMetaData(in);
 
     AtomicBoolean finished = new AtomicBoolean();
-    CopyJob job = state.nrtReplicaNode.launchPreCopyFiles(finished, primaryGen, files);
+    CopyJob job = shardState.nrtReplicaNode.launchPreCopyFiles(finished, primaryGen, files);
 
     // we hold open this request, only finishing/closing once our copy has finished, so primary knows when we finished
     while (true) {

@@ -167,12 +167,13 @@ public class GlobalState implements Closeable {
           //System.out.println("N" + StringHelper.idToString(nodeID) + ": run query Q" + query.id);
 
           IndexState indexState = get(query.indexName);
-          SearcherAndTaxonomy searcher = indexState.acquire();
+          ShardState shardState = indexState.getShard(query.shardOrd);
+          SearcherAndTaxonomy searcher = shardState.acquire();
           TopDocs hits;
           try {
             hits = searcher.searcher.search(new TermQuery(new Term("title", query.text)), 10);
           } finally {
-            indexState.release(searcher);
+            shardState.release(searcher);
           }
 
           if (Arrays.equals(query.returnNodeID, nodeID)) {
@@ -200,8 +201,7 @@ public class GlobalState implements Closeable {
 
   // nocommit why not just ls the root dir?
 
-  /** This is persisted so on restart we know about all
-   *  previously created indices. */
+  /** This is persisted so on restart we know about all previously created indices. */
   private final JSONObject indexNames = new JSONObject();
   
   private long lastIndicesGen;
@@ -282,6 +282,8 @@ public class GlobalState implements Closeable {
           } else {
             state = new IndexState(this, name, Paths.get(rootPath), false);
           }
+          // nocommit we need to also persist which shards are here?
+          state.addShard(0, false);
           indices.put(name, state);
         } else {
           throw new IllegalArgumentException("index \"" + name + "\" was not yet created");
@@ -291,8 +293,14 @@ public class GlobalState implements Closeable {
     }
   }
 
-  public boolean hasIndex(String name) {
-    return indices.containsKey(name);
+  public boolean hasIndex(String name, int shardOrd) {
+    // nocommit what if it's deleted right now?
+    IndexState indexState = indices.get(name);
+    if (indexState != null) {
+      return indexState.containsShard(shardOrd);
+    } else {
+      return false;
+    }
   }
 
   /** Remove the specified index. */

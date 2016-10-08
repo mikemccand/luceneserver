@@ -51,8 +51,6 @@ import org.apache.lucene.util.StringHelper;
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 
-import static org.apache.lucene.server.IndexState.IndexingContext;
-
 /** Called externally to notify us of another node */
 
 public class LinkNodeHandler extends Handler {

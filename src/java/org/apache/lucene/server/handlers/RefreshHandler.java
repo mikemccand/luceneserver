@@ -23,6 +23,7 @@ import java.util.Map;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.Param;
 import org.apache.lucene.server.params.Request;
 import org.apache.lucene.server.params.StringType;
@@ -51,13 +52,14 @@ public class RefreshHandler extends Handler {
   }
 
   @Override
-  public FinishRequest handle(final IndexState state, final Request r, Map<String,List<String>> params) throws Exception {
+  public FinishRequest handle(final IndexState indexState, final Request r, Map<String,List<String>> params) throws Exception {
+    final ShardState shardState = indexState.getShard(0);
     return new FinishRequest() {
       @Override
       public String finish() throws Exception {
         long t0 = System.nanoTime();
         JSONObject result = new JSONObject();
-        state.maybeRefreshBlocking();
+        shardState.maybeRefreshBlocking();
         long t1 = System.nanoTime();
         result.put("refreshTimeMS", ((t1-t0)/1000000.0));
         return result.toString();

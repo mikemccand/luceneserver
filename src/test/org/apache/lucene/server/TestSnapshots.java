@@ -80,7 +80,15 @@ public class TestSnapshots extends ServerBaseTestCase {
         if (ent.getKey().equals("id")) {
           continue;
         }
-        Path dirPath = server.curIndexPath.resolve(ent.getKey());
+
+        // nocommit messy:
+        Path dirPath;
+        if (ent.getKey().equals("state")) {
+          dirPath = server.curIndexPath.resolve(ent.getKey());
+        } else {
+          dirPath = server.curIndexPath.resolve("shard0").resolve(ent.getKey());
+        }
+        
         Path destDir = backupDir.resolve(ent.getKey());
         Files.createDirectories(destDir);
         for (Object sub : ((JSONArray) ent.getValue())) {
@@ -121,7 +129,15 @@ public class TestSnapshots extends ServerBaseTestCase {
         if (ent.getKey().equals("id")) {
           continue;
         }
-        Path dirPath = server.curIndexPath.resolve(ent.getKey());
+
+        // nocommit messy:
+        Path dirPath;
+        if (ent.getKey().equals("state")) {
+          dirPath = server.curIndexPath.resolve(ent.getKey());
+        } else {
+          dirPath = server.curIndexPath.resolve("shard0").resolve(ent.getKey());
+        }
+        
         for (Object sub : ((JSONArray) ent.getValue())) {
           String fileName = (String) sub;
           Path sourceFile = dirPath.resolve(fileName);

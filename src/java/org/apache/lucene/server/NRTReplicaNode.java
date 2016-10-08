@@ -47,6 +47,7 @@ public class NRTReplicaNode extends ReplicaNode {
                         SearcherFactory searcherFactory, PrintStream printStream, long primaryGen) throws IOException {
     super(id, dir, searcherFactory, printStream);
     this.indexName = indexName;
+    assert IndexState.isSimpleName(indexName);
     this.localAddress = localAddress;
     this.primaryAddress = primaryAddress;
 
