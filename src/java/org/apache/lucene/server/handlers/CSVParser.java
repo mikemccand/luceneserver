@@ -55,6 +55,7 @@ import org.apache.lucene.util.NumericUtils;
 class CSVParser {
 
   final static byte NEWLINE = (byte) '\n';
+  final static byte DOUBLE_QUOTE = (byte) '"';
   
   final byte[] bytes;
   final long globalOffset;
@@ -208,28 +209,26 @@ class CSVParser {
     return bufferUpto;
   }
 
-  private void addOneField(int i, int lastFieldStart) throws ParseException {
-    int len = bufferUpto - lastFieldStart - 1;
-    assert len > 0;
+  private void addOneField(int fieldUpto, int start, int length) throws ParseException {
+    assert length > 0;
 
-    // nocommit need to handle escaping!
     // nocommit need to handle multi-valued!
-    
-    switch(fields[i].valueType) {
+
+    switch(fields[fieldUpto].valueType) {
     case ATOM:
       {
-        Field field = reuseFields[i];
+        Field field = reuseFields[fieldUpto];
         BytesRef br = field.binaryValue();
         assert br != null;
         br.bytes = bytes;
-        br.offset = lastFieldStart;
-        br.length = len;
+        br.offset = start;
+        br.length = length;
         reuseDoc.add(field);
-        Field point = reusePoints[i];
+        Field point = reusePoints[fieldUpto];
         if (point != null) {
           reuseDoc.add(point);
         }
-        Field dv = reuseDVs[i];
+        Field dv = reuseDVs[fieldUpto];
         if (dv != null) {
           // nocommit not needed?
           //dv.setBytesValue(br);
@@ -239,8 +238,8 @@ class CSVParser {
       }
     case TEXT:
       {
-        String s = new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8);
-        Field field = reuseFields[i];
+        String s = new String(bytes, start, length, StandardCharsets.UTF_8);
+        Field field = reuseFields[fieldUpto];
         field.setStringValue(s);
         reuseDoc.add(field);
         break;
@@ -248,24 +247,24 @@ class CSVParser {
     case INT:
       {
         int value;
-        Field field = reuseFields[i];
+        Field field = reuseFields[fieldUpto];
         try {
-          value = MathUtil.parseInt(bytes, lastFieldStart, len);
-          //value = Integer.parseInt(new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8));
+          value = MathUtil.parseInt(bytes, start, length);
+          //value = Integer.parseInt(new String(bytes, start, length, StandardCharsets.UTF_8));
         } catch (NumberFormatException nfe) {
-          throw new NumberFormatException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\" as int: " + nfe.getMessage());
+          throw new NumberFormatException("doc at offset " + (globalOffset + start) + ": could not parse field \"" + fields[fieldUpto].name + "\" as int: " + nfe.getMessage());
         }
         if (field != null) {
           field.setIntValue(value);
           reuseDoc.add(field);
         }
-        Field point = reusePoints[i];
+        Field point = reusePoints[fieldUpto];
         if (point != null) {
           BytesRef br = point.binaryValue();
           IntPoint.encodeDimension(value, br.bytes, 0);
           reuseDoc.add(point);
         }
-        Field dv = reuseDVs[i];
+        Field dv = reuseDVs[fieldUpto];
         if (dv != null) {
           dv.setLongValue(value);
           reuseDoc.add(dv);
@@ -274,25 +273,25 @@ class CSVParser {
       }
     case LONG:
       {
-        Field field = reuseFields[i];
+        Field field = reuseFields[fieldUpto];
         long value;
         try {
-          value = MathUtil.parseLong(bytes, lastFieldStart, len);
-          //value = Long.parseLong(new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8));
+          value = MathUtil.parseLong(bytes, start, length);
+          //value = Long.parseLong(new String(bytes, start, length, StandardCharsets.UTF_8));
         } catch (NumberFormatException nfe) {
-          throw new NumberFormatException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\" as long: " + nfe.getMessage());
+          throw new NumberFormatException("doc at offset " + (globalOffset + start) + ": could not parse field \"" + fields[fieldUpto].name + "\" as long: " + nfe.getMessage());
         }
         if (field != null) {
           field.setLongValue(value);
           reuseDoc.add(field);
         }
-        Field point = reusePoints[i];
+        Field point = reusePoints[fieldUpto];
         if (point != null) {
           BytesRef br = point.binaryValue();
           LongPoint.encodeDimension(value, br.bytes, 0);
           reuseDoc.add(point);
         }
-        Field dv = reuseDVs[i];
+        Field dv = reuseDVs[fieldUpto];
         if (dv != null) {
           dv.setLongValue(value);
           reuseDoc.add(dv);
@@ -301,25 +300,25 @@ class CSVParser {
       }
     case FLOAT:
       {
-        Field field = reuseFields[i];
+        Field field = reuseFields[fieldUpto];
         float value;
         try {
-          value = MathUtil.parseFloat(bytes, lastFieldStart, len);
-          //value = Float.parseFloat(new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8));
+          value = MathUtil.parseFloat(bytes, start, length);
+          //value = Float.parseFloat(new String(bytes, start, length, StandardCharsets.UTF_8));
         } catch (NumberFormatException nfe) {
-          throw new NumberFormatException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\" as float: " + nfe.getMessage());
+          throw new NumberFormatException("doc at offset " + (globalOffset + start) + ": could not parse field \"" + fields[fieldUpto].name + "\" as float: " + nfe.getMessage());
         }
         if (field != null) {
           field.setFloatValue(value);
           reuseDoc.add(field);
         }
-        Field point = reusePoints[i];
+        Field point = reusePoints[fieldUpto];
         if (point != null) {
           BytesRef br = point.binaryValue();
           FloatPoint.encodeDimension(value, br.bytes, 0);
           reuseDoc.add(point);
         }
-        Field dv = reuseDVs[i];
+        Field dv = reuseDVs[fieldUpto];
         if (dv != null) {
           dv.setLongValue(NumericUtils.floatToSortableInt(value));
           reuseDoc.add(dv);
@@ -328,25 +327,25 @@ class CSVParser {
       }
     case DOUBLE:
       {
-        Field field = reuseFields[i];
+        Field field = reuseFields[fieldUpto];
         double value;
         try {
-          value = MathUtil.parseDouble(bytes, lastFieldStart, len);
-          //value = Double.parseDouble(new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8));
+          value = MathUtil.parseDouble(bytes, start, length);
+          //value = Double.parseDouble(new String(bytes, start, length, StandardCharsets.UTF_8));
         } catch (NumberFormatException nfe) {
-          throw new NumberFormatException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\" as double: " + nfe.getMessage());
+          throw new NumberFormatException("doc at offset " + (globalOffset + start) + ": could not parse field \"" + fields[fieldUpto].name + "\" as double: " + nfe.getMessage());
         }
         if (field != null) {
           field.setDoubleValue(value);
           reuseDoc.add(field);
         }
-        Field point = reusePoints[i];
+        Field point = reusePoints[fieldUpto];
         if (point != null) {
           BytesRef br = point.binaryValue();
           DoublePoint.encodeDimension(value, br.bytes, 0);
           reuseDoc.add(point);
         }
-        Field dv = reuseDVs[i];
+        Field dv = reuseDVs[fieldUpto];
         if (dv != null) {
           dv.setLongValue(NumericUtils.doubleToSortableLong(value));
           reuseDoc.add(dv);
@@ -355,34 +354,31 @@ class CSVParser {
       }
     case DATE_TIME:
       {
-        Field field = reuseFields[i];
-        String s = new String(bytes, lastFieldStart, len, StandardCharsets.UTF_8);
-        System.out.println("DATE TIME " + s);
-        FieldDef.DateTimeParser parser = fields[i].getDateTimeParser();
-        System.out.println("  parser=" + parser);
+        Field field = reuseFields[fieldUpto];
+        String s = new String(bytes, start, length, StandardCharsets.UTF_8);
+        FieldDef.DateTimeParser parser = fields[fieldUpto].getDateTimeParser();
         parser.position.setIndex(0);
         Date date = parser.parser.parse(s, parser.position);
         if (parser.position.getErrorIndex() != -1) {
           // nocommit more details about why?
-          throw new IllegalArgumentException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\", value \"" + s + "\" as date with format \"" + fields[i].dateTimeFormat + "\"");
+          throw new IllegalArgumentException("doc at offset " + (globalOffset + start) + ": could not parse field \"" + fields[fieldUpto].name + "\", value \"" + s + "\" as date with format \"" + fields[fieldUpto].dateTimeFormat + "\"");
         }
         if (parser.position.getIndex() != s.length()) {
           // nocommit more details about why?          
-          throw new IllegalArgumentException("doc at offset " + (globalOffset + lastFieldStart) + ": could not parse field \"" + fields[i].name + "\", value \"" + s + "\" as date with format \"" + fields[i].dateTimeFormat + "\"");
+          throw new IllegalArgumentException("doc at offset " + (globalOffset + start) + ": could not parse field \"" + fields[fieldUpto].name + "\", value \"" + s + "\" as date with format \"" + fields[fieldUpto].dateTimeFormat + "\"");
         }
         long value = date.getTime();
-        System.out.println("  value=" + value);
         if (field != null) {
           field.setLongValue(value);
           reuseDoc.add(field);
         }
-        Field point = reusePoints[i];
+        Field point = reusePoints[fieldUpto];
         if (point != null) {
           BytesRef br = point.binaryValue();
           LongPoint.encodeDimension(value, br.bytes, 0);
           reuseDoc.add(point);
         }
-        Field dv = reuseDVs[i];
+        Field dv = reuseDVs[fieldUpto];
         if (dv != null) {
           dv.setLongValue(value);
           reuseDoc.add(dv);
@@ -395,42 +391,111 @@ class CSVParser {
     }
   }
 
+  // TODO: this could be a bit faster w/ an DFA + actions (FST):
+  
   public Document nextDoc() throws ParseException {
     // clear all prior fields
     reuseDoc.clear();
 
     int fieldUpto = 0;
-    int lastFieldStart = bufferUpto;
     lastDocStart = bufferUpto;
-    
-    while (bufferUpto < bytes.length) {
-      byte b = bytes[bufferUpto++];
-      if (b == delimChar) {
 
+    boolean quoted = false;
+
+    // this loop must gracefully handle the byte[] ending in the middle of a line, by returning null (doc) and leaving lastDocStart pointing
+    // to the beginning of the last line fragment:
+    while (bufferUpto < bytes.length) {
+      byte b = bytes[bufferUpto];
+      // nocommit switch statement?
+      if (b == delimChar) {        
+        // empty field
         if (fieldUpto == fields.length) {
           throw new IllegalArgumentException("doc at offset " + lastDocStart + ": line has too many fields");
         }
-        
-        if (bufferUpto > lastFieldStart+1) {
-          addOneField(fieldUpto, lastFieldStart);
-        } else {
-          // OK: empty field
-        }
-        lastFieldStart = bufferUpto;
+        bufferUpto++;
         fieldUpto++;
-
       } else if (b == NEWLINE) {
-
-        if (fieldUpto != fields.length-1) {
-          throw new IllegalArgumentException("doc at offset " + lastDocStart + ": line has wrong number of fields: expected " + fields.length + " but saw " + (fieldUpto+1));
+        if (fieldUpto != fields.length) {
+          throw new IllegalArgumentException("doc at offset " + lastDocStart + ": line has wrong number of fields: expected " + fields.length + " but saw " + fieldUpto);
         }
-        
-        // add last field
-        addOneField(fieldUpto, lastFieldStart);
+        bufferUpto++;
         return reuseDoc;
+      } else if (b == DOUBLE_QUOTE) {
+        if (fieldUpto == fields.length) {
+          throw new IllegalArgumentException("doc at offset " + lastDocStart + ": line has too many fields");
+        }
+        if (parseEscapedField(fieldUpto) == false) {
+          break;
+        }
+        fieldUpto++;
+      } else {
+        if (fieldUpto == fields.length) {
+          throw new IllegalArgumentException("doc at offset " + lastDocStart + ": line has too many fields");
+        }
+        if (parseUnescapedField(fieldUpto) == false) {
+          break;
+        }
+        fieldUpto++;
       }
     }
 
     return null;
+  }
+
+  /** Returns true if a field was parsed, else false if the end of the bytes was hit first */
+  private boolean parseUnescapedField(int fieldUpto) throws ParseException {
+    int fieldStart = bufferUpto;
+    while (bufferUpto < bytes.length) {
+      byte b = bytes[bufferUpto++];
+      if (b == delimChar) {
+        addOneField(fieldUpto, fieldStart, bufferUpto - fieldStart - 1);
+        return true;
+      } else if (b == NEWLINE) {
+        addOneField(fieldUpto, fieldStart, bufferUpto - fieldStart - 1);
+        // put the newline back so the loop above sees it next:
+        bufferUpto--;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Parses a field escaped with surrounding double quotes.  Embedded double quotes are escaped with double-double quotes.  Else, the field
+   *  only ends with a trailing double quote.  Returns true if a field was parsed, else false if the end of the bytes was hit first. */
+  private boolean parseEscapedField(int fieldUpto) throws ParseException {
+    // We unescape in place as we parse:
+
+    int fieldStart = bufferUpto;
+
+    // bufferUpto is on the first double quote:
+    int writeTo = bufferUpto;
+    bufferUpto++;
+    while (bufferUpto < bytes.length) {
+      byte b = bytes[bufferUpto++];
+      if (b == DOUBLE_QUOTE) {
+        if (bufferUpto == bytes.length) {
+          return false;
+        }
+        if (bytes[bufferUpto] == DOUBLE_QUOTE) {
+          // an escaped double quote
+          bytes[writeTo++] = DOUBLE_QUOTE;
+          bufferUpto++;
+        } else {
+          if (bufferUpto == bytes.length) {
+            return false;
+          }
+          if (bytes[bufferUpto] == delimChar) {
+            bufferUpto++;
+          } else if (bytes[bufferUpto] != NEWLINE) {
+            throw new IllegalArgumentException("doc at offset " + lastDocStart + ": closing quote must appear only at the end of the cell");
+          }
+          addOneField(fieldUpto, fieldStart, writeTo - fieldStart);
+          return true;
+        }
+      } else {
+        bytes[writeTo++] = b;
+      }
+    }
+    return false;
   }
 }

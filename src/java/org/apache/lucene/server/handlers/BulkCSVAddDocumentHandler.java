@@ -241,6 +241,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
                       try {
                         nextDoc = parser.nextDoc();
                       } catch (Throwable t) {
+                        System.out.println("GOT ERROR: " + t);
                         ctx.setError(t);
                         nextDoc = null;
                       }

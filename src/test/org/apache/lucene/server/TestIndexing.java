@@ -371,8 +371,6 @@ public class TestIndexing extends ServerBaseTestCase {
     send("deleteIndex");
   }
 
-  // nocommit test error handling in csv inputs
-  
   public void testIndexCSVBasic() throws Exception {
     createIndex();
     send("registerFields", "{fields: {id: {type: atom, store: true, sort: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
@@ -384,6 +382,111 @@ public class TestIndexing extends ServerBaseTestCase {
     send("stopIndex");
     send("deleteIndex");
   }
+
+  public void testIndexCSVEscape1() throws Exception {
+    createIndex();
+    send("registerFields", "{fields: {id: {type: atom, store: true, sort: true, search: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
+    send("startIndex");
+    byte[] bytes = server.sendBinary("bulkCSVAddDocument",
+                                     toUTF8("," + server.curIndexName + "\nid,id2,body\n0,1,\"some text\"\n"));
+    JSONObject result = parseJSONObject(new String(bytes, StandardCharsets.UTF_8));
+    assertEquals(1, getInt(result, "indexedDocumentCount"));
+    refresh();
+    result = send("search", "{queryText: \"*:*\", retrieveFields: [body]}");
+    assertEquals("some text", getString(result, "hits[0].fields.body"));
+    send("stopIndex");
+    send("deleteIndex");
+  }
+
+  public void testIndexCSVEscape2() throws Exception {
+    createIndex();
+    send("registerFields", "{fields: {id: {type: atom, store: true, sort: true, search: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
+    send("startIndex");
+    byte[] bytes = server.sendBinary("bulkCSVAddDocument",
+                                     toUTF8("," + server.curIndexName + "\nid,id2,body\n0,1,\"some, text\"\n"));
+    JSONObject result = parseJSONObject(new String(bytes, StandardCharsets.UTF_8));
+    assertEquals(1, getInt(result, "indexedDocumentCount"));
+    refresh();
+    result = send("search", "{queryText: \"*:*\", retrieveFields: [body]}");
+    assertEquals("some, text", getString(result, "hits[0].fields.body"));
+    send("stopIndex");
+    send("deleteIndex");
+  }
+
+  public void testIndexCSVEscape3() throws Exception {
+    createIndex();
+    send("registerFields", "{fields: {id: {type: atom, store: true, sort: true, search: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
+    send("startIndex");
+    byte[] bytes = server.sendBinary("bulkCSVAddDocument",
+                                     toUTF8("," + server.curIndexName + "\nid,id2,body\n0,1,\"some\"\" text\"\n"));
+    JSONObject result = parseJSONObject(new String(bytes, StandardCharsets.UTF_8));
+    assertEquals(1, getInt(result, "indexedDocumentCount"));
+    refresh();
+    result = send("search", "{queryText: \"*:*\", retrieveFields: [body]}");
+    assertEquals("some\" text", getString(result, "hits[0].fields.body"));
+    send("stopIndex");
+    send("deleteIndex");
+  }
+
+  public void testIndexCSVEscape4() throws Exception {
+    createIndex();
+    send("registerFields", "{fields: {id: {type: atom, store: true, sort: true, search: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
+    send("startIndex");
+    byte[] bytes = server.sendBinary("bulkCSVAddDocument",
+                                     toUTF8("," + server.curIndexName + "\nid,id2,body\n0,1,\"some\"\" text\"\"\"\n"));
+    JSONObject result = parseJSONObject(new String(bytes, StandardCharsets.UTF_8));
+    assertEquals(1, getInt(result, "indexedDocumentCount"));
+    refresh();
+    result = send("search", "{queryText: \"*:*\", retrieveFields: [body]}");
+    assertEquals("some\" text\"", getString(result, "hits[0].fields.body"));
+    send("stopIndex");
+    send("deleteIndex");
+  }
+
+  public void testIndexCSVEscape5() throws Exception {
+    createIndex();
+    send("registerFields", "{fields: {id: {type: atom, store: true, sort: true, search: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
+    send("startIndex");
+    byte[] bytes = server.sendBinary("bulkCSVAddDocument",
+                                     toUTF8("," + server.curIndexName + "\nid,id2,body\n0,1,\"some\n text\"\n"));
+    JSONObject result = parseJSONObject(new String(bytes, StandardCharsets.UTF_8));
+    assertEquals(1, getInt(result, "indexedDocumentCount"));
+    refresh();
+    result = send("search", "{queryText: \"*:*\", retrieveFields: [body]}");
+    assertEquals("some\n text", getString(result, "hits[0].fields.body"));
+    send("stopIndex");
+    send("deleteIndex");
+  }
+
+  public void testIndexCSVEscape6() throws Exception {
+    createIndex();
+    send("registerFields", "{fields: {id: {type: atom, store: true, sort: true, search: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
+    send("startIndex");
+    byte[] bytes = server.sendBinary("bulkCSVAddDocument",
+                                     toUTF8("," + server.curIndexName + "\nbody,id,id2\n\"some\n text\",1,2\n"));
+    JSONObject result = parseJSONObject(new String(bytes, StandardCharsets.UTF_8));
+    assertEquals(1, getInt(result, "indexedDocumentCount"));
+    refresh();
+    result = send("search", "{queryText: \"*:*\", retrieveFields: [body]}");
+    assertEquals("some\n text", getString(result, "hits[0].fields.body"));
+    send("stopIndex");
+    send("deleteIndex");
+  }
+
+  public void testIllegalIndexCSVBadEscape() throws Exception {
+    createIndex();
+    send("registerFields", "{fields: {id: {type: atom, store: true, sort: true, search: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
+    send("startIndex");
+    Throwable t = expectThrows(IOException.class, () -> {
+        server.sendBinary("bulkCSVAddDocument",
+                          toUTF8("," + server.curIndexName + "\nbody,id,id2\n\"some \"text,1,2\n"));
+      });
+    assertContains(t.getMessage(), "doc at offset 0: closing quote must appear only at the end of the cell");
+    send("stopIndex");
+    send("deleteIndex");
+  }
+
+  // nocommit test illegal double quote before delim or newline
 
   public void testIndexCSVBasicHTTP() throws Exception {
     createIndex();
@@ -405,7 +508,7 @@ public class TestIndexing extends ServerBaseTestCase {
         server.sendBinary("bulkCSVAddDocument",
                           toUTF8("," + server.curIndexName + "\nid,id2,body\n0,1,some text,boo\n1,2,some more text\n"));
       });
-    assertContains(t.getMessage(), "doc at offset 0: line has wrong number of fields: expected 3 but saw 4");
+    assertContains(t.getMessage(), "doc at offset 0: line has too many fields");
     send("stopIndex");
     send("deleteIndex");
   }
