@@ -406,7 +406,6 @@ class CSVParser {
     // to the beginning of the last line fragment:
     while (bufferUpto < bytes.length) {
       byte b = bytes[bufferUpto];
-      // nocommit switch statement?
       if (b == delimChar) {        
         // empty field
         if (fieldUpto == fields.length) {
