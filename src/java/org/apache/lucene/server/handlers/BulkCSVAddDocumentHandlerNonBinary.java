@@ -122,7 +122,7 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
         _indexSplitDoc();
       } finally {
         semaphore.release();
-        ctx.inFlightChunks.arrive();
+        ctx.inFlightChunks.arriveAndDeregister();
       }
     }
         
