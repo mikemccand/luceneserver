@@ -39,6 +39,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.lucene.document.Document;
+import org.apache.lucene.facet.FacetsConfig;
+import org.apache.lucene.facet.sortedset.DefaultSortedSetDocValuesReaderState;
+import org.apache.lucene.facet.sortedset.SortedSetDocValuesReaderState;
 import org.apache.lucene.facet.taxonomy.CachedOrdinalsReader;
 import org.apache.lucene.facet.taxonomy.DocValuesOrdinalsReader;
 import org.apache.lucene.facet.taxonomy.OrdinalsReader;
@@ -47,6 +50,7 @@ import org.apache.lucene.facet.taxonomy.SearcherTaxonomyManager;
 import org.apache.lucene.facet.taxonomy.directory.DirectoryTaxonomyWriter;
 import org.apache.lucene.index.ConcurrentMergeScheduler;
 import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.DocValues;
 import org.apache.lucene.index.IndexCommit;
 import org.apache.lucene.index.IndexFileNames;
 import org.apache.lucene.index.IndexReader;
@@ -57,6 +61,7 @@ import org.apache.lucene.index.KeepOnlyLastCommitDeletionPolicy;
 import org.apache.lucene.index.PersistentSnapshotDeletionPolicy;
 import org.apache.lucene.index.SegmentInfos;
 import org.apache.lucene.index.SimpleMergedSegmentWarmer;
+import org.apache.lucene.index.SortedSetDocValues;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.ControlledRealTimeReopenThread;
 import org.apache.lucene.search.IndexSearcher;
@@ -158,6 +163,8 @@ public class ShardState implements Closeable {
   private final boolean doCreate;
 
   private final List<HostAndPort> replicas = new ArrayList<>();
+
+  public final Map<IndexReader,Map<String,SortedSetDocValuesReaderState>> ssdvStates = new HashMap<>();
 
   public final String name;
 
@@ -442,7 +449,7 @@ public class ShardState implements Closeable {
       manager = new SearcherTaxonomyManager(writer, true, new SearcherFactory() {
           @Override
           public IndexSearcher newSearcher(IndexReader r, IndexReader previousReader) throws IOException {
-            IndexSearcher searcher = new MyIndexSearcher(r, ShardState.this);
+            IndexSearcher searcher = new IndexSearcher(r);
             searcher.setSimilarity(indexState.sim);
             return searcher;
           }
@@ -593,18 +600,19 @@ public class ShardState implements Closeable {
                                           new SearcherFactory() {
                                             @Override
                                             public IndexSearcher newSearcher(IndexReader r, IndexReader previousReader) throws IOException {
-                                              IndexSearcher searcher = new MyIndexSearcher(r, ShardState.this);
+                                              IndexSearcher searcher = new IndexSearcher(r);
                                               searcher.setSimilarity(indexState.sim);
                                               return searcher;
                                             }
                                           },
                                           verbose ? System.out : null);
 
+      // nocommit this isn't used?
       searcherManager = new NRTPrimaryNode.PrimaryNodeReferenceManager(nrtPrimaryNode,
                                                                        new SearcherFactory() {
                                                                          @Override
                                                                          public IndexSearcher newSearcher(IndexReader r, IndexReader previousReader) throws IOException {
-                                                                           IndexSearcher searcher = new MyIndexSearcher(r, ShardState.this);
+                                                                           IndexSearcher searcher = new IndexSearcher(r);
                                                                            searcher.setSimilarity(indexState.sim);
                                                                            return searcher;
                                                                          }
@@ -672,7 +680,7 @@ public class ShardState implements Closeable {
                                           new SearcherFactory() {
                                             @Override
                                             public IndexSearcher newSearcher(IndexReader r, IndexReader previousReader) throws IOException {
-                                              IndexSearcher searcher = new MyIndexSearcher(r, ShardState.this);
+                                              IndexSearcher searcher = new IndexSearcher(r);
                                               searcher.setSimilarity(indexState.sim);
                                               return searcher;
                                             }
@@ -926,6 +934,60 @@ public class ShardState implements Closeable {
         }
         Files.delete(dir);
       }
+    }
+  }
+
+  private IndexReader.ReaderClosedListener removeSSDVStates = new IndexReader.ReaderClosedListener() {
+      @Override
+      public void onClose(IndexReader r) {
+        synchronized(ssdvStates) {
+          ssdvStates.remove(r);
+        }
+      }
+    };
+
+  public SortedSetDocValuesReaderState getSSDVState(SearcherAndTaxonomy s, Request r, FieldDef fd) throws IOException {
+    FacetsConfig.DimConfig dimConfig = indexState.facetsConfig.getDimConfig(fd.name);
+    IndexReader reader = s.searcher.getIndexReader();
+    synchronized (ssdvStates) {
+      Map<String,SortedSetDocValuesReaderState> readerSSDVStates = ssdvStates.get(reader);
+      if (readerSSDVStates == null) {
+        readerSSDVStates = new HashMap<>();
+        ssdvStates.put(reader, readerSSDVStates);
+        reader.addReaderClosedListener(removeSSDVStates);
+      }
+
+      SortedSetDocValuesReaderState ssdvState = readerSSDVStates.get(dimConfig.indexFieldName);
+      if (ssdvState == null) {
+        // TODO: maybe we should do this up front when reader is first opened instead
+        ssdvState = new DefaultSortedSetDocValuesReaderState(reader, dimConfig.indexFieldName) {
+            @Override
+            public SortedSetDocValues getDocValues() throws IOException {
+              SortedSetDocValues values = super.getDocValues();
+              if (values == null) {
+                values = DocValues.emptySortedSet();
+              }
+              return values;
+            }
+
+            @Override
+            public OrdRange getOrdRange(String dim) {
+              OrdRange result = super.getOrdRange(dim);
+              if (result == null) {
+                result = new OrdRange(0, -1);
+              }
+              return result;
+            }
+          };
+        // nocommit maybe we shouldn't make this a hard error
+        // ... ie just return 0 facets
+        if (ssdvState == null) {
+          r.fail("facets", "field \"" + fd.name + "\" was properly registered with facet=\"sortedSetDocValues\", however no documents were indexed as of this searcher");
+        }
+        readerSSDVStates.put(dimConfig.indexFieldName, ssdvState);
+      }
+
+      return ssdvState;
     }
   }
 }

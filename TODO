@@ -20,6 +20,7 @@ task management api?
 
 long running tasks?
 
+    - reserve internal field names (leading _?)
     - index aliases
     - require _source field?  so reindex is always possible ... but tricky because i must link to "the csv header used" if it's a csv source
     - get facets working w/ NRT replication in lucene server 
@@ -52,7 +53,6 @@ long running tasks?
     - how to index a binary field when CSV import is via http?
     - index aliases?
     - reindex api?  should i store _source?
-    - reserve internal field names (leading _?)
     - add op to collapse indices together
     - make a larger scale distributed search test
       - 5 shards :)
@@ -63,7 +63,6 @@ long running tasks?
       - separate fetch phase
     - get this controlled RT working with replication too
       - really i just need indexGen -> searcherVersion mapping?  and incoming query just maps indexGen to searcherVersion
-    - get live field values working w/ replication
     - MAKE TEST lucene server: concurrent close index while searching
     - node lock, to ensure only one node is running "here"?
     - geo names
@@ -84,7 +83,7 @@ long running tasks?
       - new index every X time
       - time range filter should only query indices having that time range
       - index sorting
-      - optimizing index over time (simon's cool ES change)
+      - simon's mapping of big index down to 1 segment over time ... oh, N shards down to 1
     - searching N indices and merging
     - reducing load by changing which node is primary
     - ttl?
@@ -95,7 +94,6 @@ long running tasks?
     - link to the docs from github, i guess running @ jirasearch?
       - improve the docs!
     - cold/hot indices
-    - simon's mapping of big index down to 1 segment over time ... oh, N shards down to 1
     - resharding
     - maybe open up allowed "overage backlog" in flushing new segments???
     - binary format for adding docs?
@@ -121,6 +119,7 @@ long running tasks?
     - upgrade jirasearch, switch to SimpleQP
     - persistent http/1.1 connections
     - diffs vs ES
+      - thin(ish) wrapper on Lucene
       - anal checking of settings, request params, etc.
       - ES combines "flush" and "refresh"; uwe's issue about NOT wanting to refresh
       - crazy slow restart time for ES to "recover"

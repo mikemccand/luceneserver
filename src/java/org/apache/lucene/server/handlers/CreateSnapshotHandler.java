@@ -30,7 +30,6 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
-import org.apache.lucene.server.MyIndexSearcher;
 import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.params.BooleanType; 
 import org.apache.lucene.server.params.Param; 
@@ -107,7 +106,7 @@ public class CreateSnapshotHandler extends Handler {
             // search is done:
             long t0 = System.nanoTime();
             IndexReader r = DirectoryReader.openIfChanged((DirectoryReader) s2.searcher.getIndexReader(), c);
-            IndexSearcher s = new MyIndexSearcher(r, shardState);
+            IndexSearcher s = new IndexSearcher(r);
             try {
               shardState.slm.record(s);
             } finally {

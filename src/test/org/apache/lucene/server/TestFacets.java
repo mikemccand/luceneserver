@@ -293,14 +293,8 @@ public class TestFacets extends ServerBaseTestCase {
     }
 
     // Verify error message:
-    try {
-      send("search", "{query: MatchAllDocsQuery, facets: [{dim: ssdv}]}");
-      fail("did not hit expected exception");
-    } catch (IOException ioe) {
-      // nocommit we could/should make this NOT be an error?
-      // you should just get back empty facets?
-      assertTrue(ioe.getMessage().contains("search > facets: field \"ssdv\" was properly registered with facet=\"sortedSetDocValues\", however no documents were indexed as of this searcher"));
-    }
+    send("search", "{query: MatchAllDocsQuery, facets: [{dim: ssdv}]}");
+    assertEquals(0, getInt("totalHits"));
 
     send("addDocument", "{fields: {ssdv: one}}");
     send("addDocument", "{fields: {ssdv: two}}");

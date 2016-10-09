@@ -142,7 +142,6 @@ import org.apache.lucene.server.FieldDefBindings;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
-import org.apache.lucene.server.MyIndexSearcher;
 import org.apache.lucene.server.SVJSONPassageFormatter;
 import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.WholeMVJSONPassageFormatter;
@@ -1616,7 +1615,7 @@ public class SearchHandler extends Handler {
       // Ref that we return to caller
       s.taxonomyReader.incRef();
 
-      SearcherAndTaxonomy result = new SearcherAndTaxonomy(new MyIndexSearcher(r, state), s.taxonomyReader);
+      SearcherAndTaxonomy result = new SearcherAndTaxonomy(new IndexSearcher(r), s.taxonomyReader);
       state.slm.record(result.searcher);
       long t1 = System.nanoTime();
       if (diagnostics != null) {
@@ -1927,18 +1926,6 @@ public class SearchHandler extends Handler {
     return o;
   }
 
-  private static SortedSetDocValuesReaderState getSSDVState(SearcherAndTaxonomy s, IndexState state, Request r, FieldDef fd) {
-    FacetsConfig.DimConfig dimConfig = state.facetsConfig.getDimConfig(fd.name);
-    MyIndexSearcher s2 = (MyIndexSearcher) s.searcher;
-    SortedSetDocValuesReaderState ssdvState = s2.ssdvStates.get(dimConfig.indexFieldName);
-    // nocommit maybe we shouldn't make this a hard error
-    // ... ie just return 0 facets
-    if (ssdvState == null) {
-      r.fail("facets", "field \"" + fd.name + "\" was properly registered with facet=\"sortedSetDocValues\", however no documents were indexed as of this searcher");
-    }
-    return ssdvState;
-  }
-
   static void fillFacetResults(Request r, SearcherAndTaxonomy s, FacetsCollector drillDowns,
                                FacetsCollector[] drillSideways, String[] drillSidewaysDims,
                                ShardState shardState, JSONArray facetResults,
@@ -2029,17 +2016,14 @@ public class SearchHandler extends Handler {
           facetResult = facets.getTopChildren(0, fd.name);
         } else {
           // nocommit float/double too
-          r2.fail("numericRanges", "field type must be numeric; got: " + fd.valueType);
-
-          // Dead code but compiler disagrees:
-          facetResult = null;
+          throw r2.bad("numericRanges", "field type must be numeric; got: " + fd.valueType);
         }
       } else if (fd.faceted.equals("sortedSetDocValues")) {
         FacetsCollector c = dsDimMap.get(fd.name);
         if (c == null) {
           c = drillDowns;
         }
-        SortedSetDocValuesFacetCounts facets = new SortedSetDocValuesFacetCounts(getSSDVState(s, indexState, r, fd), c);
+        SortedSetDocValuesFacetCounts facets = new SortedSetDocValuesFacetCounts(shardState.getSSDVState(s, r, fd), c);
         facetResult = facets.getTopChildren(r2.getInt("topN"), fd.name, new String[0]);
       } else {
 
@@ -2094,7 +2078,7 @@ public class SearchHandler extends Handler {
                                              indexState.facetsConfig, 
                                              c);
           } else if (fd.faceted.equals("sortedSetDocValues")) {
-            facets = new SortedSetDocValuesFacetCounts(getSSDVState(s, indexState, r, fd), c);
+            facets = new SortedSetDocValuesFacetCounts(shardState.getSSDVState(s, r, fd), c);
           } else {
             facets = new FastTaxonomyFacetCounts(indexFieldName,
                                                  s.taxonomyReader,
@@ -2122,7 +2106,7 @@ public class SearchHandler extends Handler {
                                                indexState.facetsConfig, 
                                                c);
             } else if (fd.faceted.equals("sortedSetDocValues")) {
-              facets = new SortedSetDocValuesFacetCounts(getSSDVState(s, indexState, r, fd),
+              facets = new SortedSetDocValuesFacetCounts(shardState.getSSDVState(s, r, fd),
                                                          c);
             } else {
               facets = new FastTaxonomyFacetCounts(indexFieldName,
@@ -2554,7 +2538,6 @@ public class SearchHandler extends Handler {
           long t0 = System.nanoTime();
 
           c = c3;
-          //((MyIndexSearcher) s).search(w, c3);
           if (timeoutMS > 0) {
             c = new TimeLimitingCollector(c, TimeLimitingCollector.getGlobalCounter(), timeoutMS);
           }
