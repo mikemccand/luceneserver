@@ -43,7 +43,6 @@ import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.index.DocValuesType;
 import org.apache.lucene.server.FieldDef;
-import org.apache.lucene.server.IndexState;
 import org.apache.lucene.server.util.MathUtil;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.NumericUtils;
@@ -62,7 +61,6 @@ class CSVParser {
   int bufferUpto;
   int bufferLimit;
   final FieldDef[] fields;
-  //public final IndexState indexState;
   private int lastDocStart;
   private final Field[] reuseFields;
   private final Field[] reuseDVs;
@@ -76,7 +74,6 @@ class CSVParser {
     this.fields = fields;
     bufferUpto = startOffset;
     this.globalOffset = globalOffset;
-    //this.indexState = indexState;
     // set up fields for reuse:
     reuseFields = new Field[fields.length];
     reusePoints = new Field[fields.length];
@@ -399,8 +396,6 @@ class CSVParser {
 
     int fieldUpto = 0;
     lastDocStart = bufferUpto;
-
-    boolean quoted = false;
 
     // this loop must gracefully handle the byte[] ending in the middle of a line, by returning null (doc) and leaving lastDocStart pointing
     // to the beginning of the last line fragment:

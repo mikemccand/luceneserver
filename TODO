@@ -4,8 +4,6 @@ rename state -> globalState
 
 forbidden APIs
 
-upgrade jackson
-
 server docs hosted somewhere
 
 mv src/java -> src, src/test -> srctest
@@ -22,8 +20,6 @@ task management api?
 
 long running tasks?
 
-  - remove live field values
-  - lucene server / luceneserver
     - index aliases
     - require _source field?  so reindex is always possible ... but tricky because i must link to "the csv header used" if it's a csv source
     - get facets working w/ NRT replication in lucene server 
