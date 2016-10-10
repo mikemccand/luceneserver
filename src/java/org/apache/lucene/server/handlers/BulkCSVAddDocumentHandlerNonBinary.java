@@ -127,6 +127,18 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
     }
         
     private void _indexSplitDoc() {
+      if (endFragmentStartOffset == -2) {
+        assert prev != null;
+        // nocommit for very large docs this glueing together is O(N^2) ... fix this to be a List<char[]> instead:
+        // Our entire chunk was inside a single document; instead of indexing a split doc, we combine our whole fragment and
+        // the next start fragment and pass back to the previous chunk:
+        char[] allChars = new char[chars.length + nextStartFragmentLength];
+        System.arraycopy(chars, 0, allChars, 0, chars.length);
+        System.arraycopy(nextStartFragment, 0, allChars, chars.length, nextStartFragmentLength);
+        prev.setNextStartFragment(allChars, 0, allChars.length);
+        prev = null;
+        return;
+      }
       IndexState indexState = shardState.indexState;
       int endFragmentLength = chars.length - endFragmentStartOffset;
       if (endFragmentLength + nextStartFragmentLength > 0) {
@@ -293,8 +305,7 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
         
       } else {
         // exotic case: the entire chunk is inside one document
-        // nocommit handle this corner case too!
-        ctx.setError(new IllegalArgumentException("entire chunk is a subset of one document chars.length=" + chars.length));
+        setEndFragment(-2);
         // nocommit also handle the exotic case where the chunk split right at a doc boundary
       }
     }

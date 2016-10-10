@@ -115,12 +115,25 @@ public class BulkCSVAddDocumentHandler extends Handler {
     }
         
     private void _indexSplitDoc() {
+      if (endFragmentStartOffset == -2) {
+        assert prev != null;
+        // nocommit for very large docs this glueing together is O(N^2) ... fix this to be a List<char[]> instead:
+        // Our entire chunk was inside a single document; instead of indexing a split doc, we combine our whole fragment and
+        // the next start fragment and pass back to the previous chunk:
+        byte[] allBytes = new byte[bytes.length + nextStartFragmentLength];
+        System.arraycopy(bytes, 0, allBytes, 0, bytes.length);
+        System.arraycopy(nextStartFragment, 0, allBytes, bytes.length, nextStartFragmentLength);
+        prev.setNextStartFragment(allBytes, 0, allBytes.length);
+        prev = null;
+        return;
+      }
+
       int endFragmentLength = bytes.length - endFragmentStartOffset;
       if (endFragmentLength + nextStartFragmentLength > 0) {
         byte[] allBytes = new byte[endFragmentLength + nextStartFragmentLength];
         System.arraycopy(bytes, endFragmentStartOffset, allBytes, 0, endFragmentLength);
         System.arraycopy(nextStartFragment, 0, allBytes, endFragmentLength, nextStartFragmentLength);
-        System.out.println("LAST: " + new String(allBytes, StandardCharsets.UTF_8));
+        //System.out.println("LAST: " + new String(allBytes, StandardCharsets.UTF_8));
         CSVParser parser = new CSVParser(delimChar, globalOffset + endFragmentStartOffset, fields, allBytes, 0);
         Document doc;
         try {
@@ -286,8 +299,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
         
       } else {
         // exotic case: the entire chunk is inside one document
-        // nocommit handle this corner case too!
-        ctx.setError(new IllegalArgumentException("entire chunk is a subset of one document bytes.length=" + bytes.length));
+        setEndFragment(-2);
         // nocommit also handle the exotic case where the chunk split right at a doc boundary
       }
     }

@@ -19,6 +19,7 @@ package org.apache.lucene.server;
 
 import java.io.StringReader;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.HashMap;
 
 import org.apache.lucene.document.Document;
@@ -145,23 +146,19 @@ public class TestReplication extends ServerBaseTestCase {
 
       for(int i=0;i<100;i++) {
         StringBuilder sb = new StringBuilder();
-        sb.append("{\"indexName\": \"index\", \"documents\": [");
         for(int j=0;j<100;j++) {
           Document doc = docs.nextDoc();
           JSONObject fields = new JSONObject();
           fields.put("title", doc.get("titleTokenized"));
           fields.put("body", doc.get("body"));
           fields.put("id", id++);
-          o = new JSONObject();
-          o.put("fields", fields);
-          if (j > 0) {
-            sb.append(',');
-          }
-          sb.append(o.toString());
+          sb.append(fields.toString());
+          sb.append('\n');
         }
-        sb.append("]}");
         String s = sb.toString();
-        JSONObject result = server1.send("bulkAddDocument", new HashMap<String,Object>(), new StringReader(s));
+        //System.out.println("SEND:\n" + s);
+        JSONObject result = server1.send("bulkAddDocument", Collections.singletonMap("indexName", Collections.singletonList("index")), new StringReader(s));
+        //System.out.println("GOT RESULT: " + result);
         assertEquals(100, result.get("indexedDocumentCount"));
 
         result = server2.send("search", "{indexName: index, queryText: \"*:*\", retrieveFields: [body]}");

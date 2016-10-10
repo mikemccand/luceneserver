@@ -94,7 +94,6 @@ public class TestSearch2 extends ServerBaseTestCase {
           server = server2;
         }
         JSONObject result = server.send("search2", "{queryText: test, indexNames: [index1, index2]}");
-        System.out.println("GOT: " + result);
       }
 
     } finally {

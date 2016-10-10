@@ -20,6 +20,7 @@ package org.apache.lucene.server.handlers;
 import java.io.IOException;
 import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -524,9 +525,9 @@ public class AddDocumentHandler extends Handler {
   }
 
   @Override
-  public FinishRequest handle(final IndexState state, final Request r, Map<String,List<String>> params) throws Exception {
+  public FinishRequest handle(final IndexState indexState, final Request r, Map<String,List<String>> params) throws Exception {
 
-    state.verifyStarted(r);
+    indexState.verifyStarted(r);
 
     // NOTE: somewhat wasteful since we re-serialize to
     // string only to re-parse the JSON, but this allows
@@ -535,11 +536,8 @@ public class AddDocumentHandler extends Handler {
 
     JSONObject raw = r.getRawParams();
     StringBuilder sb = new StringBuilder();
-    sb.append("{\"indexName\": \"");
-    sb.append(state.name);
-    sb.append("\", \"documents\": [");
-    sb.append(raw.toString());
-    sb.append("]}");
+    sb.append(raw.get("fields").toString());
+    sb.append('\n');
     raw.clear();
 
     final String bulkRequestString = sb.toString();
@@ -547,7 +545,8 @@ public class AddDocumentHandler extends Handler {
     return new FinishRequest() {
       @Override
       public String finish() throws Exception {
-        String result = globalState.getHandler("bulkAddDocument").handleStreamed(new StringReader(bulkRequestString), null);
+        String result = globalState.getHandler("bulkAddDocument").handleStreamed(new StringReader(bulkRequestString),
+                                                                                 Collections.singletonMap("indexName", Collections.singletonList(indexState.name)));
         if (result.indexOf("errors") != -1) {
           JSONObject o = (JSONObject) JSONValue.parseStrict(result);
           if (o.containsKey("errors")) {

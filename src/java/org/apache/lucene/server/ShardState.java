@@ -834,6 +834,8 @@ public class ShardState implements Closeable {
 
     /** Only keeps the first error seen, and all bulk indexing stops after this. */
     public void setError(Throwable t) {
+      //System.out.println("IndexingContext.setError:");
+      //t.printStackTrace(System.out);
       error.compareAndSet(null, t);
     }
 

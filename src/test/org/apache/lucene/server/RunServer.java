@@ -106,6 +106,7 @@ public class RunServer {
           }
         }
       };
+    serverThread.setName("test-main-server-" + name);
     serverThread.start();
     if (!ready.await(2, TimeUnit.SECONDS)) {
       throw new IllegalStateException("server took more than 2 seconds to start");

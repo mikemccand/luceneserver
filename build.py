@@ -61,6 +61,7 @@ def message(s, includeNewline=True):
     if includeNewline:
       s += '\n'
     sys.stdout.write(s)
+    sys.stdout.flush()
 
 def unescape(s):
   return s.replace('%0A', '\n').replace('%09', '\t')

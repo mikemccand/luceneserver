@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -72,23 +73,17 @@ public class TestIndexing extends ServerBaseTestCase {
   public void testBulkUpdateDocuments() throws Exception {
     deleteAllDocs();
     StringBuilder sb = new StringBuilder();
-    sb.append("{\"indexName\": \"index\", \"documents\": [");
     for(int i=0;i<100;i++) {
       JSONObject o = new JSONObject();
       o.put("body", "here is the body " + i);
       o.put("id", ""+i);
-      if (i > 0) {
-        sb.append(',');
-      }
-      JSONObject o2 = new JSONObject();
-      o2.put("fields", o);
-      sb.append(o2.toString());
+      sb.append(o.toString());
+      sb.append('\n');
     }
-    sb.append("]}");
 
     String s = sb.toString();
 
-    JSONObject result = send("bulkAddDocument", new HashMap<>(), new StringReader(s));
+    JSONObject result = send("bulkAddDocument", Collections.singletonMap("indexName", Collections.singletonList("index")), new StringReader(s));
     assertEquals(100, result.get("indexedDocumentCount"));
     long indexGen = ((Number) result.get("indexGen")).longValue();
     assertEquals(1, getInt(send("search", "{queryText: 'body:99', searcher: {indexGen: " + indexGen + "}}"), "totalHits"));
@@ -143,7 +138,7 @@ public class TestIndexing extends ServerBaseTestCase {
     String s = sb.toString();
 
     try {
-      send("bulkAddDocument", new HashMap<>(), new StringReader(s));
+      send("bulkAddDocument", Collections.singletonMap("indexName", Collections.singletonList("index")), new StringReader(s));
       fail("did not hit expected exception");
     } catch (IOException ioe) {
       // expected
@@ -193,7 +188,6 @@ public class TestIndexing extends ServerBaseTestCase {
   public void testBulkAddDocument() throws Exception {
     deleteAllDocs();
     StringBuilder sb = new StringBuilder();
-    sb.append("{\"indexName\": \"index\", \"documents\": [");
     for(int i=0;i<100;i++) {
       JSONObject o = new JSONObject();
       o.put("body", "here is the body " + i);
@@ -201,17 +195,12 @@ public class TestIndexing extends ServerBaseTestCase {
       o.put("price", 15.66);
       o.put("id", ""+i);
       o.put("date", "01/01/2013");
-      if (i > 0) {
-        sb.append(",");
-      }
-      JSONObject o2 = new JSONObject();
-      o2.put("fields", o);
-      sb.append(o2.toString());
+      sb.append(o.toString());
+      sb.append('\n');
     }
-    sb.append("]}");
     String s = sb.toString();
 
-    JSONObject result = send("bulkAddDocument", new HashMap<>(), new StringReader(s));
+    JSONObject result = send("bulkAddDocument", Collections.singletonMap("indexName", Collections.singletonList("index")), new StringReader(s));
     assertEquals(100, result.get("indexedDocumentCount"));
     long indexGen = getLong(result, "indexGen");
     JSONObject r = search("99", indexGen, null, false, true, null, null);
@@ -383,6 +372,30 @@ public class TestIndexing extends ServerBaseTestCase {
     send("deleteIndex");
   }
 
+  /** Index a document via CSV that's larger than the 512 KB chunk size */
+  public void testIndexCSVBig() throws Exception {
+    createIndex();
+    send("registerFields", "{fields: {id: {type: atom, store: true, sort: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
+    send("startIndex");
+    StringBuilder b = new StringBuilder();
+    int size = atLeast(512);
+    for(int i=0;i<256 * size;i++) {
+      b.append("wordy ");
+    }
+    b.append(" document");
+    String body = b.toString();
+    assertTrue(body.length() > 512*1024);
+    
+    byte[] bytes = server.sendBinary("bulkCSVAddDocument",
+                                     toUTF8("," + server.curIndexName + "\nid,id2,body\n0,1," + body + "\n"));
+    JSONObject result = parseJSONObject(new String(bytes, StandardCharsets.UTF_8));
+    assertEquals(1, getInt(result, "indexedDocumentCount"));
+    refresh();
+    assertEquals(1, getInt(send("search", "{queryText: document}"), "totalHits"));
+    send("stopIndex");
+    send("deleteIndex");
+  }
+
   public void testIndexCSVLatLon() throws Exception {
     createIndex();
     send("registerFields", "{fields: {id: {type: atom, store: true, sort: true}, point: {type: latlon, sort: true, search: true}, body: {type: text, store: true, highlight: true}}}");
@@ -525,6 +538,30 @@ public class TestIndexing extends ServerBaseTestCase {
     params.put("indexName", server.curIndexName);
     JSONObject result = server.send("bulkCSVAddDocument2", params, new StringReader("id,id2,body\n0,1,some text\n1,2,some more text\n"));
     assertEquals(2, getInt(result, "indexedDocumentCount"));
+    send("stopIndex");
+    send("deleteIndex");
+  }
+
+  /** Index a document via CSV that's larger than the 512 KB chunk size */
+  public void testIndexCSVBigHTTP() throws Exception {
+    createIndex();
+    send("registerFields", "{fields: {id: {type: atom, store: true, sort: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
+    send("startIndex");
+    StringBuilder b = new StringBuilder();
+    int size = atLeast(512);
+    for(int i=0;i<256 * size;i++) {
+      b.append("wordy ");
+    }
+    b.append(" document");
+    String body = b.toString();
+    assertTrue(body.length() > 512*1024);
+
+    Map<String,Object> params = new HashMap<>();
+    params.put("indexName", server.curIndexName);
+    JSONObject result = server.send("bulkCSVAddDocument2", params, new StringReader("id,id2,body\n0,1," + body + "\n"));
+    assertEquals(1, getInt(result, "indexedDocumentCount"));
+    refresh();
+    assertEquals(1, getInt(send("search", "{queryText: document}"), "totalHits"));
     send("stopIndex");
     send("deleteIndex");
   }
