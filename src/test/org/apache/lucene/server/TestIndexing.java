@@ -383,6 +383,35 @@ public class TestIndexing extends ServerBaseTestCase {
     send("deleteIndex");
   }
 
+  public void testIndexCSVLatLon() throws Exception {
+    createIndex();
+    send("registerFields", "{fields: {id: {type: atom, store: true, sort: true}, point: {type: latlon, sort: true, search: true}, body: {type: text, store: true, highlight: true}}}");
+    send("startIndex");
+    byte[] bytes = server.sendBinary("bulkCSVAddDocument",
+                                     toUTF8("," + server.curIndexName + "\nid,point,body\n0,42.3677;71.0709,some text\n"));
+    JSONObject result = parseJSONObject(new String(bytes, StandardCharsets.UTF_8));
+    assertEquals(1, getInt(result, "indexedDocumentCount"));
+    refresh();
+    send("search", "{query: {class: LatLonDistanceQuery, field: point, latitude: 41.0, longitude: 71.0, radiusMeters: 1000000.0}}");
+    assertEquals(1, getInt("totalHits"));
+    send("stopIndex");
+    send("deleteIndex");
+  }
+
+  public void testIllegalIndexCSVBadLatLon() throws Exception {
+    createIndex();
+    send("registerFields", "{fields: {id: {type: atom, store: true, sort: true}, point: {type: latlon, sort: true, search: true}, body: {type: text, store: true, highlight: true}}}");
+    send("startIndex");
+    Throwable t = expectThrows(IOException.class, () -> {
+        server.sendBinary("bulkCSVAddDocument",
+                          toUTF8("," + server.curIndexName + "\nid,point,body\n0,42.3677x71.0709,some text\n"));
+      });
+    assertContains(t.getMessage(), "doc at offset 30: could not parse field \"point\", value \"42.3677x71.0709\" as lat;lon format");
+    
+    send("stopIndex");
+    send("deleteIndex");
+  }
+
   public void testIndexCSVEscape1() throws Exception {
     createIndex();
     send("registerFields", "{fields: {id: {type: atom, store: true, sort: true, search: true}, id2: {type: atom, store: true, sort: true}, body: {type: text, store: true, highlight: true}}}");
@@ -496,6 +525,36 @@ public class TestIndexing extends ServerBaseTestCase {
     params.put("indexName", server.curIndexName);
     JSONObject result = server.send("bulkCSVAddDocument2", params, new StringReader("id,id2,body\n0,1,some text\n1,2,some more text\n"));
     assertEquals(2, getInt(result, "indexedDocumentCount"));
+    send("stopIndex");
+    send("deleteIndex");
+  }
+
+  public void testIndexCSVLatLonHTTP() throws Exception {
+    createIndex();
+    send("registerFields", "{fields: {id: {type: atom, store: true, sort: true}, point: {type: latlon, sort: true, search: true}, body: {type: text, store: true, highlight: true}}}");
+    send("startIndex");
+    Map<String,Object> params = new HashMap<>();
+    params.put("indexName", server.curIndexName);
+    JSONObject result = send("bulkCSVAddDocument2", params, new StringReader("id,point,body\n0,42.3677;71.0709,some text\n"));
+    assertEquals(1, getInt(result, "indexedDocumentCount"));
+    refresh();
+    send("search", "{query: {class: LatLonDistanceQuery, field: point, latitude: 41.0, longitude: 71.0, radiusMeters: 1000000.0}}");
+    assertEquals(1, getInt("totalHits"));
+    send("stopIndex");
+    send("deleteIndex");
+  }
+
+  public void testIllegalIndexCSVBadLatLonHTTP() throws Exception {
+    createIndex();
+    send("registerFields", "{fields: {id: {type: atom, store: true, sort: true}, point: {type: latlon, sort: true, search: true}, body: {type: text, store: true, highlight: true}}}");
+    send("startIndex");
+    Map<String,Object> params = new HashMap<>();
+    params.put("indexName", server.curIndexName);
+    Throwable t = expectThrows(IOException.class, () -> {
+        send("bulkCSVAddDocument2", params, new StringReader("id,point,body\n0,42.3677x71.0709,some text\n"));
+      });
+    assertContains(t.getMessage(), "doc at offset 30: could not parse field \"point\", value \"42.3677x71.0709\" as lat;lon format");
+    
     send("stopIndex");
     send("deleteIndex");
   }

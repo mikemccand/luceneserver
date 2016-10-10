@@ -34,6 +34,7 @@ import org.apache.lucene.document.DoublePoint;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FloatPoint;
 import org.apache.lucene.document.IntPoint;
+import org.apache.lucene.document.LatLonPoint;
 import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.document.NumericDocValuesField;
 import org.apache.lucene.document.SortedDocValuesField;
@@ -55,6 +56,7 @@ class CSVParser {
 
   final static byte NEWLINE = (byte) '\n';
   final static byte DOUBLE_QUOTE = (byte) '"';
+  final static byte SEMICOLON = (byte) ';';
   
   final byte[] bytes;
   final long globalOffset;
@@ -191,7 +193,11 @@ class CSVParser {
           }
           break;
         }
-      // nocommit LAT_LON?
+      case LAT_LON:
+        {
+          reusePoints[i] = new LatLonPoint(fd.name, 0.0, 0.0);
+          break;
+        }
       default:
         throw new AssertionError();
       }
@@ -382,7 +388,26 @@ class CSVParser {
         }
         break;
       }
-    // nocommit LAT_LON
+    case LAT_LON:
+      {
+        LatLonPoint point = (LatLonPoint) reusePoints[fieldUpto];
+        int i=0;
+        for(;i<length;i++) {
+          if (bytes[start+i] == SEMICOLON) {
+            double lat = MathUtil.parseDouble(bytes, start, i);
+            double lon = MathUtil.parseDouble(bytes, start+i+1, length-i-1);
+            point.setLocationValue(lat, lon);
+            reuseDoc.add(point);
+            break;
+          }
+        }
+
+        if (i == length) {
+          throw new IllegalArgumentException("doc at offset " + (globalOffset + start) + ": could not parse field \"" + fields[fieldUpto].name + "\", value \"" + new String(bytes, start, length, StandardCharsets.UTF_8) + "\" as lat;lon format");
+        }
+        
+        break;
+      }
     default:
       throw new AssertionError();
     }

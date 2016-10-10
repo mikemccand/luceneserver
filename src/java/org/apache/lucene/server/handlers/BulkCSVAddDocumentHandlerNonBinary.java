@@ -249,7 +249,6 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
                       try {
                         nextDoc = parser.nextDoc();
                       } catch (Throwable t) {
-                        System.out.println("FAIL: " + t);
                         ctx.setError(t);
                         nextDoc = null;
                       }
