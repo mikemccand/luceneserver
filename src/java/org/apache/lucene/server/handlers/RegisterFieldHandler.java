@@ -310,7 +310,6 @@ public class RegisterFieldHandler extends Handler {
                   "Which underlying Lucene index field is used to hold any indexed taxonomy or sorted set doc values facets",
                   new StringType(), FacetsConfig.DEFAULT_INDEX_FIELD_NAME),
         new Param("storeDocValues", "Whether to index the value into doc values.", new BooleanType(), false),
-        new Param("liveValues", "Enable live values for this field: whenever this field is retrieved during a search, the live (most recetly added) value will always be returned; set this to the field name of your id (primary key) field.  Uses @lucene:core:org.apache.lucene.index.LiveFieldValues under the hood.", new StringType()),
         new Param("omitNorms", "True if norms are omitted.", new BooleanType(), false),
         new Param("analyzer", "Analyzer to use for this field during indexing and searching.", ANALYZER_TYPE),
         new Param("indexAnalyzer", "Analyzer to use for this field during indexing.", ANALYZER_TYPE),
@@ -398,7 +397,7 @@ public class RegisterFieldHandler extends Handler {
       values = null;
     }
 
-    return new FieldDef(name, null, FieldDef.FieldValueType.VIRTUAL, null, null, null, true, false, null, null, null, false, null, values, null);
+    return new FieldDef(name, null, FieldDef.FieldValueType.VIRTUAL, null, null, null, true, false, null, null, null, false, values, null);
   }
 
   private FieldDef parseOneFieldType(Request r, IndexState state, Map<String,FieldDef> pendingFieldDefs, String name, JSONObject o) throws IOException {
@@ -753,40 +752,6 @@ public class RegisterFieldHandler extends Handler {
       searchAnalyzer = indexAnalyzer;
     }
 
-    String liveValuesIDField;
-    if (f.hasParam("liveValues")) {
-      // nocommit: sort of silly you cannot register id & live
-      // fields in same request...
-      FieldDef idField = state.getField(f, "liveValues");
-      liveValuesIDField = idField.name;
-      if (type != FieldDef.FieldValueType.ATOM && type != FieldDef.FieldValueType.TEXT) {
-        f.fail("liveValues", "only type=atom or type=text fields may have liveValues enabled");
-      }
-      if (multiValued) {
-        f.fail("liveValues", "liveValues fields must not be multiValued");
-      }
-      if (!ft.stored()) {
-        f.fail("liveValues", "this field is not stored");
-      }
-      if (!idField.fieldType.stored()) {
-        f.fail("liveValues", "id field \"" + liveValuesIDField + "\" is not stored");
-      }
-      if (idField.multiValued) {
-        f.fail("liveValues", "id field \"" + liveValuesIDField + "\" must not be multiValued");
-      }
-      if (idField.valueType != FieldDef.FieldValueType.ATOM && idField.valueType != FieldDef.FieldValueType.TEXT) {
-        f.fail("liveValues", "id field \"" + liveValuesIDField + "\" must have type=atom or type=text");
-      }
-      // TODO: we could relax this, since
-      // PostingsHighlighter lets you pull from "private"
-      // source:
-      if (highlighted) {
-        f.fail("liveValues", "cannot highlight live fields");
-      }
-    } else {
-      liveValuesIDField = null;
-    }
-
     // TODO: facets w/ dates
 
     String facet = f.getEnum("facet");
@@ -830,7 +795,7 @@ public class RegisterFieldHandler extends Handler {
 
     // nocommit facetsConfig.setRequireDimCount
 
-    return new FieldDef(name, ft, type, facet, pf, dvf, multiValued, usePoints, sim, indexAnalyzer, searchAnalyzer, highlighted, liveValuesIDField, null, dateTimeFormat);
+    return new FieldDef(name, ft, type, facet, pf, dvf, multiValued, usePoints, sim, indexAnalyzer, searchAnalyzer, highlighted, null, dateTimeFormat);
   }
 
   /** Messy: we need this for indexed-but-not-tokenized

@@ -79,9 +79,6 @@ public class FieldDef implements Closeable {
   /** True if the field will be highlighted. */
   public final boolean highlighted;
 
-  /** Field name to use as the ID field for live-values. */
-  public final String liveValuesIDField;
-
   /** Only set for a virtual field (expression). */
   public final ValueSource valueSource;
 
@@ -105,7 +102,7 @@ public class FieldDef implements Closeable {
   /** Sole constructor. */
   public FieldDef(String name, FieldType fieldType, FieldValueType valueType, String faceted,
                   String postingsFormat, String docValuesFormat, boolean multiValued, boolean usePoints,
-                  Similarity sim, Analyzer indexAnalyzer, Analyzer searchAnalyzer, boolean highlighted, String liveValuesIDField,
+                  Similarity sim, Analyzer indexAnalyzer, Analyzer searchAnalyzer, boolean highlighted,
                   ValueSource valueSource, String dateTimeFormat) {
     this.name = name;
     this.fieldType = fieldType;
@@ -127,7 +124,6 @@ public class FieldDef implements Closeable {
     this.indexAnalyzer = indexAnalyzer;
     this.searchAnalyzer = searchAnalyzer;
     this.highlighted = highlighted;
-    this.liveValuesIDField = liveValuesIDField;
     this.dateTimeFormat = dateTimeFormat;
     // nocommit messy:
     if (fieldType != null) {

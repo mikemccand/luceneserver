@@ -105,14 +105,13 @@ public class AddDocumentHandler extends Handler {
     assert o != null;
     assert fd != null;
     
-    if (fd.fieldType.stored() || fd.fieldType.indexOptions() != IndexOptions.NONE || fd.fieldType.docValuesType() != null) {
+    if (fd.fieldType.stored() || fd.fieldType.indexOptions() != IndexOptions.NONE || fd.fieldType.docValuesType() != DocValuesType.NONE) {
       switch(fd.valueType) {
       case TEXT:
       case ATOM:
-        // nocommit why...?
-        //if (!(o instanceof String)) {
-        //fail(fd.name, "expected String value but got " + o);
-        //}
+        if (!(o instanceof String)) {
+          fail(fd.name, "expected String value but got " + o);
+        }
         break;
       case BOOLEAN:
         if (!(o instanceof Boolean)) {
@@ -153,11 +152,9 @@ public class AddDocumentHandler extends Handler {
         parser.position.setIndex(0);
         Date date = parser.parser.parse(s, parser.position);
         if (parser.position.getErrorIndex() != -1) {
-          // nocommit more details about why?
           fail(fd.name, "could not parse \"" + o + "\" as date_time with format \"" + fd.dateTimeFormat + "\"");
         }
         if (parser.position.getIndex() != s.length()) {
-          // nocommit more details about why?
           fail(fd.name, "could not parse \"" + o + "\" as date_time with format \"" + fd.dateTimeFormat + "\"");
         }
         o = date.getTime();        
@@ -199,14 +196,9 @@ public class AddDocumentHandler extends Handler {
       }
     }
 
-    // nocommit what about sorted set?
-
-    // nocommit what about sorted numeric?
-
     // Separately index doc values:
     DocValuesType dvType = fd.fieldType.docValuesType();
-    if (dvType == DocValuesType.BINARY ||
-        dvType == DocValuesType.SORTED) {
+    if (dvType == DocValuesType.BINARY || dvType == DocValuesType.SORTED) {
       if (o instanceof String == false) {
         fail(fd.name, "expected String but got: " + o);
       }
@@ -287,7 +279,6 @@ public class AddDocumentHandler extends Handler {
       f.setBoost(boost);
       doc.add(f);
     }
-    //System.out.println("add doc: " + doc);
   }
 
   /** Used by plugins to process a document after it was
@@ -300,10 +291,10 @@ public class AddDocumentHandler extends Handler {
     public boolean invoke(IndexState state, String fieldName, JsonParser p, Document doc) throws IOException;
   }
 
-  final List<PostHandle> postHandlers = new CopyOnWriteArrayList<PostHandle>();
+  static final List<PostHandle> postHandlers = new CopyOnWriteArrayList<PostHandle>();
   
   /** Record a new {@link PostHandle}. */
-  public void addPostHandle(PostHandle handler) {
+  public static void addPostHandle(PostHandle handler) {
     postHandlers.add(handler);
   }
 
@@ -332,7 +323,7 @@ public class AddDocumentHandler extends Handler {
 
   /** Parses the fields, which should look like {field1:
    *  ..., field2: ..., ...} */
-  public void parseFields(IndexState state, Document doc, JsonParser p) throws IOException {
+  public static void parseFields(IndexState state, Document doc, JsonParser p) throws IOException {
     JsonToken token = p.nextToken();
     if (token != JsonToken.START_OBJECT) {
       throw new IllegalArgumentException("fields should be an object");
@@ -350,9 +341,7 @@ public class AddDocumentHandler extends Handler {
   /** Parse a Document using Jackson's streaming parser
    *  API.  The document should look like {indexName: 'foo',
    *  fields: {..., ...}} */
-  // nocommit why isn't this static?
-  Document parseDocument(IndexState state, JsonParser p) throws IOException {
-    //System.out.println("parseDocument: " + r);
+  public static Document parseDocument(IndexState state, JsonParser p) throws IOException {
     JsonToken token = p.nextToken();
     if (token == JsonToken.END_ARRAY) {
       // nocommit hackish.. caller should tell us this means "end"?
