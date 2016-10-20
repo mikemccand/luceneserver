@@ -49,7 +49,7 @@ MY_EPOCH = datetime.datetime(year=2014, month=1, day=1)
 
 issueToCommitPaths = gitHistory.parseLog()
 try:
-  with open('userNamesMap.pk', 'rb') as f:
+  with open('%s/userNamesMap.pk' % localconstants.ROOT_STATE_PATH, 'rb') as f:
     userNameToDisplayName = pickle.loads(f.read())
 except FileNotFoundError:
   userNameToDisplayName = {}
@@ -86,7 +86,7 @@ ICU_TOKENIZER_KEEP_ISSUES = {
 
 def createSchema(svr):
 
-  path = localconstants.rootPath
+  path = '%s/jira' % localconstants.ROOT_INDICES_PATH
 
   if os.path.exists(path):
     shutil.rmtree(path)
@@ -500,7 +500,7 @@ def main():
 def buildFullSuggest(svr):
   print('Build suggest...')
   t0 = time.time()
-  suggestFile = open('jira.suggest', 'wb')
+  suggestFile = open('%s/jira.suggest' % localconstants.ROOT_STATE_PATH, 'wb')
   allUsers = {}
   for issue in allIssues():
     key = issue['key'].lower()
@@ -579,7 +579,13 @@ def fullReindex(svr, doDelete):
   startTime = datetime.datetime.now()
 
   if doDelete:
-    if svr.send('indexStatus', {'indexName': 'jira'})['status'] == 'started':
+    try:
+      isStarted = svr.send('indexStatus', {'indexName': 'jira'})['status'] == 'started'
+    except:
+      traceback.print_exc()
+      isStarted = False
+      
+    if isStarted:
       print('Rollback index...')
       try:
         svr.send('rollbackIndex', {'indexName': 'jira'})
@@ -607,7 +613,7 @@ def fullReindex(svr, doDelete):
   print('Done full index')
   commit(svr, startTime)
 
-  open('userNamesMap.pk', 'wb').write(pickle.dumps(userNameToDisplayName))
+  open('%s/userNamesMap.pk' % localconstants.ROOT_STATE_PATH, 'wb').write(pickle.dumps(userNameToDisplayName))
 
 def commit(svr, timeStamp):
   t0 = time.time()
@@ -650,7 +656,7 @@ def indexDocs(svr, issues, printIssue=False, updateSuggest=False):
   bulk.add('{"indexName": "jira", "documents": [')
 
   if updateSuggest:
-    suggestFile = open('jiranrt.suggest', 'wb')
+    suggestFile = open('%s/jiranrt.suggest' % localconstants.ROOT_STATE_PATH, 'wb')
 
   now = datetime.datetime.now()
 
@@ -658,7 +664,7 @@ def indexDocs(svr, issues, printIssue=False, updateSuggest=False):
   for issue in issues:
     key = issue['key'].lower()
 
-    debug = key.upper() == 'LUCENE-7174'
+    debug = False and key.upper() == 'LUCENE-7174' and localconstants.isDev
     
     if debug:
       print()

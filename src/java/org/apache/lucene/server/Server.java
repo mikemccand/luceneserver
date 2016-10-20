@@ -628,7 +628,7 @@ Package p = Server.class.getPackage();
   }
 
   private static void usage() {
-    System.out.println("\nUsage: java -cp <stuff> org.apache.lucene.server.Server [-port port] [-maxHTTPThreadCount count] [-stateDir /path/to/dir]\n\n");
+    System.out.println("\nUsage: java -cp <stuff> org.apache.lucene.server.Server [-ipPort ip:port] [-maxHTTPThreadCount count] [-stateDir /path/to/dir]\n\n");
   }
 
   public Server(String nodeName, Path globalStateDir, int backlog, int threadCount, List<String> bindIPPorts) throws Exception {

@@ -36,7 +36,10 @@ import http.cookies
 Handles incoming queries for the search UI.
 """
 
-TRACE = True
+TRACE = False
+
+if not localconstants.isDev:
+  TRACE = False
 
 allProjects = ('Tika', 'Solr', 'Lucene', 'Infrastructure')
 
@@ -975,7 +978,7 @@ def handleMoreFacets(path, isMike, environ):
   else:
     args = {}
 
-  print('moreFacets args: %s' % args)
+  # print('moreFacets args: %s' % args)
 
   index = 'jira'
 
@@ -1115,7 +1118,7 @@ def printTokens(send):
 def handleQuery(path, isMike, environ):
 
   send = util.ServerClient().send
-  printTokens(send)
+  #printTokens(send)
 
   t0 = time.time()
 
@@ -1439,9 +1442,6 @@ def handleQuery(path, isMike, environ):
   if spec.highlighter is not None:
     query['highlighter'] = spec.highlighter
 
-  #print('query:');
-  #pprint.pprint(query)
-
   ta = time.time()
   if TRACE:
     print()
@@ -1545,7 +1545,6 @@ def handleQuery(path, isMike, environ):
             }
             */
             request.source = "titles_" + type;
-            request.index = "%s";
             request.contexts = "%s";
             $.getJSON("/suggest.py", request, response);
           },
@@ -1575,7 +1574,7 @@ def handleQuery(path, isMike, environ):
           }
         };
       });
-      </script>''' % (spec.indexName, ','.join(contexts)))
+      </script>''' % ','.join(contexts))
 
   w('\n')
   w('<style>')
@@ -1678,22 +1677,10 @@ def handleQuery(path, isMike, environ):
   # Top (black) navbar:
   w('<div class="navbar navbar-inverse navbar-fixed-top">')
   w('  <div class="navbar-inner">')
-  #w('    <div class="container">')
-  #w('      <div class="nav-collapse collapse">')
   w('        <ul class="nav">')
-  for id, label in (('books', 'Books'), ('jira', 'All Issues'), ('wiki', 'Wikipedia')):
-    if id not in localconstants.SHOW_INDICES:
-      continue
-    if spec.indexName == id:
-      c = ' class="active pull-left"'
-    else:
-      c = ''
-    w('<li%s><a href="/%s?index=%s">%s</a></li>' % (c, localconstants.FORM_ACTION, id, label))
+  w('<li class="active pull-left"><a href="/search.py">All Issues</a></li>')
   w('<li><a href="/about.html">About</a></li>')
   w('        </ul>')
-  #w(u'<input class="search-query" placeholder="Search" type=text size=60 name=newText value="%s">\n' % escape(text.decode('utf-8')))  w('        <input class=
-  #w('      </div><!--/.nav-collapse -->')
-  #w('    </div>')
   w('  </div>')
   w('</div>')
   
@@ -1708,7 +1695,6 @@ def handleQuery(path, isMike, environ):
   facets = result['facets']
   args = []
   args.append('text=%s' % urllib.parse.quote(text))
-  args.append('index=%s' % spec.indexName)
   for field, values in drillDowns:
     #print 'field %s, values %s' % (field, values)
     args.append('dd=%s' % urllib.parse.quote('%s:%s' % (field, facetValuesToString([facetPathToString(x) for x in values]))))
@@ -1736,8 +1722,7 @@ def handleQuery(path, isMike, environ):
 
   w('<div class="navbar">')
   w('<div class="navbar-inner">')
-  w('<form class="navbar-form" method=GET action="%s">\n' % localconstants.FORM_ACTION)
-  w('<input type=hidden name=index value="%s">\n' % spec.indexName)
+  w('<form class="navbar-form" method=GET action="search.py">\n')
   w('<input type=hidden name=chg value="">\n')
   w('<input type=hidden name=text value="%s">' % escape(text))
   w('<input type=hidden name=a1 value="">')
@@ -1921,10 +1906,7 @@ def handleQuery(path, isMike, environ):
 
     #w('<br>')
     #w('<div class=container>')
-    if spec.indexName == 'cams':
-      w('<table border=1 cellpadding=2>')
-    else:
-      w('<table>')
+    w('<table>')
     if groupBy is not None:
       for group in result['groups']:
         renderGroupHeader(w, group, groupDDField, hitsPerGroup)
