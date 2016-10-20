@@ -84,4 +84,5 @@ with BlockedFileReader(srcFile) as fIn, BlockedFileWriter(destFile, 1024*1024) a
     if fIn.readline() is None:
       break
     s = fIn.readline()
+    #print("add %s" % s)
     fOut.add(s[:-1])

@@ -126,7 +126,9 @@ public class BulkAddDocumentHandler extends Handler {
       try {
         _indexSplitDoc();
       } finally {
+        // nocommit only one semaphore!!
         semaphore.release();
+        indexState.globalState.indexingJobsRunning.release();
         ctx.inFlightChunks.arrive();
       }
     }
@@ -425,7 +427,7 @@ public class BulkAddDocumentHandler extends Handler {
         }
         // NOTE: This ctor will stall when it tries to acquire the semaphore if we already have too many in-flight indexing chunks:
         prev = new ParseAndIndexOneChunk(globalOffset, ctx, prev, indexState, buffer, semaphore, addDocHandler);
-        globalState.indexService.submit(prev);
+        globalState.submitIndexingTask(prev);
         if (count == -1) {
           // the end
           prev.setNextStartFragment(new char[0], 0, 0);

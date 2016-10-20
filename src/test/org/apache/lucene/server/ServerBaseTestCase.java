@@ -168,6 +168,10 @@ public abstract class ServerBaseTestCase extends LuceneTestCase {
     send("stopIndex", "{indexName: " + indexName + "}");
   }
 
+  protected static void stopIndex() throws Exception {
+    stopIndex(server.curIndexName);
+  }
+
   protected static void deleteIndex(String indexName) throws Exception {
     send("deleteIndex", "{indexName: " + indexName + "}");
   }
@@ -176,6 +180,11 @@ public abstract class ServerBaseTestCase extends LuceneTestCase {
 
   protected static void createIndex() throws Exception {
     createIndex("index" + indexUpto.getAndIncrement());
+  }
+
+  protected static void createAndStartIndex() throws Exception {
+    createIndex();
+    send("startIndex", "{indexName: " + server.curIndexName + "}");
   }
 
   protected static void createIndex(String indexName) throws Exception {

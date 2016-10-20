@@ -213,7 +213,7 @@ public class BulkUpdateDocumentsHandler extends Handler {
       // Parent is last:
       children.add(parent);
 
-      globalState.indexService.submit(shardState.getAddDocumentsJob(count, updateTerm, children, ctx));
+      globalState.submitIndexingTask(shardState.getAddDocumentsJob(count, updateTerm, children, ctx));
       count++;
     }
 

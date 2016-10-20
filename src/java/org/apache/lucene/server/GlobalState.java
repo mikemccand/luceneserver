@@ -41,11 +41,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.lucene.facet.taxonomy.SearcherTaxonomyManager.SearcherAndTaxonomy;
@@ -105,9 +108,7 @@ public class GlobalState implements Closeable {
 
   // TODO: make these controllable
   // nocommit allow controlling per CSV/json bulk import max concurrency sent into IW?
-  //private final static int MAX_INDEXING_THREADS = 10;
   private final static int MAX_INDEXING_THREADS = Runtime.getRuntime().availableProcessors();
-  //private final static int MAX_INDEXING_THREADS = 1;
 
   final DocHandler docHandler = new DocHandler();
 
@@ -119,16 +120,17 @@ public class GlobalState implements Closeable {
 
   public final SearchQueue searchQueue;
 
+  public final Semaphore indexingJobsRunning = new Semaphore(MAX_BUFFERED_ITEMS);
+
   // Seems to be substantially faster than ArrayBlockingQueue at high throughput:  
   final BlockingQueue<Runnable> docsToIndex = new LinkedBlockingQueue<Runnable>(MAX_BUFFERED_ITEMS);
 
-  /** Common thread pool to index documents. */
-  public final ExecutorService indexService = new BlockingThreadPoolExecutor(MAX_BUFFERED_ITEMS,
-                                                                             MAX_INDEXING_THREADS,
-                                                                             MAX_INDEXING_THREADS,
-                                                                             60, TimeUnit.SECONDS,
-                                                                             docsToIndex,
-                                                                             new NamedThreadFactory("LuceneIndexing"));
+  /** Common thread pool to index document chunks. */
+  private final ExecutorService indexService = new ThreadPoolExecutor(MAX_INDEXING_THREADS,
+                                                                      MAX_INDEXING_THREADS,
+                                                                      60, TimeUnit.SECONDS,
+                                                                      docsToIndex,
+                                                                      new NamedThreadFactory("LuceneIndexing"));
   /** Server shuts down once this latch is decremented. */
   public final CountDownLatch shutdownNow = new CountDownLatch(1);
 
@@ -241,6 +243,16 @@ public class GlobalState implements Closeable {
       }
     }
     return null;
+  }
+
+  public void submitIndexingTask(Runnable job) throws InterruptedException {
+    indexingJobsRunning.acquire();
+    indexService.submit(job);
+  }
+
+  public void submitIndexingTask(Callable job) throws InterruptedException {
+    indexingJobsRunning.acquire();
+    indexService.submit(job);
   }
 
   /** Record a new handler, by methode name (search,

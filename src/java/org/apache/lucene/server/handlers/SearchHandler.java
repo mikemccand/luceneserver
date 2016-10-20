@@ -131,6 +131,7 @@ import org.apache.lucene.search.join.BitSetProducer;
 import org.apache.lucene.search.join.QueryBitSetProducer;
 import org.apache.lucene.search.join.ScoreMode;
 import org.apache.lucene.search.join.ToParentBlockJoinCollector;
+import org.apache.lucene.search.join.ToParentBlockJoinIndexSearcher;
 import org.apache.lucene.search.join.ToParentBlockJoinQuery;
 import org.apache.lucene.search.postingshighlight.PassageFormatter;
 import org.apache.lucene.search.postingshighlight.PassageScorer;
@@ -213,6 +214,7 @@ public class SearchHandler extends Handler {
                                                                new StructType(
                                                                    new Param("occur", "Occur.", BOOLEAN_OCCUR_TYPE),
                                                                    new Param("query", "Query for this clause", QUERY_TYPE_WRAP)))),
+                                                       new Param("disableCoord", "If true, coord factors will not be used", new BooleanType(), false),
                                                        new Param("minimumNumberShouldMatch", "Minimum number of should clauses for a match.", new IntType(), 0)),
                                          new PolyEntry("CommonTermsQuery", "A query that executes high-frequency terms in a optional sub-query to prevent slow queries due to common terms like stopwords (see @lucene:queries:org.apache.lucene.queries.CommonTermsQuery)",
                                                        new Param("terms", "List of terms", new ListType(new StringType())),
@@ -1007,6 +1009,8 @@ public class SearchHandler extends Handler {
       return BooleanClause.Occur.MUST;
     } else if (occurString.equals("must_not")) {
       return BooleanClause.Occur.MUST_NOT;
+    } else if (occurString.equals("filter")) {
+      return BooleanClause.Occur.FILTER;
     } else {
       // BUG
       assert false;
@@ -1051,10 +1055,13 @@ public class SearchHandler extends Handler {
       Request r2 = pr.r;
       BooleanQuery.Builder bq = new BooleanQuery.Builder();
       bq.setMinimumNumberShouldMatch(r2.getInt("minimumNumberShouldMatch"));
+      bq.setDisableCoord(r2.getBoolean("disableCoord"));
       for(Object o : r2.getList("subQueries")) {
         Request r3 = (Request) o;
         BooleanClause.Occur occur = parseBooleanOccur(r3.getEnum("occur"));
-        bq.add(parseQuery(timestampSec, topRequest, state, r3.getStruct("query"), field, useBlockJoinCollector, dynamicFields), occur);
+        Query subQuery = parseQuery(timestampSec, topRequest, state, r3.getStruct("query"), field, useBlockJoinCollector, dynamicFields);
+        assert subQuery != null: "got null subQuery from " + r3.getStruct("query");
+        bq.add(subQuery, occur);
       }
       q = bq.build();
     } else if (pr.name.equals("CommonTermsQuery")) {
@@ -1072,8 +1079,7 @@ public class SearchHandler extends Handler {
       if (pr.r.hasParam("query")) {
         q = new ConstantScoreQuery(parseQuery(timestampSec, topRequest, state, pr.r.getStruct("query"), field, useBlockJoinCollector, dynamicFields));
       } else {
-        // nocommit exc here?
-        q = null;
+        throw pr.r.bad("query", "ConstantScoreQuery must have a query");
       }
     } else if (pr.name.equals("FuzzyQuery")) {
       if (field == null) {
@@ -1224,8 +1230,7 @@ public class SearchHandler extends Handler {
         q = LongPoint.newRangeQuery(field, toMinLong(min), toMaxLong(max));
       } else {
         // BUG
-        assert false;
-        q = null;
+        throw r.bad("NumericRangeQuery", "unhandled valueType " + fd.valueType);
       }
     } else if (pr.name.equals("TermQuery")) {
       if (field == null) {
@@ -1310,8 +1315,7 @@ public class SearchHandler extends Handler {
       } else if (scoreModeString.equals("Total")) {
         scoreMode = ScoreMode.Total;
       } else {
-        assert false;
-        scoreMode = null;
+        throw pr.r.bad("scoreMode", "unknown scoreMode " + scoreModeString);
       }
       q = new ToParentBlockJoinQuery(childQuery, parentsFilter, scoreMode);
       if (pr.r.hasParam("childHits")) {
@@ -1349,9 +1353,7 @@ public class SearchHandler extends Handler {
       try {
         q = parseQuery(queryParser, queryText);
       } catch (Exception e) {
-        r2.fail("text", "could not parse", e);
-        // dead code but compiler disagrees:
-        return null;
+        throw r2.bad("text", "could not parse", e);
       }
       //System.out.println("  got: " +q);
     } else if (pr.name.equals("WildcardQuery")) {
@@ -1360,8 +1362,7 @@ public class SearchHandler extends Handler {
       }
       q = new WildcardQuery(new Term(field, pr.r.getString("term")));
     } else {
-      q = null;
-      assert false;
+      throw r.bad("class", "unhandled query class " + pr.name);
     }
     float boost = r.getFloat("boost");
     if (boost != 1.0f) {
@@ -1615,7 +1616,7 @@ public class SearchHandler extends Handler {
       // Ref that we return to caller
       s.taxonomyReader.incRef();
 
-      SearcherAndTaxonomy result = new SearcherAndTaxonomy(new IndexSearcher(r), s.taxonomyReader);
+      SearcherAndTaxonomy result = new SearcherAndTaxonomy(new MyIndexSearcher(r), s.taxonomyReader);
       state.slm.record(result.searcher);
       long t1 = System.nanoTime();
       if (diagnostics != null) {
@@ -2476,6 +2477,7 @@ public class SearchHandler extends Handler {
 
         // Always use drill sideways; it downgrades to a
         // "normal" query if there were no drilldowns:
+        //System.out.println("SEARCHER: " + s.searcher.getClass());
         DrillSideways ds = new DrillSideways(s.searcher, indexState.facetsConfig, s.taxonomyReader) {
 
             private FacetsCollector getCollector(String dim, Map<String,FacetsCollector> dsMap, FacetsCollector drillDowns) {
@@ -2503,6 +2505,7 @@ public class SearchHandler extends Handler {
           };
 
         // Fills in facetResults as a side-effect:
+        //System.out.println("DDQ: " + ddq);
         try {
           ds.search(ddq, c2);
         } catch (TimeLimitingCollector.TimeExceededException tee) {

@@ -134,7 +134,7 @@ public class TestSuggest extends ServerBaseTestCase {
     assertEquals(1, getInt("count"));
 
     for(int i=0;i<2;i++) {
-      System.out.println("TEST: i=" + i);
+      //System.out.println("TEST: i=" + i);
       send("suggestLookup", "{text: lost, suggestName: suggestnrt}");
       assertEquals(15, getLong("results[0].weight"));
       assertEquals("love <font color=red>lost</font>", toString(getArray("results[0].key")));
@@ -273,6 +273,30 @@ public class TestSuggest extends ServerBaseTestCase {
       assertEquals(1, getInt(result, "results[1].weight"));
       assertEquals("the cat meows", get(result, "results[1].key"));
       assertEquals("payload1", get(result, "results[1].payload"));
+
+      // Make sure suggest survives server restart:    
+      bounceServer();
+      send("startIndex");
+    }
+  }
+
+  public void testInfixSuggesterWithContexts() throws Exception {
+    createAndStartIndex();
+
+    Writer fstream = new OutputStreamWriter(new FileOutputStream(tempFile.toFile()), "UTF-8");
+    BufferedWriter out = new BufferedWriter(fstream);
+    out.write("15\u001flove lost\u001ffoobar\u001flucene\n");
+    out.close();
+
+    send("buildSuggest", "{source: {localFile: '" + tempFile.toAbsolutePath() + "'}, class: 'InfixSuggester', suggestName: 'infix_suggest', analyzer: {tokenizer: Whitespace, tokenFilters: [LowerCase]}}");
+    assertEquals(1, getInt("count"));
+
+    for(int i=0;i<2;i++) {
+      send("suggestLookup", "{text: 'lov', suggestName: 'infix_suggest', contexts: ['lucene']}");
+      assertEquals(1, getInt("results.length"));
+      assertEquals(15, getInt("results[0].weight"));
+      assertEquals("<font color=red>lov</font>e lost", toString(getArray("results[0].key")));
+      assertEquals("foobar", getString("results[0].payload"));
 
       // Make sure suggest survives server restart:    
       bounceServer();

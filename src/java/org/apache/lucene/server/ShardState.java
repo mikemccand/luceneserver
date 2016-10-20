@@ -69,6 +69,7 @@ import org.apache.lucene.search.ReferenceManager.RefreshListener;
 import org.apache.lucene.search.ReferenceManager;
 import org.apache.lucene.search.SearcherFactory;
 import org.apache.lucene.search.SearcherLifetimeManager;
+import org.apache.lucene.search.join.ToParentBlockJoinIndexSearcher;
 import org.apache.lucene.search.suggest.Lookup;
 import org.apache.lucene.search.suggest.analyzing.AnalyzingInfixSuggester;
 import org.apache.lucene.server.params.Request;
@@ -362,7 +363,7 @@ public class ShardState implements Closeable {
     }
 
     boolean success = false;
-
+    
     try {
 
       if (indexState.saveLoadState == null) {
@@ -449,7 +450,7 @@ public class ShardState implements Closeable {
       manager = new SearcherTaxonomyManager(writer, true, new SearcherFactory() {
           @Override
           public IndexSearcher newSearcher(IndexReader r, IndexReader previousReader) throws IOException {
-            IndexSearcher searcher = new IndexSearcher(r);
+            IndexSearcher searcher = new MyIndexSearcher(r);
             searcher.setSimilarity(indexState.sim);
             return searcher;
           }
@@ -600,7 +601,7 @@ public class ShardState implements Closeable {
                                           new SearcherFactory() {
                                             @Override
                                             public IndexSearcher newSearcher(IndexReader r, IndexReader previousReader) throws IOException {
-                                              IndexSearcher searcher = new IndexSearcher(r);
+                                              IndexSearcher searcher = new MyIndexSearcher(r);
                                               searcher.setSimilarity(indexState.sim);
                                               return searcher;
                                             }
@@ -612,7 +613,7 @@ public class ShardState implements Closeable {
                                                                        new SearcherFactory() {
                                                                          @Override
                                                                          public IndexSearcher newSearcher(IndexReader r, IndexReader previousReader) throws IOException {
-                                                                           IndexSearcher searcher = new IndexSearcher(r);
+                                                                           IndexSearcher searcher = new MyIndexSearcher(r);
                                                                            searcher.setSimilarity(indexState.sim);
                                                                            return searcher;
                                                                          }
@@ -680,7 +681,7 @@ public class ShardState implements Closeable {
                                           new SearcherFactory() {
                                             @Override
                                             public IndexSearcher newSearcher(IndexReader r, IndexReader previousReader) throws IOException {
-                                              IndexSearcher searcher = new IndexSearcher(r);
+                                              IndexSearcher searcher = new MyIndexSearcher(r);
                                               searcher.setSimilarity(indexState.sim);
                                               return searcher;
                                             }
@@ -761,6 +762,7 @@ public class ShardState implements Closeable {
         ctx.setError(new RuntimeException("error while indexing document " + index, e));
       } finally {
         ctx.addCount.incrementAndGet();
+        indexState.globalState.indexingJobsRunning.release();
       }
 
       return gen;
@@ -810,6 +812,7 @@ public class ShardState implements Closeable {
         ctx.setError(new RuntimeException("error while indexing document " + index, e));
       } finally {
         ctx.addCount.incrementAndGet();
+        indexState.globalState.indexingJobsRunning.release();
       }
 
       return gen;

@@ -1,6 +1,10 @@
+get faster (CSV, chunked json) bulk update document/s
+
 hmm what to do about "index gen" and "searcher version" now that I am sharding!?  i guess it must become a... list?
 
 rename state -> globalState
+
+partial reindex (just one column)
 
 forbidden APIs
 

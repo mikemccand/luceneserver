@@ -100,6 +100,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
       this.bytes = bytes;
       this.semaphore = semaphore;
       this.globalOffset = globalOffset;
+      // nocommit only one semaphore!!  GlobalState also has its own
       semaphore.acquire();
     }
 
@@ -110,6 +111,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
         _indexSplitDoc();
       } finally {
         semaphore.release();
+        shardState.indexState.globalState.indexingJobsRunning.release();
         ctx.inFlightChunks.arrive();
       }
     }
@@ -399,7 +401,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
         }
         // NOTE: This ctor will stall when it tries to acquire the semaphore if we already have too many in-flight indexing chunks:
         prev = new ParseAndIndexOneChunk(delimChar, globalOffset, ctx, prev, shardState, fields, buffer, semaphore);
-        globalState.indexService.submit(prev);
+        globalState.submitIndexingTask(prev);
         if (count == -1) {
           // the end
           prev.setNextStartFragment(new byte[0], 0, 0);
@@ -441,7 +443,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
       out.writeBytes(bytes, 0, bytes.length);
     }
     streamOut.flush();
-  }  
+  }
 
   @Override
   public String getTopDoc() {

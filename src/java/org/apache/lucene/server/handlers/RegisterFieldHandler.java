@@ -483,6 +483,8 @@ public class RegisterFieldHandler extends Handler {
 
     String dateTimeFormat = null;
 
+    // System.out.println("NAME: " + name + " type: " + type + " hightlight: " + highlighted);
+
     switch(type) {
 
     case TEXT:
@@ -496,6 +498,7 @@ public class RegisterFieldHandler extends Handler {
         ft.setDocValuesType(DocValuesType.BINARY);
       }
       if (highlighted) {
+        stored = true;
         ft.setStored(true);
         ft.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
       } else {
@@ -631,9 +634,11 @@ public class RegisterFieldHandler extends Handler {
             type == FieldDef.FieldValueType.LAT_LON ||
             type == FieldDef.FieldValueType.DATE_TIME) {
           usePoints = true;
-        } else {
+        } else if (ft.indexOptions() == IndexOptions.NONE) {
           ft.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS);
         }
+      } else if (highlighted) {
+        throw f.bad("search", "search must be true when highlight is true");
       } else {
         ft.setIndexOptions(IndexOptions.NONE);
       }
@@ -795,6 +800,8 @@ public class RegisterFieldHandler extends Handler {
 
     // nocommit facetsConfig.setRequireDimCount
 
+    // System.out.println("REGISTER: " + name + " -> " + ft);
+
     return new FieldDef(name, ft, type, facet, pf, dvf, multiValued, usePoints, sim, indexAnalyzer, searchAnalyzer, highlighted, null, dateTimeFormat);
   }
 
@@ -835,6 +842,7 @@ public class RegisterFieldHandler extends Handler {
           String script = r2.getString("script");
           String rules = r2.getString("rules");
           rules = COMMENTS_PATTERN.matcher(rules).replaceAll("");
+          //System.out.println("ICU RULES:\n" + rules);
           int code;
           try {
             code = UCharacter.getPropertyValueEnum(UProperty.SCRIPT, script);

@@ -255,7 +255,8 @@ public class BuildSuggestHandler extends Handler {
             // render directly to JSONArray instead of html
             // string:
 
-            TokenStream ts = queryAnalyzer.tokenStream("text", new StringReader(text));
+            // nocommit push this fix (queryAnalyzer -> indexAnalyzer) back:
+            TokenStream ts = indexAnalyzer.tokenStream("text", new StringReader(text));
             CharTermAttribute termAtt = ts.addAttribute(CharTermAttribute.class);
             OffsetAttribute offsetAtt = ts.addAttribute(OffsetAttribute.class);
             ts.reset();
@@ -354,12 +355,12 @@ public class BuildSuggestHandler extends Handler {
 
     @Override
     public boolean hasContexts() {
-      return false;
+      return other.hasContexts();
     }
 
     @Override
     public Set<BytesRef> contexts() {
-      return null;
+      return other.contexts();
     }
 
     @Override

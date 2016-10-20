@@ -319,6 +319,16 @@ public class TestFacets extends ServerBaseTestCase {
     }
   }
 
+  public void testMultiValuedHierarchyFacets() throws Exception {
+    createAndStartIndex();
+    send("registerFields", "{fields: {dates: {type: atom, search: false, store: false, facet: hierarchy, multiValued: true}}}");
+    send("addDocument", "{fields: {dates: [['2016', '10', 10'], ['2015', '6', '1']]}}");
+    refresh();
+    send("search", "{query: MatchAllDocsQuery, facets: [{dim: dates, topN: 10}]}");
+    assertEquals("top: -1, 2016: 1, 2015: 1", formatFacetCounts(getObject("facets[0]")));    
+    stopIndex();
+  }
+
   public static String formatFacetCounts(JSONObject facets) {
     StringBuilder sb = new StringBuilder();
     JSONArray arr = getArray(facets, "counts");

@@ -121,6 +121,7 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
       try {
         _indexSplitDoc();
       } finally {
+        shardState.indexState.globalState.indexingJobsRunning.release();
         semaphore.release();
         ctx.inFlightChunks.arriveAndDeregister();
       }
@@ -416,7 +417,7 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
         }
         // NOTE: This ctor will stall when it tries to acquire the semaphore if we already have too many in-flight indexing chunks:
         prev = new ParseAndIndexOneChunk(delimChar, globalOffset, ctx, prev, shardState, fields, buffer, semaphore);
-        globalState.indexService.submit(prev);
+        globalState.submitIndexingTask(prev);
         if (count == -1) {
           // the end
           prev.setNextStartFragment(new char[0], 0, 0);

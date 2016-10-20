@@ -95,7 +95,7 @@ public class UpdateSuggestHandler extends Handler {
             break;
           }
 
-          lookup2.update(term, null, iterator.weight(), hasPayloads ? iterator.payload() : null);
+          lookup2.update(term, iterator.hasContexts() ? iterator.contexts() : null, iterator.weight(), hasPayloads ? iterator.payload() : null);
           count++;
         }
 

@@ -156,7 +156,7 @@ public class IndexState implements Closeable {
   /** Optional index time sorting (write once!) or null if no index time sorting */
   private Sort indexSort;
 
-  final GlobalState globalState;
+  public final GlobalState globalState;
 
   /** Which norms format to use for all indexed fields. */
   public String normsFormat = "Lucene53";

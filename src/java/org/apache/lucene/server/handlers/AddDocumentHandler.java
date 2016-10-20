@@ -173,9 +173,16 @@ public class AddDocumentHandler extends Handler {
         
       doc.add(new FacetField(fd.name, o.toString()));
     } else if (fd.faceted.equals("hierarchy")) {
-      if (o instanceof List) { 
-        List<String> values = (List<String>) o;
-        doc.add(new FacetField(fd.name, values.toArray(new String[values.size()])));
+      if (o instanceof List) {
+        if (fd.multiValued) {
+          List<List<String>> values = (List<List<String>>) o;
+          for(List<String> sub : values) {
+            doc.add(new FacetField(fd.name, sub.toArray(new String[sub.size()])));
+          }
+        } else {
+          List<String> values = (List<String>) o;
+          doc.add(new FacetField(fd.name, values.toArray(new String[values.size()])));
+        }
       } else {
         doc.add(new FacetField(fd.name, o.toString()));
       }
@@ -408,21 +415,53 @@ public class AddDocumentHandler extends Handler {
     } else if (token == JsonToken.VALUE_FALSE) {
       o = Boolean.FALSE;
     } else if (fd.faceted.equals("hierarchy") && token == JsonToken.START_ARRAY) {
-      List<String> values = new ArrayList<String>();
-      while (true) {
-        token = p.nextToken();
-        if (token == JsonToken.END_ARRAY) {
-          break;
-        } else if (token != JsonToken.VALUE_STRING) {
-          if (token == JsonToken.START_ARRAY) {
+      if (fd.multiValued == false) {
+        List<String> values = new ArrayList<>();
+        while (true) {
+          token = p.nextToken();
+          if (token == JsonToken.END_ARRAY) {
+            break;
+          } else if (token != JsonToken.VALUE_STRING) {
+            if (token == JsonToken.START_ARRAY) {
+              fail(fd.name, "expected array of strings, but saw array inside array");
+            } else {
+              fail(fd.name, "expected array of strings, but saw " + token + " inside array");
+            }
+          }
+          values.add(p.getText());
+        }
+        o = values;
+      } else  {
+        List<List<String>> values = new ArrayList<>();
+        while (true) {
+          token = p.nextToken();
+          if (token == JsonToken.END_ARRAY) {
+            break;
+          } else if (token == JsonToken.START_ARRAY) {
+            List<String> sub = new ArrayList<>();
+            values.add(sub);
+            while (true) {
+              token = p.nextToken();
+              if (token == JsonToken.VALUE_STRING) {
+                sub.add(p.getText());
+              } else if (token == JsonToken.END_ARRAY) {
+                break;
+              } else {
+                fail(fd.name, "expected array of strings or array of array of strings, but saw " + token + " inside inner array");
+              }
+            }
+          } else if (token == JsonToken.VALUE_STRING) {
+            List<String> sub = new ArrayList<>();
+            values.add(sub);
+            sub.add(p.getText());
+          } else if (token == JsonToken.START_ARRAY) {
             fail(fd.name, "expected array of strings, but saw array inside array");
           } else {
             fail(fd.name, "expected array of strings, but saw " + token + " inside array");
           }
         }
-        values.add(p.getText());
+        o = values;
       }
-      o = values;
     } else if (fd.valueType == FieldDef.FieldValueType.LAT_LON) {
       if (token != JsonToken.START_ARRAY) {
         fail(fd.name, "latlon field must be [lat, lon] value; got " + token);

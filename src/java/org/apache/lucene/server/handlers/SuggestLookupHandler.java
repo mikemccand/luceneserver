@@ -18,8 +18,10 @@ package org.apache.lucene.server.handlers;
  */
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.lucene.search.suggest.Lookup.LookupResult;
 import org.apache.lucene.search.suggest.Lookup;
@@ -28,6 +30,8 @@ import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
 import org.apache.lucene.server.params.*;
+import org.apache.lucene.util.BytesRef;
+
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 
@@ -42,6 +46,7 @@ public class SuggestLookupHandler extends Handler {
         new Param("highlight", "True if the suggestions should be highlighted (currently only works with AnalyzingInfixSuggester).", new BooleanType(), true),
         new Param("allTermsRequired", "If true then all terms must be found (this only applies to InfixSuggester currently).",
                   new BooleanType(), false),
+        new Param("contexts", "Which contexts to filter by", new ListType(new StringType())),
         new Param("count", "How many suggestions to return.", new IntType(), 5));
 
   @Override
@@ -72,14 +77,24 @@ public class SuggestLookupHandler extends Handler {
     final boolean allTermsRequired = r.getBoolean("allTermsRequired");
     final boolean highlight = r.getBoolean("highlight");
 
+    final Set<BytesRef> contexts;
+    if (r.hasParam("contexts")) {
+      contexts = new HashSet<>();
+      for(Object o : r.getList("contexts")) {
+        contexts.add(new BytesRef((String) o));
+      }
+    } else {
+      contexts = null;
+    }
+
     return new FinishRequest() {
       @Override
       public String finish() throws IOException {
         List<LookupResult> results;
         if (lookup instanceof AnalyzingInfixSuggester) {
-          results = ((AnalyzingInfixSuggester) lookup).lookup(text, count, allTermsRequired, highlight);
+          results = ((AnalyzingInfixSuggester) lookup).lookup(text, contexts, count, allTermsRequired, highlight);
         } else {
-          results = lookup.lookup(text, false, count);
+          results = lookup.lookup(text, contexts, false, count);
         }
         JSONObject ret = new JSONObject();
         JSONArray retArray = new JSONArray();

@@ -1,0 +1,21 @@
+better handling of renamed issues
+
+are we getting dup suggestions w/ rename?
+
+org.this.that is not splitting into tokens!!
+
+lucene smoke doesn't highlight lucene in suggestions?
+
+remove isDev/prod/isMike?
+
+
+NEW
+  - 3 new facet fields
+    - Updated ago
+    - Last comment user
+    - Commited By --> fun one, e.g. see what Mike McCandless committed under solr
+  - fixed "committed paths", broken since git switch
+  - actual names now expanded in comments from user names
+  - commit links go straight to source control
+  - some more synonyms
+  - upgraded 4.6.x -> 6.x!

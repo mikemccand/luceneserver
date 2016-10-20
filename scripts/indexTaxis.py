@@ -34,7 +34,9 @@ PACKAGE_FILE = os.path.abspath('build/luceneserver-%s-SNAPSHOT.zip' % LUCENE_SER
 
 USER_NAME = getpass.getuser()
 
-BINARY_CSV = False
+BINARY_CSV = True
+
+USE_JSON = False
 
 class BinarySend:
   def __init__(self, host, port, command):
@@ -321,9 +323,12 @@ def main():
     nextPrint = 250000
     replicaStarted = False
 
-    #docSource = '/lucenedata/nyc-taxi-data/alltaxis.csv.blocks'
-    docSource = '/b/alltaxis.csv.blocks'
-    #docSource = '/l/data/alltaxis.csv.blocks'
+    if USE_JSON:
+      docSource = '/b/alltaxis.luceneserver.json'
+    else:
+      #docSource = '/lucenedata/nyc-taxi-data/alltaxis.csv.blocks'
+      docSource = '/b/alltaxis.csv.blocks'
+      #docSource = '/l/data/alltaxis.csv.blocks'
     if not os.path.exists(docSource):
       # Not Mike's home computer!
       docSource = 'data/alltaxis.1M.csv.blocks'
@@ -348,7 +353,6 @@ def main():
 
     #with open('/lucenedata/nyc-taxi-data/alltaxis.csv.blocks', 'rb') as f:
     totBytes = 0
-    chunkCount = 0
 
     doSearch = len(replicaPorts) > 0
 
@@ -356,7 +360,9 @@ def main():
     if dps is not None:
       dps = float(dps)
 
-    if BINARY_CSV:
+    if USE_JSON:
+       c = ChunkedHTTPSend(LOCALHOST, primaryPorts[0], 'bulkAddDocument2', {'indexName': 'index'})
+    elif BINARY_CSV:
       b1 = BinarySend(LOCALHOST, primaryPorts[1], 'bulkCSVAddDocument')
       b1.add(b',index\n')
     else:
@@ -364,28 +370,46 @@ def main():
       c = ChunkedHTTPSend(LOCALHOST, primaryPorts[0], 'bulkCSVAddDocument2', {'indexName': 'index', 'delimChar': ','})
 
     with open(docSource, 'rb') as f:
-      csvHeader = f.readline()
-      if BINARY_CSV:      
-        b1.add(csvHeader)
+      if USE_JSON:
+        pass
       else:
-        c.add(csvHeader)
-      while True:
-        header = f.readline()
-        if len(header) == 0:
-          break
-        byteCount, docCount = (int(x) for x in header.strip().split())
-        bytes = f.read(byteCount)
-        totBytes += byteCount
+        csvHeader = f.readline()
         if BINARY_CSV:      
-          b1.add(bytes)
+          b1.add(csvHeader)
         else:
+          c.add(csvHeader)
+
+      while True:
+        if USE_JSON:
+          b = f.read(8)
+          if len(b) == 0:
+            break
+          docCount, byteCount = struct.unpack('ii', b)
+          totBytes += byteCount
+          #print('docCount %s, byteCount %s' % (docCount, byteCount))
+          bytes = f.read(byteCount)
           try:
             c.add(bytes)
           except:
             print('FAILED:')
             print(c.finish())
             raise
-        chunkCount += 1
+        else:
+          header = f.readline()
+          if len(header) == 0:
+            break
+          byteCount, docCount = (int(x) for x in header.strip().split())
+          bytes = f.read(byteCount)
+          totBytes += byteCount
+          if BINARY_CSV:      
+            b1.add(bytes)
+          else:
+            try:
+              c.add(bytes)
+            except:
+              print('FAILED:')
+              print(c.finish())
+              raise
         #print('doc: %s' % doc)
         id += docCount
         if id >= nextPrint:

@@ -199,7 +199,7 @@ public class BulkUpdateDocumentHandler extends Handler {
       }
 
       // TODO: this is dup'd code ... share better w/ AddDocHandler
-      globalState.indexService.submit(shardState.getAddDocumentJob(count, updateTerm, doc, ctx));
+      globalState.submitIndexingTask(shardState.getAddDocumentJob(count, updateTerm, doc, ctx));
       count++;
     }
     

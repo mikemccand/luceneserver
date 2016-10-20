@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.lucene.search.suggest.InputIterator;
@@ -39,6 +40,7 @@ public class FromFileTermFreqIterator implements InputIterator, Closeable {
   public int suggestCount;
 
   private BytesRef extra;
+  private final Set<BytesRef> contexts = new HashSet<>();
 
   /** Sole constructor. */
   public FromFileTermFreqIterator(File sourceFile) throws IOException {
@@ -47,12 +49,12 @@ public class FromFileTermFreqIterator implements InputIterator, Closeable {
 
   @Override
   public boolean hasContexts() {
-    return false;
+    return true;
   }
 
   @Override
   public Set<BytesRef> contexts() {
-    return null;
+    return contexts;
   }
 
   @Override
@@ -88,7 +90,16 @@ public class FromFileTermFreqIterator implements InputIterator, Closeable {
         throw new RuntimeException("line " + lineCount + " is malformed");
       }
       BytesRef text = new BytesRef(line.substring(spot+1, spot2));
-      extra = new BytesRef(line.substring(spot2+1));
+
+      int spot3 = line.indexOf('\u001f', spot2+1);
+      if (spot3 == -1) {
+        throw new RuntimeException("line " + lineCount + " is malformed");
+      }
+      
+      extra = new BytesRef(line.substring(spot2+1, spot3));
+      BytesRef context = new BytesRef(line.substring(spot3+1));
+      contexts.clear();
+      contexts.add(context);
 
       return text;
     }
