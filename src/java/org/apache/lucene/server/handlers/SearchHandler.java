@@ -143,6 +143,7 @@ import org.apache.lucene.server.FieldDefBindings;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.MyIndexSearcher;
 import org.apache.lucene.server.SVJSONPassageFormatter;
 import org.apache.lucene.server.ShardState;
 import org.apache.lucene.server.WholeMVJSONPassageFormatter;

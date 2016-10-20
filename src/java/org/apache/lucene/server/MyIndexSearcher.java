@@ -37,7 +37,7 @@ import org.apache.lucene.util.Bits;
 /** This is sadly necessary because for ToParentBlockJoinQuery we must invoke .scorer not .bulkScorer, yet for DrillSideways we must do
  *  exactly the opposite! */
 
-class MyIndexSearcher extends IndexSearcher {
+public class MyIndexSearcher extends IndexSearcher {
   public MyIndexSearcher(IndexReader reader) {
     super(reader);
   }

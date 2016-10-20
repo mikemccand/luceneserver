@@ -16,13 +16,14 @@ import util
 import gitHistory
 
 """
-This tool uses Jira's JSON search API to download all Jira issues for
+This tool uses Jira's JSON REST search API to download all Jira issues for
 certain Apache projects.  The raw json is stored in a on-disk sqlite3
 database, kept up to date by periodically asking Jira for which issues
 changed in the last 30 seconds.  Then we iterate the issues from that
 db into the lucene server index.
 
-A luceneserver instance should already be running when you run this.
+A luceneserver instance (default localhost) should already be running
+when you run this.
 """
 
 # fields to add
@@ -55,6 +56,9 @@ except FileNotFoundError:
 except:
   print('WARNING: unable to load prior user names map; starting new one')
   userNameToDisplayName = {}
+
+# For some insane reason, Doug has no display name ;)
+userNameToDisplayName['cutting@apache.org'] = 'Doug Cutting'
 
 def prettyPrintJSON(obj):
   print(json.dumps(obj,
@@ -620,6 +624,8 @@ def isCommitUser(userName):
 
 def addUser(allUsers, userMap, project, key=None):
   displayName = userMap['displayName']
+  if displayName == 'cutting@apache.org':
+    displayName = 'Doug Cutting'
   if isCommitUser(displayName):
     displayName = 'commitbot'
     user = 'commitbot'
@@ -652,12 +658,13 @@ def indexDocs(svr, issues, printIssue=False, updateSuggest=False):
   for issue in issues:
     key = issue['key'].lower()
 
-    debug = key.upper() == 'LUCENE-3169'
+    debug = key.upper() == 'LUCENE-7174'
     
     if debug:
       print()
-      print('HERE:')
+      print('ORIG ISSSUE:')
       prettyPrintJSON(issue)
+      
     if printIssue:
       print('  %s' % key)
 
@@ -760,17 +767,12 @@ def indexDocs(svr, issues, printIssue=False, updateSuggest=False):
       subDoc = {}
       subDoc['author'] = x['author']['displayName']
       isCommit = isCommitUser(subDoc['author'])
-      if debug:
-        print('%s isCommit=%s' % (isCommit, x))
       body = x['body']
       if isCommit:
-        if debug:
-          print("  body: %s" % body)
+        subDoc['author'] = 'commitbot'
         hasCommits = True
         m = reCommitURL.findall(body)
         if len(m) > 0:
-          if debug:
-            print('  in git part: ' % m)
           for y in m:
             if 'git-wip-us' in y or 'svn.apache.org/r' in y:
               subDoc['commitURL'] = y.strip()
@@ -796,6 +798,12 @@ def indexDocs(svr, issues, printIssue=False, updateSuggest=False):
             if branch is not None:
               branch = branch.group(1)
               branch = branch.replace('refs/heads/', '')
+
+        # drop first 2 not-so-useful lines of the commit message,
+        # because we separately extract this info:
+        #   Commit XXX in lucene-solr's branch YYY from ZZZ
+        #   [ <url> ]
+        
         body = '\n'.join(body.split('\n')[2:])
         if branch is not None:
           body = '%s: %s' % (branch, body)
@@ -855,7 +863,7 @@ def indexDocs(svr, issues, printIssue=False, updateSuggest=False):
     
     if debug:
       print()
-      print('HERE:')
+      print('Indexed document:')
       prettyPrintJSON(update)
 
     bulk.add(json.dumps(update))
@@ -885,8 +893,11 @@ def mapUserName(user):
 def cleanJiraMarkup(key, s):
   s = s.replace(key.upper() + ':', '')
   s = s.replace('{noformat}', ' ')
+
+  # Don't index quoted parts from prior comments into the current comment:
   s = reQuote.sub(' ', s)
   s = reBQ.sub(' ', s)
+  
   s = s.replace('\\', '')
   s = reCode.sub(r'\1', s)
   s = reUserName.sub(mapUserName, s)

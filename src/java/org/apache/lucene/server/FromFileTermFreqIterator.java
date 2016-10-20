@@ -97,9 +97,21 @@ public class FromFileTermFreqIterator implements InputIterator, Closeable {
       }
       
       extra = new BytesRef(line.substring(spot2+1, spot3));
-      BytesRef context = new BytesRef(line.substring(spot3+1));
+
       contexts.clear();
-      contexts.add(context);
+      
+      int upto = spot3+1;
+      while (true ){
+        int nextUpto = line.indexOf('\u001f', upto);
+        if (nextUpto == -1) {
+          contexts.add(new BytesRef(line.substring(upto)));
+          break;
+        } else {
+          contexts.add(new BytesRef(line.substring(upto, nextUpto)));
+          upto = nextUpto+1;
+        }
+      }
+      //System.out.println("CONTEXTS: " + text.utf8ToString() + " -> " + contexts);
 
       return text;
     }

@@ -1,3 +1,18 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import pprint
 import math
 import urllib.request, urllib.error, urllib.parse
@@ -17,9 +32,13 @@ import random
 import datetime
 import http.cookies
 
-TRACE = False
+"""
+Handles incoming queries for the search UI.
+"""
 
-allProjects = ('Tika', 'Solr', 'Lucene')
+TRACE = True
+
+allProjects = ('Tika', 'Solr', 'Lucene', 'Infrastructure')
 
 DO_PROX_HIGHLIGHT = False
 
@@ -72,38 +91,17 @@ class UISpec:
 class JIRASpec(UISpec):
 
   def buildBrowseOnlyQuery(self):
-    if False:
-      return {'class': 'BooleanQuery',
-              'subQueries': [
-        {'query': {'class': 'ConstantScoreQuery',
-                   'query': {'class': 'BooleanFieldQuery',
-                             'field': 'parent'}},
-         'occur': 'should'},
-        {'query': {'class': 'ToParentBlockJoinQuery',
-                   'childQuery': {'class': 'ConstantScoreQuery',
-                                  'query': {'class': 'BooleanQuery',
-                                            'subQueries': [{'occur': 'must',
-                                                            'query': 'MatchAllDocsQuery'},
-                                                           {'occur': 'must_not',
-                                                            'query': {'class': 'BooleanFieldQuery',
-                                                                      'field': 'parent'}}]}},
-                   'parentsFilter': {'class': 'BooleanFieldQuery', 'field': 'parent'},
-                   'scoreMode': 'Max',
-                   'childHits': {'maxChildren': 2,
-                                 'sort': [{'field': 'created', 'reverse': True}]}},
-         'occur': 'should'}]}
-    else:
-      return {'class': 'ToParentBlockJoinQuery',
-              'childQuery': {'class': 'BooleanQuery',
-                                            'subQueries': [{'occur': 'must',
-                                                            'query': 'MatchAllDocsQuery'},
-                                                           {'occur': 'must_not',
-                                                            'query': {'class': 'BooleanFieldQuery',
-                                                                      'field': 'parent'}}]},
-              'parentsFilter': {'class': 'BooleanFieldQuery', 'field': 'parent'},
-              'scoreMode': 'Max',
-              'childHits': {'maxChildren': 2,
-                            'sort': [{'field': 'created', 'reverse': True}]}}
+    return {'class': 'ToParentBlockJoinQuery',
+            'childQuery': {'class': 'BooleanQuery',
+                                          'subQueries': [{'occur': 'must',
+                                                          'query': 'MatchAllDocsQuery'},
+                                                         {'occur': 'must_not',
+                                                          'query': {'class': 'BooleanFieldQuery',
+                                                                    'field': 'parent'}}]},
+            'parentsFilter': {'class': 'BooleanFieldQuery', 'field': 'parent'},
+            'scoreMode': 'Max',
+            'childHits': {'maxChildren': 2,
+                          'sort': [{'field': 'created', 'reverse': True}]}}
 
   def buildTextQuery(self, text):
     l0 = []
@@ -136,6 +134,7 @@ class JIRASpec(UISpec):
                   'childQuery':
                   {'class': 'BooleanQuery',
                    'subQueries': [{'occur': 'should', 'query': {'class': 'text', 'field': 'body', 'text': text}},
+                                  {'occur': 'should', 'query': {'class': 'text', 'field': 'author', 'text': text}},
                                   {'occur': 'should', 'query': {'class': 'text', 'field': 'childKey', 'text': lowerText, 'boost': 3.0}}]},
                   'parentsFilter': {'class': 'BooleanFieldQuery', 'field': 'parent'},
                   'scoreMode': 'Max',
@@ -248,10 +247,10 @@ jiraSpec.facetFields = (
   ('Updated', 'updated', False, None, False),
   ('Updated ago', 'updatedOld', False, None, False),
   ('User', 'allUsers', False, None, True),
-  ('Committed By', 'committedBy', False, None, True),
+  ('Committed by', 'committedBy', False, None, True),
   ('Last comment user', 'lastContributor', False, None, True),
   ('Fix version', 'fixVersions', True, '-int', True),
-  ('Committed Paths', 'committedPaths', True, None, False),
+  ('Committed paths', 'committedPaths', True, None, False),
   ('Component', 'facetComponents', True, None, True),
   ('Type', 'issueType', False, None, True),
   ('Priority', 'facetPriority', False, None, False),
@@ -1111,12 +1110,12 @@ def printTokens(send):
                      'EnglishMinimalStem']}
 
   print('TOKENS')
-  prettyPrintJSON(send('analyze', {'analyzer': analyzer, 'indexName': 'jira', 'text': 'here is LUCENE-2000 and SOLR-1999 that is all'}))
+  prettyPrintJSON(send('analyze', {'analyzer': analyzer, 'indexName': 'jira', 'text': 'Commit ebb2127cca54e49ed5c7462d11ee8dda6125e287'}))
 
 def handleQuery(path, isMike, environ):
 
   send = util.ServerClient().send
-  #printTokens(send)
+  printTokens(send)
 
   t0 = time.time()
 

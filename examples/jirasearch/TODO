@@ -8,8 +8,17 @@ lucene smoke doesn't highlight lucene in suggestions?
 
 remove isDev/prod/isMike?
 
+NRT is failing to show new comments?
+
+grep through production logs for exeptions!
+
+why does "bens" make bogus suggestions?
+
+search for 7462 SHOULD have found LUCENE-7174, like it does in production now
+
 
 NEW
+  - open source
   - 3 new facet fields
     - Updated ago
     - Last comment user
