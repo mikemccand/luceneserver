@@ -253,7 +253,7 @@ jiraSpec.facetFields = (
   ('Status', 'status', False, None, False),
   ('Project', 'project', False, None, False),
   ('Updated', 'updated', False, None, False),
-  ('Updated ago', 'updatedOld', False, None, False),
+  ('Updated ago', 'updatedAgo', False, None, False),
   ('User', 'allUsers', False, None, True),
   ('Committed by', 'committedBy', False, None, True),
   ('Last comment user', 'lastContributor', False, None, True),
@@ -1021,7 +1021,7 @@ def handleMoreFacets(path, isMike, environ):
               break
           else:
             raise RuntimeError('failed to find numericRange label %s' % value)
-        elif field == 'updatedOld':
+        elif field == 'updatedAgo':
           for d in getOldTimeFacets(now):
             if d['label'] == value[0]:
               l2.append({'field': 'updated',
@@ -1074,6 +1074,7 @@ def getOldTimeFacets(now):
     {'label': '> 1 week ago', 'min': 0, 'max': now-7*24*3600, 'minInclusive': True, 'maxInclusive': True},
     {'label': '> 1 month ago', 'min': 0, 'max': int(now-30.5*24*3600), 'minInclusive': True, 'maxInclusive': True},
     {'label': '> 3 months ago', 'min': 0, 'max': int(now-3*30.5*24*3600), 'minInclusive': True, 'maxInclusive': True},
+    {'label': '> 1 year ago', 'min': 0, 'max': int(now-365.25*24*3600), 'minInclusive': True, 'maxInclusive': True},
     ]
 
 def printTokens(send):
@@ -1232,9 +1233,7 @@ def handleQuery(path, isMike, environ):
       field = args['a1'][0]
       label = facetStringToPath(args['a2'][0])
       for idx, (field2, values) in enumerate(drillDowns):
-        if field2 == field or \
-           (field == 'updated' and field2 == 'updatedOld') or \
-           (field == 'updatedOld' and field2 == 'updated'):
+        if field2 == field:
           # Replace existing drill down on this field:
           drillDowns[idx] = (field, [label])
           break
@@ -1381,8 +1380,8 @@ def handleQuery(path, isMike, environ):
       topN = 7
     if dim == 'updated':
       d = {'dim': dim, 'numericRanges': getTimeFacets(now)}
-    elif dim == 'updatedOld':
-      d = {'dim': 'updated', 'numericRanges': getOldTimeFacets(now)}
+    elif dim == 'updatedAgo':
+      d = {'dim': 'updatedAgo', 'numericRanges': getOldTimeFacets(now)}
     else:
       d = {'dim': dim, 'topN': topN}
     l.append(d)
@@ -1425,10 +1424,10 @@ def handleQuery(path, isMike, environ):
               break
           else:
             raise RuntimeError('failed to find numericRange label %s' % value)
-        elif field == 'updatedOld':
+        elif field == 'updatedAgo':
           for d in getOldTimeFacets(now):
             if d['label'] == value[0]:
-              l2.append({'field': 'updated',
+              l2.append({'field': 'updatedAgo',
                          'numericRange': d})
               break
           else:
@@ -1436,7 +1435,7 @@ def handleQuery(path, isMike, environ):
         else:
           l2.append({'field': field, 'value': value})
 
-      if field not in ('updated', 'updatedOld') and not spec.facetByID[field][0]:
+      if field not in ('updated', 'updatedAgo') and not spec.facetByID[field][0]:
         ddExtraMap[field] = len(l)
         l.append({'dim': field, 'labels': values[0]})
                   

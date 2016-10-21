@@ -181,6 +181,11 @@ def createSchema(svr):
                         'store': True,
                         'search': True,
                         'facet': 'numericRange'},
+            'updatedAgo': {'type': 'long',
+                           'sort': True,
+                           'store': True,
+                           'search': True,
+                           'facet': 'numericRange'},
             'parent': {'type': 'boolean'},
             'status': {'type': 'atom',
                        'store': True,
@@ -833,6 +838,9 @@ def indexDocs(svr, issues, printIssue=False, updateSuggest=False):
 
     # Compute our own updated instead of using Jira's, to be max(createTime, comments):
     doc['updated'] = int(float(updated.strftime('%s.%f')))
+
+    # TODO: maybe lucene server needs a copy field:
+    doc['updatedAgo'] = doc['updated']
 
     if lastContributor is not None:
       doc['lastContributor'] = lastContributor
