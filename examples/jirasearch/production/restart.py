@@ -89,9 +89,7 @@ while True:
 print()
 print('Restart Apache httpd')
 
-# nocommit fixme:
-
-#run('/home/changingbits/webapps/examples/apache2/bin/restart')
+run('/home/changingbits/webapps/examples/apache2/bin/restart')
 #run('sudo /etc/rc.d/init.d/httpd restart')
 
 print()

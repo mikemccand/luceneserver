@@ -92,7 +92,7 @@ class ServerClient:
   def __init__(self, host=None, port=None):
     if host is None:
       host = 'localhost'
-      port = 4000
+      port = localconstants.SERVER_PORT
     self.host = host
     self.port = port
     

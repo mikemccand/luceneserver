@@ -94,17 +94,22 @@ class UISpec:
 class JIRASpec(UISpec):
 
   def buildBrowseOnlyQuery(self):
-    return {'class': 'ToParentBlockJoinQuery',
-            'childQuery': {'class': 'BooleanQuery',
-                                          'subQueries': [{'occur': 'must',
-                                                          'query': 'MatchAllDocsQuery'},
-                                                         {'occur': 'must_not',
-                                                          'query': {'class': 'BooleanFieldQuery',
-                                                                    'field': 'parent'}}]},
-            'parentsFilter': {'class': 'BooleanFieldQuery', 'field': 'parent'},
-            'scoreMode': 'Max',
-            'childHits': {'maxChildren': 2,
-                          'sort': [{'field': 'created', 'reverse': True}]}}
+    # Match all on both parent (in case it has no comments yet) and children:
+    return {'class': 'BooleanQuery',
+            'subQueries': [{'occur': 'should',
+                            'query': {'class': 'ToParentBlockJoinQuery',
+                                      'childQuery': {'class': 'BooleanQuery',
+                                                     'subQueries': [{'occur': 'must',
+                                                                     'query': 'MatchAllDocsQuery'},
+                                                                    {'occur': 'must_not',
+                                                                     'query': {'class': 'BooleanFieldQuery',
+                                                                               'field': 'parent'}}]},
+                                      'parentsFilter': {'class': 'BooleanFieldQuery', 'field': 'parent'},
+                                      'scoreMode': 'Max',
+                                      'childHits': {'maxChildren': 2,
+                                                    'sort': [{'field': 'created', 'reverse': True}]}}},
+                           {'occur': 'should',
+                            'query': {'class': 'MatchAllDocsQuery'}}]}
 
   def buildTextQuery(self, text):
     l0 = []

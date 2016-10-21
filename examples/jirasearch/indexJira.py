@@ -41,8 +41,6 @@ reBQ = re.compile(r'bq\. .*?$', re.MULTILINE)
 reCode = re.compile('{{(.*?)}}', re.DOTALL)
 reUserName = re.compile(r'(\[~.*?\])')
 
-DEFAULT_PORT = 4000
-
 DB_PATH = localconstants.DB_PATH
 
 MY_EPOCH = datetime.datetime(year=2014, month=1, day=1)
@@ -294,16 +292,17 @@ def allIssues():
     db.close()
 
 def specificIssues(issues):
-  db = sqlite3.connect(DB_PATH)
+  db = sqlite3.connect('/l/jirasearch/issues.db')
   try:
     c = db.cursor()
-    for k, v in c.execute('SELECT key, body FROM issues where key in (%s)' % ','.join(issues)):
-      try:
-        yield pickle.loads(v)
-      except:
-        traceback.print_exc()
-        print(k)
-        raise
+    for issue in issues:
+      for k, v in c.execute('SELECT key, body FROM issues where key = ?', (issue,)):
+        try:
+          yield pickle.loads(v)
+        except:
+          traceback.print_exc()
+          print(k)
+          raise
   finally:
     db.close()
 
@@ -664,7 +663,7 @@ def indexDocs(svr, issues, printIssue=False, updateSuggest=False):
   for issue in issues:
     key = issue['key'].lower()
 
-    debug = False and key.upper() == 'LUCENE-7174' and localconstants.isDev
+    debug = False and key.upper() == 'SOLR-9077' and localconstants.isDev
     
     if debug:
       print()

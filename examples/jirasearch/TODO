@@ -16,7 +16,6 @@ why does "bens" make bogus suggestions?
 
 search for 7462 SHOULD have found LUCENE-7174, like it does in production now
 
-
 NEW
   - open source
   - 3 new facet fields
