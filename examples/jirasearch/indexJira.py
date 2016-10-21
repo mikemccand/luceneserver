@@ -292,7 +292,7 @@ def allIssues():
     db.close()
 
 def specificIssues(issues):
-  db = sqlite3.connect('/l/jirasearch/issues.db')
+  db = sqlite3.connect(DB_PATH)
   try:
     c = db.cursor()
     for issue in issues:
