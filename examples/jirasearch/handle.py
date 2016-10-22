@@ -36,7 +36,7 @@ import http.cookies
 Handles incoming queries for the search UI.
 """
 
-TRACE = True
+TRACE = False
 
 if not localconstants.isDev:
   TRACE = False
@@ -109,7 +109,8 @@ class JIRASpec(UISpec):
                                       'childHits': {'maxChildren': 2,
                                                     'sort': [{'field': 'created', 'reverse': True}]}}},
                            {'occur': 'should',
-                            'query': {'class': 'MatchAllDocsQuery'}}]}
+                            'query': {'class': 'BooleanFieldQuery',
+                                      'field': 'parent'}}]}
 
   def buildTextQuery(self, text):
     l0 = []

@@ -25,3 +25,8 @@ why is top level browse count 200K+!?  we are counting the child documents?
 annoyingly, the Jira query process does NOT count a new commit on an issue as updating its timestamp
 
 is NRT indexer not seeing newly created issues?
+
+merge the missed issues back into allIssues.txt in /lucenedata
+
+is there a faster bulk export?
+  - should i re-do w/ rendering and use html strip char factory to get good final inch highlighting somehow...
