@@ -38,7 +38,8 @@ reInBranch2 = re.compile(r'\[(.*?) commit\]')
 reInGitBranch = re.compile("'s branch (.*?) from")
 reQuote = re.compile('{quote}.*?{quote}', re.DOTALL)
 reBQ = re.compile(r'bq\. .*?$', re.MULTILINE)
-reCode = re.compile('{{(.*?)}}', re.DOTALL)
+reCode1 = re.compile('{{(.*?)}}', re.DOTALL)
+reCode2 = re.compile('{code}(.*?){code}', re.DOTALL)
 reUserName = re.compile(r'(\[~.*?\])')
 
 DB_PATH = localconstants.DB_PATH
@@ -913,7 +914,8 @@ def cleanJiraMarkup(key, s):
   s = reBQ.sub(' ', s)
   
   s = s.replace('\\', '')
-  s = reCode.sub(r'\1', s)
+  s = reCode1.sub(r'\1', s)
+  s = reCode2.sub(r'\1', s)
   s = reUserName.sub(mapUserName, s)
   s = s.strip()
   return s

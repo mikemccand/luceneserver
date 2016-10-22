@@ -79,8 +79,7 @@ for project, maxNumber in maxByProject.items():
       print('  recovered: %s' % key)
     elif key not in keys:
       print('  missing: %s' % key)
-      # nocommit do INFRA issues in 2nd pass:
-      if project != 'INFRA':
+      if project == 'INFRA':
         missing.append(key)
 db.close()
 

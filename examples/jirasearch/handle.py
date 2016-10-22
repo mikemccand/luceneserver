@@ -36,7 +36,7 @@ import http.cookies
 Handles incoming queries for the search UI.
 """
 
-TRACE = False
+TRACE = True
 
 if not localconstants.isDev:
   TRACE = False
