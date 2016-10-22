@@ -667,8 +667,9 @@ def indexDocs(svr, issues, printIssue=False, updateSuggest=False):
   first = True
   for issue in issues:
     key = issue['key'].lower()
+    #print(key)
 
-    debug = False and key.upper() == 'SOLR-9077' and localconstants.isDev
+    debug = False and key.upper() == 'INFRA-10234' and localconstants.isDev
     
     if debug:
       print()
