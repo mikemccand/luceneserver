@@ -20,7 +20,7 @@ why does "bens" make bogus suggestions?
 
 search for 7462 SHOULD have found LUCENE-7174, like it does in production now
 
-why is top level browse count 200K+!?  we are counting the child documents?
+how come number search e.g. 7462 does not highlight the issue title?
 
 annoyingly, the Jira query process does NOT count a new commit on an issue as updating its timestamp
 

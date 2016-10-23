@@ -16,13 +16,15 @@ make sure if a doc fails to index that we log its fields+values
 
 reindex api?
 
-parallel reader "create new column" api?
+parallel reader "create new column" api? (TestDemoParallelReader)
 
 rolling restart
 
 task management api?
 
 long running tasks?
+
+  - glass sharding
 
     - reserve internal field names (leading _?)
     - index aliases
@@ -50,9 +52,6 @@ long running tasks?
       - upgrade index api
     - hmm "we don't cache aggregations": can lucene cache facet counts and post-aggreggate?
     - live similarity updating?
-    - switch bulk json protocol over to one-doc-per-line too, and use fast bulk thread splitter
-    - csv escaping
-    - get csv working correctly when one doc spans multiple chunks
     - accept cbor too
     - how to index a binary field when CSV import is via http?
     - index aliases?
@@ -72,7 +71,6 @@ long running tasks?
     - geo names
       - get copy field working
     - add ./build.py beast
-    - "suddenly add a whole new field" fork an index idea (TestDemoParallelLeafReader)
     - source field, reindexing?
     - upgrade process how?
     - persistent http connections b/w nodes

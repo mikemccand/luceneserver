@@ -682,6 +682,10 @@ def indexDocs(svr, issues, printIssue=False, updateSuggest=False):
 
     fields = issue['fields']
     project = fixProject(fields['project']['name'])
+    if project not in allProjects:
+      # This can happen when the issue is renamed to a project outside
+      # of the ones we index:
+      continue
 
     created = fields['created']
     desc = fields['description']
