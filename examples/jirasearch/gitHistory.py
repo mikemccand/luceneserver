@@ -164,8 +164,16 @@ def parseLog(f=None):
         if changedIssues is not None:
           changedIssues.add(issue)
         if issue not in issueToPaths:
-          issueToPaths[issue] = [set()]
-        issueToPaths[issue][0].add(author)
+          # common case: only one author; store as string in that case
+          issueToPaths[issue] = [author]
+        elif type(issueToPaths[issue][0]) is str:
+          if issueToPaths[issue][0] != author:
+            # uncommon case: upgrade string to set
+            issueToPaths[issue][0] = set(issueToPaths[issue][0])
+            issueToPaths[issue][0].add(author)
+        else:
+          # already a set
+          issueToPaths[issue][0].add(author)
     else:
       letter = line[0]
       if letter not in ('M', 'A', 'D', 'R'):
@@ -173,8 +181,9 @@ def parseLog(f=None):
       path = line[1:].strip()
       fixed = fixPath(path)
       if fixed is not None:
+        s = '%s:%s' % (letter, fixed)
         for issue in issues:
-          issueToPaths[issue].append((letter, fixed))
+          issueToPaths[issue].append(s)
 
   print('gitHistory: after parseLog maxRev=%s' % maxRev)
 

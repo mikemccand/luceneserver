@@ -405,6 +405,7 @@ def main():
         lastUpdate = now - datetime.timedelta(days=10)
     finally:
       db.close()
+      db = None
 
     first = False
     lastSuggestBuild = time.time()
@@ -477,6 +478,7 @@ def main():
           db.commit()
         finally:
           db.close()
+          db = None
         lastUpdate = now
         print('  %s: %d results of %d' % (startAt, numIssues, total))
         print('  %.1f sec to index' % (time.time()-t1))
@@ -488,7 +490,9 @@ def main():
       # Check for git commits every 30 minutes:
       if time.time() - lastGITBuild > 30*60 and anyUpdatesSinceGIT:
         lastGITBuild = time.time()
-        committedIssues = gitHistory.refresh()[1]
+        newIssueToCommitPaths, committedIssues = gitHistory.refresh()
+        # merge new git history into our in-memory version:
+        mergeIssueCommits(issueToCommitPaths, newIssueToCommitPaths)
         print('  update from git commits...')
         indexDocs(svr, specificIssues(committedIssues), printIssue=True)
         print('  done update from git commits...')
@@ -499,8 +503,27 @@ def main():
       if now - lastCommitTime > datetime.timedelta(days=1):
         commit(svr, now)
         lastCommitTime = now
-        
+
       time.sleep(30.0)
+
+def mergeIssueCommits(issueToCommitPaths, newIssueToCommitPaths):
+  for issue, ent in newIssueToCommitPaths.items():
+    old = issueToCommitPaths.get(issue)
+    if old is None:
+      issueToCommitPaths[issue] = ent
+    else:
+      # merge authors
+      s = old[0]
+      if type(s) is str:
+        s = set(s)
+      s2 = ent[0]
+      if type(s2) is str:
+        s2 = set(s2)
+      s.update(s2)
+      if len(s) == 1:
+        s = list(s)[0]
+      old[0] = s
+      old.extend(ent[1:])
 
 def buildFullSuggest(svr):
   print('Build suggest...')
@@ -743,7 +766,9 @@ def indexDocs(svr, issues, printIssue=False, updateSuggest=False):
     else:
       cps = []
       doc['committedBy'] = list(paths[0])
-      for letter, path in paths[1:]:
+      for path in paths[1:]:
+        i = path.find(':')
+        path = path[i+1:]
         cps.append(path.split('/'))
       doc['committedPaths'] = cps
       
