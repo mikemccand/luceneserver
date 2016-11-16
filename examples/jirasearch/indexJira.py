@@ -766,7 +766,11 @@ def indexDocs(svr, issues, printIssue=False, updateSuggest=False):
       pass
     else:
       cps = []
-      doc['committedBy'] = list(paths[0])
+      if type(paths[0]) is str:
+        authors = [paths[0]]
+      else:
+        authors = list(paths[0])
+      doc['committedBy'] = authors
       for path in paths[1:]:
         i = path.find(':')
         path = path[i+1:]
