@@ -169,8 +169,10 @@ def parseLog(f=None):
         elif type(issueToPaths[issue][0]) is str:
           if issueToPaths[issue][0] != author:
             # uncommon case: upgrade string to set
-            issueToPaths[issue][0] = set(issueToPaths[issue][0])
-            issueToPaths[issue][0].add(author)
+            s = set()
+            s.add(issueToPaths[issue][0])
+            s.add(author)
+            issueToPaths[issue][0] = s
         else:
           # already a set
           issueToPaths[issue][0].add(author)
