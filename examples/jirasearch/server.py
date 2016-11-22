@@ -177,9 +177,7 @@ def application(environ, startResponse):
       
 def main():
 
-  isDev = False
-
-  if isDev:
+  if False:
     import runServer
     svr = runServer.RunServer(localconstants.SERVER_PORT, localconstants.rootPath)
 
@@ -201,7 +199,7 @@ def main():
     else:
       port = int(sys.argv[idx+1])
 
-    httpd = wsgiref.simple_server.make_server('10.17.4.93', port, application)
+    httpd = wsgiref.simple_server.make_server('10.17.4.92', port, application)
 
     print('Ready on port %s' % port)
     httpd.serve_forever()

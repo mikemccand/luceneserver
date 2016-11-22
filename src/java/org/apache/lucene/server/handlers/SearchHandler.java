@@ -196,7 +196,8 @@ public class SearchHandler extends Handler {
 
   private final static Type BOOLEAN_OCCUR_TYPE = new EnumType("must", "Clause is required.",
                                                               "should", "Clause is optional.",
-                                                              "must_not", "Clause must not match.");
+                                                              "must_not", "Clause must not match.",
+                                                              "filter", "Clause is required but does not score");
 
   private final static WrapType FILTER_TYPE_WRAP = new WrapType();
   private final static WrapType QUERY_TYPE_WRAP = new WrapType();

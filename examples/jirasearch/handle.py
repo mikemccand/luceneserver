@@ -119,6 +119,8 @@ class JIRASpec(UISpec):
          'subQueries': l0
          }
     lowerText = text.lower()
+
+    l2 = []
     for field in ('summary', 'description', 'key', 'allUsers', 'otherText'):
       if field in ('summary', 'key'):
         boost = 3.0
@@ -130,13 +132,28 @@ class JIRASpec(UISpec):
       else:
         text0 = text
         
-      l0.append({'occur': 'should',
+      l2.append({'occur': 'should',
                  'query': {'class': 'text',
                            'boost': boost,
                            'field': field,
                            'text': text0}})
 
-    # Join each issue comment up:
+    # match parent fields only; make sure we only match parent docs
+    # with this part of the query:
+
+    l0.append(
+      {'occur': 'should',
+       'query': {'class': 'BooleanQuery',
+                 'disableCoord': True,
+                 'subQueries': [{'query': {'class': 'BooleanQuery',
+                                           'subQueries': l2},
+                                 'occur': 'must'},
+                                {'query': {'class': 'BooleanFieldQuery',
+                                           'field': 'parent'},
+                                 'occur': 'filter'}]}})
+
+    # Also match text fields on child docs (each comment on the issue)
+    # and Join up to the issue:
     l0.append({'occur': 'should',
                'query':
                  {'class': 'ToParentBlockJoinQuery',
@@ -842,7 +859,6 @@ def renderJiraHits(w, groups, userDrillDowns):
   for group in groups:
     fields = group['fields']
     key = fields['key'].upper()
-
     if fields['status'] in ('Open', 'Reopened', 'In Progress'):
       skey = key
     else:

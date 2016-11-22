@@ -111,6 +111,7 @@ def createSchema(svr):
                         {'input': ['oom', 'oome', 'OutOfMemory', 'OutOfMemoryError', 'OutOfMemoryException'], 'output': 'OutOfMemoryError'},
                         {'input': ['ir', 'IndexReader'], 'output': 'IndexReader'},
                         {'input': ['rob', 'robert'], 'output': 'robert'},
+                        {'input': ['mike', 'michael'], 'output': 'michael'},
                         {'input': ['npe', 'nullpointerexception'], 'output': 'npe'},
                         {'input': ['hilite', 'highlight'], 'output': 'highlight'},
                         {'input': ['iw', 'IndexWriter'], 'output': 'IndexWriter'},
