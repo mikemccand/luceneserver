@@ -411,9 +411,10 @@ def main():
 
     first = False
     lastSuggestBuild = time.time()
-    lastGITBuild = time.time()
+    lastGITBuild = 0
     lastCommit = time.time()
-    anyUpdatesSinceGIT = False
+    # Force a git refresh on startup:
+    anyUpdatesSinceGIT = True
 
     while True:
 
