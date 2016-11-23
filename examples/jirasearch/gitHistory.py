@@ -199,7 +199,7 @@ def refresh():
   cwd = os.getcwd()
   try:
     os.chdir(localconstants.LUCENE_TRUNK_GIT_CLONE)
-    if os.system('git fetch origin master') == 0:
+    if os.system('git pull origin master') == 0:
       s = os.popen('git log --reverse --name-status %s..HEAD' % maxRev).read()
       open(GIT_HISTORY_FILE, 'ab').write(s.encode('utf-8'))
       f = io.StringIO(s)
