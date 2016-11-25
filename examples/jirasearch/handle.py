@@ -851,14 +851,21 @@ def toAgo(seconds):
   else:
     return addUnit('%.1f' % (seconds/24/3600/365), 'year')
   
-def renderJiraHits(w, groups, userDrillDowns):
+def renderJiraHits(w, text, groups, userDrillDowns):
 
   now = int(time.time() + getUTCOffset())
+
+  lowerText = text.strip().lower().replace('-', ' ')
 
   # Each group is a Jira issue; each (child) doc is a comment on that issue
   for group in groups:
     fields = group['fields']
     key = fields['key'].upper()
+
+    # hack alert!  really i should index a separate text+highlight field for this...
+    if key.lower().replace('-', ' ') == lowerText:
+      key = '<b>%s</b>' % key
+    
     if fields['status'] in ('Open', 'Reopened', 'In Progress'):
       skey = key
     else:
@@ -1931,9 +1938,9 @@ def handleQuery(path, isMike, environ):
     if groupBy is not None:
       for group in result['groups']:
         renderGroupHeader(w, group, groupDDField, hitsPerGroup)
-        renderJiraHits(w, group['hits'], userDrillDowns)
+        renderJiraHits(w, text, group['hits'], userDrillDowns)
     else:
-      renderJiraHits(w, result['groups'], userDrillDowns)
+      renderJiraHits(w, text, result['groups'], userDrillDowns)
 
     #w('</div>')
     w('</table>')

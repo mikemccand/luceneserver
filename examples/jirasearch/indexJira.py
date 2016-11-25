@@ -97,9 +97,12 @@ def createSchema(svr):
   svr.send('startIndex', {'indexName': 'jira'})
 
   analyzer = {
+    'charFilters': [{'class': 'Mapping',
+                     'mappingFileContents': '"LUCENE-" => "LUCENE"\n"lucene-" => "lucene"\n"SOLR-" => "SOLR"\n"solr-" => "solr"\n"INFRA-" => "INFRA"\n"infra-" => "infra"'}],
     'tokenizer': ICU_TOKENIZER_KEEP_ISSUES,
     'tokenFilters': ['EnglishPossessive',
                      {'class': 'WordDelimiter',
+                      'splitOnNumerics': 0,
                       'preserveOriginal': 1},
                      'LowerCase',
                      {'class': 'Synonym',
@@ -133,7 +136,7 @@ def createSchema(svr):
                      'EnglishMinimalStem']}
 
   #print('TOKENS')
-  #prettyPrintJSON(svr.send('analyze', {'analyzer': analyzer, 'indexName': 'jira', 'text': 'AnalyzingInfixSuggester'}))
+  #prettyPrintJSON(svr.send('analyze', {'analyzer': analyzer, 'indexName': 'jira', 'text': 'foo LUCENE-444 lucene-1123 AnalyzingInfixSuggester'}))
 
   fields = {'key': {'type': 'atom',
                     'sort': True,
