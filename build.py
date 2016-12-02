@@ -24,8 +24,8 @@ deps = [
 
 testDeps = [
   ('de.thetaphi', 'forbiddenapis', '2.2'),
-  ('com.carrotsearch.randomizedtesting', 'junit4-ant', '2.0.13'),
-  ('com.carrotsearch.randomizedtesting', 'randomizedtesting-runner', '2.3.4'),
+  ('com.carrotsearch.randomizedtesting', 'junit4-ant', '2.4.0'),
+  ('com.carrotsearch.randomizedtesting', 'randomizedtesting-runner', '2.4.0'),
   ('junit', 'junit', '4.10')
   ]
   
@@ -185,7 +185,7 @@ class RunTestsJVM(threading.Thread):
                 s = s[:s.find('(')]
                 message('\nNOTE: test case done: %.3f sec for %s\n' % (event[1]['executionTime']/1000., s))
             elif event[0] in ('TEST_FAILURE', 'SUITE_FAILURE'):
-              details = event[1]['failure']
+              details = event[1]
               s = '\n!! %s.%s FAILED !!:\n\n' % (job[25:], testCaseName)
               s += ''.join(pendingOutput)
               if 'message' in details:
@@ -199,7 +199,8 @@ class RunTestsJVM(threading.Thread):
             elif event[0] == 'TEST_STARTED':
               self.testCount += 1
               testCaseFailed = False
-              testCaseName = event[1]['description']
+              #testCaseName = event[1]['description']
+              testCaseName = event[1]
               i = testCaseName.find('#')
               j = testCaseName.find('(')
               testCaseName = testCaseName[i+1:j]

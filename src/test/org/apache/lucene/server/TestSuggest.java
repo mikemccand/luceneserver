@@ -61,7 +61,7 @@ public class TestSuggest extends ServerBaseTestCase {
     out.write("5\u001fthe time is now\u001ffoobar\n");
     out.close();
 
-    JSONObject result = send("buildSuggest", "{source: {localFile: '" + tempFile.toAbsolutePath() + "'}, class: 'AnalyzingSuggester', suggestName: 'suggest', indexAnalyzer: EnglishAnalyzer, queryAnalyzer: {tokenizer: Standard, tokenFilters: [EnglishPossessive, LowerCase, PorterStem]]}}");
+    JSONObject result = send("buildSuggest", "{source: {localFile: '" + tempFile.toAbsolutePath() + "', hasContexts: false}, class: 'AnalyzingSuggester', suggestName: 'suggest', indexAnalyzer: EnglishAnalyzer, queryAnalyzer: {tokenizer: Standard, tokenFilters: [EnglishPossessive, LowerCase, PorterStem]]}}");
     assertEquals(5, result.get("count"));
     //commit();
 
@@ -203,7 +203,7 @@ public class TestSuggest extends ServerBaseTestCase {
     out.write("15\u001flove lost\u001ffoobar\n");
     out.close();
 
-    JSONObject result = send("buildSuggest", "{source: {localFile: '" + tempFile.toAbsolutePath() + "'}, class: 'FuzzySuggester', suggestName: 'suggest3', analyzer: {tokenizer: Whitespace, tokenFilters: [LowerCase]}}");
+    JSONObject result = send("buildSuggest", "{source: {localFile: '" + tempFile.toAbsolutePath() + "', hasContexts: false}, class: 'FuzzySuggester', suggestName: 'suggest3', analyzer: {tokenizer: Whitespace, tokenFilters: [LowerCase]}}");
     assertEquals(1, result.get("count"));
     //commit();
 

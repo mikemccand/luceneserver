@@ -29,11 +29,13 @@ import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.FromFileTermFreqIterator;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
+import org.apache.lucene.server.params.BooleanType;
 import org.apache.lucene.server.params.Param;
 import org.apache.lucene.server.params.Request;
 import org.apache.lucene.server.params.StringType;
 import org.apache.lucene.server.params.StructType;
 import org.apache.lucene.util.BytesRef;
+
 import net.minidev.json.JSONObject;
 
 /** Handles {@code updateSuggest}. */
@@ -47,7 +49,8 @@ public class UpdateSuggestHandler extends Handler {
         // nocommit also allow pulling from index/expressions, like BuildSuggest:
         new Param("source", "Where to get suggestions from",
             new StructType(
-                new Param("localFile", "Local file (to the server) to read suggestions + weights from; format is weight U+001F suggestion U+001F payload, one per line, with suggestion UTF-8 encoded.  If this option is used then searcher, suggestField, weightField/Expression, payloadField should not be specified.", new StringType()))));
+                           new Param("localFile", "Local file (to the server) to read suggestions + weights from; format is weight U+001F suggestion U+001F payload, one per line, with suggestion UTF-8 encoded.  If this option is used then searcher, suggestField, weightField/Expression, payloadField should not be specified.", new StringType()),
+                           new Param("hasContexts", "True if this suggester file provides contexts", new BooleanType(), true))));
 
   /** Sole constructor. */
   public UpdateSuggestHandler(GlobalState state) {
@@ -80,13 +83,14 @@ public class UpdateSuggestHandler extends Handler {
 
     Request r2 = r.getStruct("source");
     final File localFile = new File(r2.getString("localFile"));
+    final boolean hasContexts = r2.getBoolean("hasContexts");
 
     return new FinishRequest() {
 
       @Override
       public String finish() throws IOException {
 
-        InputIterator iterator = new FromFileTermFreqIterator(localFile);
+        InputIterator iterator = new FromFileTermFreqIterator(localFile, hasContexts);
         boolean hasPayloads = iterator.hasPayloads();
         int count = 0;
         while (true) {

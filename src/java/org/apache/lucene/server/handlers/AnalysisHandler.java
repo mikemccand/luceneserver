@@ -42,7 +42,7 @@ public class AnalysisHandler extends Handler {
   private final static StructType TYPE = new StructType(
                                                         new Param("indexName", "Index Name", new StringType()),
                                                         new Param("text", "Text to analyze", new StringType()),
-                                                        new Param("analyzer", "Analyzer", RegisterFieldHandler.ANALYZER_TYPE));
+                                                        new Param("analyzer", "Analyzer", RegisterFieldsHandler.ANALYZER_TYPE));
 
   /** Sole constructor. */
   public AnalysisHandler(GlobalState state) {
@@ -64,7 +64,7 @@ public class AnalysisHandler extends Handler {
     final String text = r.getString("text");
 
     // TODO: allow passing field name in, and we use its analyzer?
-    final Analyzer a = RegisterFieldHandler.getAnalyzer(state, r, "analyzer");
+    final Analyzer a = RegisterFieldsHandler.getAnalyzer(state, r, "analyzer");
 
     return new FinishRequest() {
       @Override

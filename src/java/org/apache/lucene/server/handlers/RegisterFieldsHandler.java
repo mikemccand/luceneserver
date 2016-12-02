@@ -106,10 +106,8 @@ import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 import net.minidev.json.JSONValue;
 
-// nocommit rename to RegisterFieldsHandler:
-
 /** Handles {@code registerFields}. */
-public class RegisterFieldHandler extends Handler {
+public class RegisterFieldsHandler extends Handler {
 
   private final static List<Object> DEFAULT_ENGLISH_STOP_WORDS = new ArrayList<Object>();
   static {
@@ -347,7 +345,7 @@ public class RegisterFieldHandler extends Handler {
             new StructType(new Param("*", "Register this field name with the provided type.  Note that the field name must be of the form [a-zA-Z_][a-zA-Z_0-9]*.  You can register multiple fields in one request.", FIELD_TYPE))));
 
   /** Sole constructor. */
-  public RegisterFieldHandler(GlobalState state) {
+  public RegisterFieldsHandler(GlobalState state) {
     super(state);
   }
 
@@ -450,11 +448,9 @@ public class RegisterFieldHandler extends Handler {
     boolean sorted = f.getBoolean("sort");
     boolean grouped = f.getBoolean("group");
 
-    boolean stored;
+    Boolean stored = null;
     if (f.hasParam("store")) {
       stored = f.getBoolean("store");
-    } else {
-      stored = false;
     }
 
     // TODO: current we only highlight using
@@ -481,6 +477,13 @@ public class RegisterFieldHandler extends Handler {
       }
     }
 
+    // if stored was unspecified and we are highlighting, turn it on:
+    if (highlighted) {
+      if (stored == null) {
+        stored = true;
+      }
+    }
+    
     String dateTimeFormat = null;
 
     // System.out.println("NAME: " + name + " type: " + type + " hightlight: " + highlighted);
@@ -498,7 +501,9 @@ public class RegisterFieldHandler extends Handler {
         ft.setDocValuesType(DocValuesType.BINARY);
       }
       if (highlighted) {
-        stored = true;
+        if (stored == false) {
+          f.fail("store", "store=false is not allowed when highlight=true");
+        }
         ft.setStored(true);
         ft.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
       } else {
@@ -510,7 +515,16 @@ public class RegisterFieldHandler extends Handler {
       if (f.hasParam("analyzer")) {
         f.fail("analyzer", "no analyzer allowed with atom (it's hardwired to KeywordAnalyzer internally)");
       }
-      ft.setIndexOptions(IndexOptions.DOCS);
+      if (highlighted) {
+        if (stored == false) {
+          f.fail("store", "store=false is not allowed when highlight=true");
+        }
+        // nocommit need test highlighting atom fields
+        ft.setStored(true);
+        ft.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
+      } else {
+        ft.setIndexOptions(IndexOptions.DOCS);
+      }
       ft.setOmitNorms(true);
       ft.setTokenized(false);
       if (sorted || grouped) {
@@ -575,7 +589,7 @@ public class RegisterFieldHandler extends Handler {
       break;
       
     case LAT_LON:
-      if (stored) {
+      if (stored == Boolean.TRUE) {
         f.fail("stored", "latlon fields cannot be stored");
       }
       ft.setDimensions(2, Integer.BYTES);
@@ -613,14 +627,10 @@ public class RegisterFieldHandler extends Handler {
       throw new AssertionError("unhandled type \"" + type + "\"");
     }
 
-    // System.out.println("REGISTER: " + name + " ft=" + ft);
-
     // nocommit InetAddressPoint, BiggishInteger
 
-    if (stored) {
+    if (stored == Boolean.TRUE) {
       ft.setStored(true);
-    } else if (highlighted) {
-      f.fail("store", "store=false is not allowed when highlight=true");
     }
 
     boolean usePoints = false;

@@ -92,7 +92,7 @@ import org.apache.lucene.search.suggest.Lookup;
 import org.apache.lucene.search.suggest.analyzing.AnalyzingInfixSuggester;
 import org.apache.lucene.server.handlers.BuildSuggestHandler;
 import org.apache.lucene.server.handlers.LiveSettingsHandler;
-import org.apache.lucene.server.handlers.RegisterFieldHandler;
+import org.apache.lucene.server.handlers.RegisterFieldsHandler;
 import org.apache.lucene.server.handlers.SettingsHandler;
 import org.apache.lucene.server.params.BooleanType;
 import org.apache.lucene.server.params.FloatType;
@@ -798,8 +798,8 @@ public class IndexState implements Closeable {
       JSONObject fieldsState = (JSONObject) o.get("fields");
       JSONObject top = new JSONObject();
       top.put("fields", fieldsState);
-      Request r = new Request(null, null, top, RegisterFieldHandler.TYPE);
-      FinishRequest fr = ((RegisterFieldHandler) globalState.getHandler("registerFields")).handle(this, r, null);
+      Request r = new Request(null, null, top, RegisterFieldsHandler.TYPE);
+      FinishRequest fr = ((RegisterFieldsHandler) globalState.getHandler("registerFields")).handle(this, r, null);
       assert !Request.anythingLeft(top): top;
       fr.finish();
 

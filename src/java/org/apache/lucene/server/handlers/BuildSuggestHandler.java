@@ -63,7 +63,7 @@ import net.minidev.json.JSONObject;
 import net.minidev.json.JSONValue;
 import net.minidev.json.parser.ParseException;
 
-import static org.apache.lucene.server.handlers.RegisterFieldHandler.ANALYZER_TYPE;
+import static org.apache.lucene.server.handlers.RegisterFieldsHandler.ANALYZER_TYPE;
 
 /** Handles {@code buildSuggest}. */
 public class BuildSuggestHandler extends Handler {
@@ -103,6 +103,7 @@ public class BuildSuggestHandler extends Handler {
         new Param("source", "Where to get suggestions from",
             new StructType(
                   new Param("localFile", "Local file (to the server) to read suggestions + weights from; format is weight U+001F suggestion U+001F payload, one per line, with suggestion UTF-8 encoded.  If this option is used then searcher, suggestField, weightField/Expression, payloadField should not be specified.", new StringType()),
+                  new Param("hasContexts", "True if this file provides per-suggestion contexts.", new BooleanType(), true),
                   new Param("searcher", "Specific searcher version to use for pull suggestions to build.  There are three different ways to specify a searcher version.",
                             SearchHandler.SEARCHER_VERSION_TYPE),
                   new Param("suggestField", "Field (from stored documents) containing the suggestion text", new StringType()),
@@ -142,6 +143,7 @@ public class BuildSuggestHandler extends Handler {
       Request source = r.getStruct("source");
       if (source.hasParam("localFile")) {
         source.getString("localFile");
+        source.getBoolean("hasContexts");
       } else {
         Request searcher = source.getStruct("searcher");
         if (searcher.hasParam("indexGen")) {
@@ -198,10 +200,10 @@ public class BuildSuggestHandler extends Handler {
     // nocommit allow passing a field name, and we use that
     // field name's analyzer?
     if (r.hasParam("analyzer")) {
-      indexAnalyzer = queryAnalyzer = RegisterFieldHandler.getAnalyzer(indexState, r, "analyzer");
+      indexAnalyzer = queryAnalyzer = RegisterFieldsHandler.getAnalyzer(indexState, r, "analyzer");
     } else {
-      indexAnalyzer = RegisterFieldHandler.getAnalyzer(indexState, r, "indexAnalyzer");
-      queryAnalyzer = RegisterFieldHandler.getAnalyzer(indexState, r, "queryAnalyzer");
+      indexAnalyzer = RegisterFieldsHandler.getAnalyzer(indexState, r, "indexAnalyzer");
+      queryAnalyzer = RegisterFieldsHandler.getAnalyzer(indexState, r, "queryAnalyzer");
     }
     if (indexAnalyzer == null) {
       r.fail("analyzer", "analyzer or indexAnalyzer must be specified");
@@ -420,10 +422,11 @@ public class BuildSuggestHandler extends Handler {
       if (!localFile.canRead()) {
         r.fail("localFile", "cannot read file");
       }
+      boolean hasContexts = source.getBoolean("hasContexts");
       searcher = null;
       // Pull suggestions from local file:
       try {
-        iterator = new FromFileTermFreqIterator(localFile);
+        iterator = new FromFileTermFreqIterator(localFile, hasContexts);
       } catch (IOException ioe) {
         r.fail("localFile", "cannot open file", ioe);
       }

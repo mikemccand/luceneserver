@@ -35,6 +35,7 @@ public class FromFileTermFreqIterator implements InputIterator, Closeable {
   private final BufferedReader reader;
   private long weight;
   private int lineCount;
+  final boolean hasContexts;
 
   /** How many suggestions were found. */
   public int suggestCount;
@@ -43,13 +44,14 @@ public class FromFileTermFreqIterator implements InputIterator, Closeable {
   private final Set<BytesRef> contexts = new HashSet<>();
 
   /** Sole constructor. */
-  public FromFileTermFreqIterator(File sourceFile) throws IOException {
+  public FromFileTermFreqIterator(File sourceFile, boolean hasContexts) throws IOException {
     reader = new BufferedReader(new InputStreamReader(new FileInputStream(sourceFile), "UTF-8"), 65536);
+    this.hasContexts = hasContexts;
   }
 
   @Override
   public boolean hasContexts() {
-    return true;
+    return hasContexts;
   }
 
   @Override
@@ -93,25 +95,25 @@ public class FromFileTermFreqIterator implements InputIterator, Closeable {
 
       int spot3 = line.indexOf('\u001f', spot2+1);
       if (spot3 == -1) {
-        throw new RuntimeException("line " + lineCount + " is malformed");
-      }
-      
-      extra = new BytesRef(line.substring(spot2+1, spot3));
+        extra = new BytesRef(line.substring(spot2+1));
+      } else {
+        extra = new BytesRef(line.substring(spot2+1, spot3));
 
-      contexts.clear();
+        contexts.clear();
       
-      int upto = spot3+1;
-      while (true ){
-        int nextUpto = line.indexOf('\u001f', upto);
-        if (nextUpto == -1) {
-          contexts.add(new BytesRef(line.substring(upto)));
-          break;
-        } else {
-          contexts.add(new BytesRef(line.substring(upto, nextUpto)));
-          upto = nextUpto+1;
+        int upto = spot3+1;
+        while (true) {
+          int nextUpto = line.indexOf('\u001f', upto);
+          if (nextUpto == -1) {
+            contexts.add(new BytesRef(line.substring(upto)));
+            break;
+          } else {
+            contexts.add(new BytesRef(line.substring(upto, nextUpto)));
+            upto = nextUpto+1;
+          }
         }
+        //System.out.println("CONTEXTS: " + text.utf8ToString() + " -> " + contexts);
       }
-      //System.out.println("CONTEXTS: " + text.utf8ToString() + " -> " + contexts);
 
       return text;
     }
