@@ -98,7 +98,7 @@ public class BulkAddDocumentsHandler extends Handler {
       throw new IllegalArgumentException("indexName should be string");
     }
 
-    IndexState indexState = globalState.get(parser.getText());
+    IndexState indexState = globalState.getIndex(parser.getText());
     indexState.verifyStarted(null);
     if (parser.nextToken() != JsonToken.FIELD_NAME) {
       throw new IllegalArgumentException("expected documents next");

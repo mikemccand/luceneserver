@@ -74,7 +74,6 @@ public class BulkCSVAddDocumentHandler extends Handler {
     private final ShardState shardState;
     private final FieldDef[] fields;
     private final byte[] bytes;
-    private final Semaphore semaphore;
 
     /** Byte starting offset of our chunk in the total incoming byte stream; we use this to locate errors */
     private final long globalOffset;
@@ -90,7 +89,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
     private final byte delimChar;
     
     public ParseAndIndexOneChunk(byte delimChar, long globalOffset, ShardState.IndexingContext ctx, ParseAndIndexOneChunk prev, ShardState shardState,
-                                 FieldDef[] fields, byte[] bytes, Semaphore semaphore) throws InterruptedException {
+                                 FieldDef[] fields, byte[] bytes) throws InterruptedException {
       this.delimChar = delimChar;
       this.ctx = ctx;
       ctx.inFlightChunks.register();
@@ -98,25 +97,22 @@ public class BulkCSVAddDocumentHandler extends Handler {
       this.shardState = shardState;
       this.fields = fields;
       this.bytes = bytes;
-      this.semaphore = semaphore;
       this.globalOffset = globalOffset;
-      // nocommit only one semaphore!!  GlobalState also has its own
-      semaphore.acquire();
     }
 
     /** Indexes the one document that spans across the end of our chunk.  This is invoked when the chunk after us first starts, or when we
      *  finish processing all whole docs in our chunk, whichever comes last. */
-    private void indexSplitDoc() {
+    private void indexSplitDoc() throws InterruptedException {
       try {
         _indexSplitDoc();
       } finally {
-        semaphore.release();
+        shardState.finishIndexingChunk();
         shardState.indexState.globalState.indexingJobsRunning.release();
         ctx.inFlightChunks.arrive();
       }
     }
         
-    private void _indexSplitDoc() {
+    private void _indexSplitDoc() throws InterruptedException {
       if (endFragmentStartOffset == -2) {
         assert prev != null;
         // nocommit for very large docs this glueing together is O(N^2) ... fix this to be a List<char[]> instead:
@@ -171,7 +167,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
     }
 
     /** The chunk after us calls this with its prefix fragment */
-    public synchronized void setNextStartFragment(byte[] bytes, int offset, int length) {
+    public synchronized void setNextStartFragment(byte[] bytes, int offset, int length) throws InterruptedException {
       if (nextStartFragment != null) {
         throw new IllegalStateException("setNextStartFragment was already called");
       }
@@ -184,7 +180,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
       }
     }
 
-    private synchronized void setEndFragment(int offset) {
+    private synchronized void setEndFragment(int offset) throws InterruptedException {
       endFragmentStartOffset = offset;
       if (nextStartFragment != null) {
         indexSplitDoc();
@@ -202,7 +198,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
       }
     }
 
-    private void _run() {
+    private void _run() throws InterruptedException {
 
       // find the start of our first document:
       int upto;
@@ -347,7 +343,7 @@ public class BulkCSVAddDocumentHandler extends Handler {
       } else if (b == CSVParser.NEWLINE) {
         if (indexState == null) {
           String indexName = curField.toString();
-          indexState = globalState.get(indexName);
+          indexState = globalState.getIndex(indexName);
           if (indexState.isStarted() == false) {
             throw new IllegalArgumentException("index \"" + indexName + "\" isn't started: cannot index documents");
           }
@@ -362,8 +358,6 @@ public class BulkCSVAddDocumentHandler extends Handler {
       }
     }
 
-    ShardState shardState = indexState.getShard(0);
-
     FieldDef[] fields = fieldsList.toArray(new FieldDef[fieldsList.size()]);
 
     IndexingContext ctx = new IndexingContext();
@@ -372,9 +366,6 @@ public class BulkCSVAddDocumentHandler extends Handler {
     // nocommit tune this .. core count?
 
     // Use this to limit how many in-flight 256 KB chunks we allow into the JVM at once:
-
-    // nocommit this should be in GlobalState so it's across all incoming indexing:
-    Semaphore semaphore = new Semaphore(64);
 
     boolean done = false;
 
@@ -388,6 +379,8 @@ public class BulkCSVAddDocumentHandler extends Handler {
     ParseAndIndexOneChunk prev = null;
     int phase = ctx.inFlightChunks.getPhase();
 
+    ShardState lastShardState = null;
+
     while (done == false && ctx.getError() == null) {
       int count = in.read(buffer, bufferUpto, buffer.length-bufferUpto);
       if (count == -1 || bufferUpto + count == buffer.length) {
@@ -399,8 +392,10 @@ public class BulkCSVAddDocumentHandler extends Handler {
           System.arraycopy(buffer, 0, realloc, 0, bufferUpto);
           buffer = realloc;
         }
-        // NOTE: This ctor will stall when it tries to acquire the semaphore if we already have too many in-flight indexing chunks:
-        prev = new ParseAndIndexOneChunk(delimChar, globalOffset, ctx, prev, shardState, fields, buffer, semaphore);
+        lastShardState = indexState.getWritableShard();
+        prev = new ParseAndIndexOneChunk(delimChar, globalOffset, ctx, prev, lastShardState, fields, buffer);
+
+        // NOTE: This will stall when it tries to acquire the global state semaphore if we already have too many in-flight indexing chunks:
         globalState.submitIndexingTask(prev);
         if (count == -1) {
           // the end
@@ -434,7 +429,8 @@ public class BulkCSVAddDocumentHandler extends Handler {
       out.writeBytes(bytes, 0, bytes.length);
     } else {
       JSONObject o = new JSONObject();
-      o.put("indexGen", shardState.writer.getMaxCompletedSequenceNumber());
+      // nocommit how to do sequence number across shards?
+      o.put("indexGen", lastShardState.writer.getMaxCompletedSequenceNumber());
       o.put("indexedDocumentCount", ctx.addCount.get());
 
       byte[] bytes = o.toString().getBytes(StandardCharsets.UTF_8);

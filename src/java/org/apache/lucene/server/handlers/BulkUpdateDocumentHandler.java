@@ -104,7 +104,7 @@ public class BulkUpdateDocumentHandler extends Handler {
       throw new IllegalArgumentException("indexName should be string");
     }
 
-    IndexState indexState = globalState.get(parser.getText());
+    IndexState indexState = globalState.getIndex(parser.getText());
     indexState.verifyStarted(null);
 
     ShardState shardState = indexState.getShard(0);

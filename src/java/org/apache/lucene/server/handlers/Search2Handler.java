@@ -209,7 +209,7 @@ public class Search2Handler extends Handler {
   }
 
   @Override
-  public FinishRequest handle(final IndexState state, final Request r, Map<String,List<String>> params) throws Exception {
+  public FinishRequest handle(final IndexState ignored, final Request r, Map<String,List<String>> params) throws Exception {
 
     String queryText = r.getString("queryText");
 
@@ -218,27 +218,30 @@ public class Search2Handler extends Handler {
     long t0 = System.nanoTime();
 
     for(Object _indexName : r.getList("indexNames")) {
-
       String indexName = (String) _indexName;
-
-      // Assign a unique ID for this query + indexName
-      QueryID queryID = new QueryID();
-
-      queryIDs.add(queryID);
+      IndexState indexState = globalState.getIndex(indexName);
 
       // Enroll the query in the distributed queue:
-      globalState.searchQueue.addNewQuery(queryID, indexName, 0, queryText, globalState.nodeID);
+      for(Integer shardOrd : indexState.shards.keySet()) {
+      // Assign a unique ID for this query + index + shard
+        QueryID queryID = new QueryID();
+        queryIDs.add(queryID);
+        globalState.searchQueue.addNewQuery(queryID, indexName, shardOrd, queryText, globalState.nodeID);
+      }
 
       // nocommit move this into addNewQuery
+      /*
       for(RemoteNodeConnection node : globalState.remoteNodes) {
         synchronized(node.c) {
           node.c.out.writeByte(NodeToNodeHandler.CMD_NEW_QUERY);
           node.c.out.writeBytes(queryID.id, 0, queryID.id.length);
+          // nocommit must send shard too:
           node.c.out.writeString(indexName);
           node.c.out.writeString(queryText);
           node.c.flush();
         }
       }
+      */
     }
 
     // TODO: we could let "wait for results" be optional here:

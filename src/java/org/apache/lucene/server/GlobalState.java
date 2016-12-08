@@ -53,6 +53,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.lucene.facet.taxonomy.SearcherTaxonomyManager.SearcherAndTaxonomy;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TimeLimitingCollector;
@@ -168,12 +169,14 @@ public class GlobalState implements Closeable {
           }
           //System.out.println("N" + StringHelper.idToString(nodeID) + ": run query Q" + query.id);
 
-          IndexState indexState = get(query.indexName);
+          IndexState indexState = getIndex(query.indexName);
           ShardState shardState = indexState.getShard(query.shardOrd);
           SearcherAndTaxonomy searcher = shardState.acquire();
+          shardState.slm.record(searcher.searcher);
+          System.out.println("searcher for " + shardState);
           TopDocs hits;
           try {
-            hits = searcher.searcher.search(new TermQuery(new Term("title", query.text)), 10);
+            hits = searcher.searcher.search(new MatchAllDocsQuery(), 10);
           } finally {
             shardState.release(searcher);
           }
@@ -282,8 +285,7 @@ public class GlobalState implements Closeable {
   }
 
   /** Get the {@link IndexState} by index name. */
-  // nocommit rename to getIndex
-  public IndexState get(String name) throws IOException {
+  public IndexState getIndex(String name) throws IOException {
     synchronized(indices) {
       IndexState state = indices.get(name);
       if (state == null) {

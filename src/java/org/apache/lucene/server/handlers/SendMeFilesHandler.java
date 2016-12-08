@@ -68,7 +68,7 @@ public class SendMeFilesHandler extends Handler {
   public void handleBinary(InputStream streamIn, DataInput in, DataOutput out, OutputStream streamOut) throws Exception {
     // which index we will send files from
     String indexName = in.readString();
-    IndexState indexState = globalState.get(indexName);
+    IndexState indexState = globalState.getIndex(indexName);
     ShardState shardState = indexState.getShard(0);
 
     // TODO: we could also allow replica to copy files from another replica, or a peer-to-peer multicast, or something?

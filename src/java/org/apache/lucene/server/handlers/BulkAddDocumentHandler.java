@@ -90,7 +90,7 @@ public class BulkAddDocumentHandler extends Handler {
     /** Shared context across all docs being indexed in this one stream */
     private final ShardState.IndexingContext ctx;
     
-    private final IndexState indexState;
+    private final ShardState shardState;
     private final char[] chars;
     private final Semaphore semaphore;
     private final AddDocumentHandler addDocHandler;
@@ -107,12 +107,12 @@ public class BulkAddDocumentHandler extends Handler {
     private int nextStartFragmentOffset;
     private int nextStartFragmentLength;
     
-    public ParseAndIndexOneChunk(long globalOffset, ShardState.IndexingContext ctx, ParseAndIndexOneChunk prev, IndexState indexState,
+    public ParseAndIndexOneChunk(long globalOffset, ShardState.IndexingContext ctx, ParseAndIndexOneChunk prev, ShardState shardState,
                                  char[] chars, Semaphore semaphore, AddDocumentHandler addDocHandler) throws InterruptedException {
       this.ctx = ctx;
       ctx.inFlightChunks.register();
       this.prev = prev;
-      this.indexState = indexState;
+      this.shardState = shardState;
       this.chars = chars;
       this.semaphore = semaphore;
       this.globalOffset = globalOffset;
@@ -128,7 +128,7 @@ public class BulkAddDocumentHandler extends Handler {
       } finally {
         // nocommit only one semaphore!!
         semaphore.release();
-        indexState.globalState.indexingJobsRunning.release();
+        shardState.indexState.globalState.indexingJobsRunning.release();
         ctx.inFlightChunks.arrive();
       }
     }
@@ -148,7 +148,6 @@ public class BulkAddDocumentHandler extends Handler {
         return;
       }
       
-      ShardState shardState = indexState.getShard(0);
       int endFragmentLength = chars.length - endFragmentStartOffset;
       if (endFragmentLength + nextStartFragmentLength > 0) {
         char[] allChars = new char[endFragmentLength + nextStartFragmentLength];
@@ -166,16 +165,16 @@ public class BulkAddDocumentHandler extends Handler {
         Document doc = new Document();
                       
         try {
-          addDocHandler.parseFields(indexState, doc, parser);
+          addDocHandler.parseFields(shardState.indexState, doc, parser);
         } catch (Throwable t) {
           ctx.setError(t);
           return;
         }
 
         ctx.addCount.incrementAndGet();
-        if (indexState.hasFacets()) {
+        if (shardState.indexState.hasFacets()) {
           try {
-            doc = indexState.facetsConfig.build(shardState.taxoWriter, doc);
+            doc = shardState.indexState.facetsConfig.build(shardState.taxoWriter, doc);
           } catch (IOException ioe) {
             ctx.setError(new RuntimeException("document at offset " + (globalOffset + parser.getCurrentLocation().getCharOffset()) + " hit exception building facets", ioe));
             return;
@@ -229,8 +228,6 @@ public class BulkAddDocumentHandler extends Handler {
 
     private void _run() {
 
-      ShardState shardState = indexState.getShard(0);
-
       // find the start of our first document:
       int upto;
       if (prev != null) {
@@ -272,7 +269,7 @@ public class BulkAddDocumentHandler extends Handler {
 
                 // now parse & index whole documents:
 
-                final boolean hasFacets = indexState.hasFacets();
+                final boolean hasFacets = shardState.indexState.hasFacets();
 
                 return new Iterator<Document>() {
                   private Document nextDoc;
@@ -310,7 +307,7 @@ public class BulkAddDocumentHandler extends Handler {
 
                       nextDoc = new Document();
                       try {
-                        addDocHandler.parseFields(indexState, nextDoc, parser);
+                        addDocHandler.parseFields(shardState.indexState, nextDoc, parser);
                       } catch (Throwable t) {
                         nextSet = true;
                         nextDoc = null;
@@ -322,7 +319,7 @@ public class BulkAddDocumentHandler extends Handler {
                       ctx.addCount.incrementAndGet();
                       if (hasFacets) {
                         try {
-                          nextDoc = indexState.facetsConfig.build(shardState.taxoWriter, nextDoc);
+                          nextDoc = shardState.indexState.facetsConfig.build(shardState.taxoWriter, nextDoc);
                         } catch (IOException ioe) {
                           nextSet = true;
                           nextDoc = null;
@@ -385,8 +382,7 @@ public class BulkAddDocumentHandler extends Handler {
     String indexName = params.get("indexName").get(0);
 
     // Make sure the index does in fact exist
-    IndexState indexState = globalState.get(indexName);
-    ShardState shardState = indexState.getShard(0);
+    IndexState indexState = globalState.getIndex(indexName);
 
     // Make sure the index is started:
     if (indexState.isStarted() == false) {
@@ -415,6 +411,8 @@ public class BulkAddDocumentHandler extends Handler {
 
     AddDocumentHandler addDocHandler = (AddDocumentHandler) globalState.getHandler("addDocument");
 
+    ShardState lastShardState = null;
+
     while (done == false && ctx.getError() == null) {
       int count = reader.read(buffer, bufferUpto, buffer.length-bufferUpto);
       if (count == -1 || bufferUpto + count == buffer.length) {
@@ -426,7 +424,8 @@ public class BulkAddDocumentHandler extends Handler {
           buffer = realloc;
         }
         // NOTE: This ctor will stall when it tries to acquire the semaphore if we already have too many in-flight indexing chunks:
-        prev = new ParseAndIndexOneChunk(globalOffset, ctx, prev, indexState, buffer, semaphore, addDocHandler);
+        lastShardState = indexState.getWritableShard();
+        prev = new ParseAndIndexOneChunk(globalOffset, ctx, prev, lastShardState, buffer, semaphore, addDocHandler);
         globalState.submitIndexingTask(prev);
         if (count == -1) {
           // the end
@@ -458,7 +457,8 @@ public class BulkAddDocumentHandler extends Handler {
       return null;
     } else {
       JSONObject o = new JSONObject();
-      o.put("indexGen", shardState.writer.getMaxCompletedSequenceNumber());
+      // nocommit how to handle this across shards?  we must re-base the sequence numbers ourself?
+      o.put("indexGen", lastShardState.writer.getMaxCompletedSequenceNumber());
       o.put("indexedDocumentCount", ctx.addCount.get());
       return o.toString();
     }

@@ -34,6 +34,7 @@ import org.apache.lucene.server.params.Request;
 import org.apache.lucene.server.params.StringType;
 import org.apache.lucene.server.params.StructType;
 
+import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 
 /** Handles {@code stats}. */
@@ -58,41 +59,56 @@ public class StatsHandler extends Handler {
 
   @Override
   public FinishRequest handle(final IndexState indexState, final Request r, Map<String,List<String>> params) throws Exception {
-    final ShardState shardState = indexState.getShard(0);
     return new FinishRequest() {
       @Override
       public String finish() throws IOException {
         JSONObject result = new JSONObject();
-        final JSONObject searchers = new JSONObject();
-        result.put("searchers", searchers);
+        JSONArray shards = new JSONArray();
+        result.put("shards", shards);
+        for(Map.Entry<Integer,ShardState> ent : indexState.shards.entrySet()) {
+          ShardState shardState = ent.getValue();
+          JSONObject shard = new JSONObject();
+          shards.add(shard);
+          shard.put("ord", ent.getKey());
+          shard.put("maxDoc", shardState.maxDoc());
 
-        // TODO: snapshots
+          final JSONObject searchers = new JSONObject();
+          shard.put("searchers", searchers);
 
-        // TODO: go per segment and print more details, and
-        // only print segment for a given searcher if it's
-        // "new"
+          // TODO: snapshots
 
-        // Doesn't actually prune; just gathers stats
-        shardState.slm.prune(new SearcherLifetimeManager.Pruner() {
-            @Override
-            public boolean doPrune(double ageSec, IndexSearcher searcher) {
-              JSONObject s = new JSONObject();
-              searchers.put(Long.toString(((DirectoryReader) searcher.getIndexReader()).getVersion()), s);
-              s.put("staleAgeSeconds", ageSec);
-              s.put("segments", searcher.getIndexReader().toString());
-              return false;
-            }
-          });
+          // TODO: go per segment and print more details, and
+          // only print segment for a given searcher if it's
+          // "new"
 
-        JSONObject taxo = new JSONObject();
-        result.put("taxonomy", taxo);
+          // Doesn't actually prune; just gathers stats
+          shardState.slm.prune(new SearcherLifetimeManager.Pruner() {
+              @Override
+              public boolean doPrune(double ageSec, IndexSearcher searcher) {
+                JSONObject s = new JSONObject();
+                searchers.put(Long.toString(((DirectoryReader) searcher.getIndexReader()).getVersion()), s);
+                s.put("staleAgeSeconds", ageSec);
+                s.put("segments", searcher.getIndexReader().toString());
+                s.put("maxDoc", searcher.getIndexReader().maxDoc());
+                return false;
+              }
+            });
+
+          JSONObject curSearcher = new JSONObject();
+          shard.put("currentSearcher", curSearcher);
+          shard.put("state", shardState.getState());
+
+          JSONObject taxo = new JSONObject();
+          shard.put("taxonomy", taxo);
         
-        SearcherAndTaxonomy s = shardState.acquire();
-        try {
-          taxo.put("segments", s.taxonomyReader.toString());
-          taxo.put("numOrds", s.taxonomyReader.getSize());
-        } finally {
-          shardState.release(s);
+          SearcherAndTaxonomy s = shardState.acquire();
+          try {
+            taxo.put("segments", s.taxonomyReader.toString());
+            taxo.put("numOrds", s.taxonomyReader.getSize());
+            curSearcher.put("segments", s.searcher.toString());
+          } finally {
+            shardState.release(s);
+          }
         }
 
         // nocommit cached filters from index searchers?

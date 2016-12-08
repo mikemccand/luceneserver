@@ -50,7 +50,7 @@ public class AddReplicaHandler extends Handler {
   @Override
   public void handleBinary(InputStream streamIn, DataInput in, DataOutput out, OutputStream streamOut) throws Exception {
     String indexName = in.readString();
-    IndexState indexState = globalState.get(indexName);
+    IndexState indexState = globalState.getIndex(indexName);
     ShardState shardState = indexState.getShard(0);
     if (shardState.isPrimary() == false) {
       throw new IllegalArgumentException("index \"" + indexName + "\" was not started or is not a primary");

@@ -1,3 +1,4 @@
+import pprint
 import random
 import gzip
 import socket
@@ -259,8 +260,7 @@ def main():
     if len(replicaPorts) > 0:
       refreshSec = 1.0
     else:
-      # Turn off refreshes to maximize indexing throughput:
-      refreshSec = 100000.0
+      refreshSec = 5.0
     send(LOCALHOST, primaryPorts[0], "liveSettings", {'indexName': 'index', 'index.ramBufferSizeMB': 256., 'maxRefreshSec': refreshSec})
 
     fields = {'indexName': 'index',
@@ -361,7 +361,7 @@ def main():
       dps = float(dps)
 
     if USE_JSON:
-       c = ChunkedHTTPSend(LOCALHOST, primaryPorts[0], 'bulkAddDocument2', {'indexName': 'index'})
+      c = ChunkedHTTPSend(LOCALHOST, primaryPorts[0], 'bulkAddDocument2', {'indexName': 'index'})
     elif BINARY_CSV:
       b1 = BinarySend(LOCALHOST, primaryPorts[1], 'bulkCSVAddDocument')
       b1.add(b',index\n')
@@ -421,7 +421,10 @@ def main():
             print('%6.1f sec: %.2fM hits on replica, %.2f M docs... %.1f docs/sec, %.1f MB/sec' % (delay, x['totalHits']/1000000., id/1000000., dps, (totBytes/1024./1024.)/delay))
           else:
             print('%6.1f sec: %.2f M docs... %.1f docs/sec, %.1f MB/sec' % (delay, id/1000000., dps, (totBytes/1024./1024.)/delay))
-
+          result = json.loads(send(LOCALHOST, primaryPorts[0], 'stats', {'indexName': 'index'}))
+          print(json.dumps(result, sort_keys=True, indent=4))
+          x = json.loads(send(LOCALHOST, primaryPorts[0], 'search2', {'indexNames': ['index'], 'queryText': '*:*'}));
+          print('%d hits...' % x['totalHits'])
           while nextPrint <= id:
             nextPrint += 250000
 

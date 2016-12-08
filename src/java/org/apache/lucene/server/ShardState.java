@@ -96,7 +96,7 @@ public class ShardState implements Closeable {
   public final Path rootDir;
 
   /** Which shard we are in this index */
-  private final int shardOrd;
+  public final int shardOrd;
 
   /** Base directory */
   public Directory origIndexDir;
@@ -434,7 +434,7 @@ public class ShardState implements Closeable {
           }
         };
 
-      writer = new IndexWriter(indexDir, indexState.getIndexWriterConfig(openMode, origIndexDir));
+      writer = new IndexWriter(indexDir, indexState.getIndexWriterConfig(openMode, origIndexDir, shardOrd));
       snapshots = (PersistentSnapshotDeletionPolicy) writer.getConfig().getIndexDeletionPolicy();
 
       // NOTE: must do this after writer, because SDP only
@@ -586,7 +586,7 @@ public class ShardState implements Closeable {
 
       boolean verbose = indexState.getBooleanSetting("index.verbose");
 
-      writer = new IndexWriter(indexDir, indexState.getIndexWriterConfig(openMode, origIndexDir));
+      writer = new IndexWriter(indexDir, indexState.getIndexWriterConfig(openMode, origIndexDir, shardOrd));
       snapshots = (PersistentSnapshotDeletionPolicy) writer.getConfig().getIndexDeletionPolicy();
 
       // NOTE: must do this after writer, because SDP only
@@ -993,6 +993,95 @@ public class ShardState implements Closeable {
       }
 
       return ssdvState;
+    }
+  }
+
+  @Override
+  public String toString() {
+    return indexState.name + ":" + shardOrd;
+  }
+
+  private final AtomicInteger runningChunks = new AtomicInteger();
+  private volatile int finishWriting;
+
+  public void startIndexingChunk() {
+    if (finishWriting != 0) {
+      throw new IllegalStateException("cannot start indexing when finish is called");
+    }
+    runningChunks.incrementAndGet();
+  }
+
+  public void finishIndexingChunk() throws InterruptedException {
+    if (runningChunks.decrementAndGet() == 0) {
+      if (finishWriting == 1) {
+        finishIndexing();
+      }
+    }
+  }
+
+  public String getState() {
+    if (finishWriting == 2) {
+      return "readonly";
+    } else if (finishWriting == 1) {
+      return "finishing";
+    } else {
+      return "active";
+    }
+  }
+
+  public void finishIndexing() throws InterruptedException {
+    System.out.println(this + ": now finish indexing");
+    indexState.globalState.submitIndexingTask(new Runnable() {
+        @Override
+        public void run() {
+          // nocommit make this tunable
+          try {
+            System.out.println(ShardState.this + ": now force merge");
+            writer.forceMerge(1);
+            System.out.println(ShardState.this + ": done force merge; now refresh");
+            reopenThread.close();
+            maybeRefreshBlocking();
+            System.out.println(ShardState.this + ": done force merge; now close writers");
+            finishWriting = 2;
+
+            // nocommit register this, somehow, in a long running task
+            // nocommit close searcher pruning thread too
+            
+            writer.close();
+            taxoWriter.close();
+            System.out.println(ShardState.this + ": done force merge; done close writers");
+            // nocommit what about refreshing readers after this?  can i "reopen to last reader" somehow?
+            indexState.globalState.indexingJobsRunning.release();
+          } catch (Throwable t) {
+            System.out.println("ShardState.finishIndexing " + this + " FAILED:");
+            t.printStackTrace(System.out);
+            throw new RuntimeException(t);
+          }
+        }
+      });
+  }
+
+  public int maxDoc() throws IOException {
+    synchronized (this) {
+      if (finishWriting == 0) {
+        return writer.maxDoc();
+      }
+    }
+
+    SearcherAndTaxonomy searcher = acquire();
+    try {
+      return searcher.searcher.getIndexReader().maxDoc();
+    } finally {
+      release(searcher);
+    }
+  }
+
+  public void finishWriting() throws InterruptedException {
+    synchronized(this) {
+      finishWriting = 1;
+    }
+    if (runningChunks.get() == 0) {
+      finishIndexing();
     }
   }
 }

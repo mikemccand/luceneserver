@@ -342,7 +342,7 @@ public class BulkCSVAddDocumentHandlerNonBinary extends Handler {
     String indexName = params.get("indexName").get(0);
 
     // Make sure the index does in fact exist
-    IndexState indexState = globalState.get(indexName);
+    IndexState indexState = globalState.getIndex(indexName);
 
     // Make sure the index is started:
     if (indexState.isStarted() == false) {

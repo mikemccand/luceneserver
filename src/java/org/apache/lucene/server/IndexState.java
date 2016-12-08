@@ -74,6 +74,7 @@ import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.KeepOnlyLastCommitDeletionPolicy;
+import org.apache.lucene.index.MergePolicy;
 import org.apache.lucene.index.PersistentSnapshotDeletionPolicy;
 import org.apache.lucene.index.SegmentInfos;
 import org.apache.lucene.index.SimpleMergedSegmentWarmer;
@@ -183,7 +184,9 @@ public class IndexState implements Closeable {
   /** {@link Bindings} to pass when evaluating expressions. */
   public final Bindings exprBindings = new FieldDefBindings(fields);
 
-  private final Map<Integer,ShardState> shards = new ConcurrentHashMap<>();
+  public final Map<Integer,ShardState> shards = new ConcurrentHashMap<>();
+
+  private ShardState writableShard;
 
   /** Built suggest implementations */
   public final Map<String,Lookup> suggesters = new ConcurrentHashMap<String,Lookup>();
@@ -362,6 +365,7 @@ public class IndexState implements Closeable {
     this.globalState = globalState;
     this.name = name;
     this.rootDir = rootDir;
+    // nocommit require rootDir != null!  no RAMDirectory!
     if (rootDir != null) {
       if (Files.exists(rootDir) == false) {
         Files.createDirectories(rootDir);
@@ -435,7 +439,7 @@ public class IndexState implements Closeable {
     return saveLoadState.getNextWriteGen() != 0;
   }
 
-  IndexWriterConfig getIndexWriterConfig(OpenMode openMode, Directory origIndexDir) throws IOException {
+  IndexWriterConfig getIndexWriterConfig(OpenMode openMode, Directory origIndexDir, int shardOrd) throws IOException {
     IndexWriterConfig iwc = new IndexWriterConfig(indexAnalyzer);
     iwc.setOpenMode(openMode);
     if (getBooleanSetting("index.verbose")) {
@@ -452,7 +456,15 @@ public class IndexState implements Closeable {
     // nocommit in primary case we can't do this?
     iwc.setMergedSegmentWarmer(new SimpleMergedSegmentWarmer(iwc.getInfoStream()));
     
-    ConcurrentMergeScheduler cms = (ConcurrentMergeScheduler) iwc.getMergeScheduler();
+    ConcurrentMergeScheduler cms = new ConcurrentMergeScheduler() {
+        @Override
+        public synchronized MergeThread getMergeThread(IndexWriter writer, MergePolicy.OneMerge merge) throws IOException {
+          MergeThread thread = super.getMergeThread(writer, merge);
+          thread.setName(thread.getName() + " [" + name + ":" + shardOrd + "]");
+          return thread;
+        }
+      };
+    iwc.setMergeScheduler(cms);
 
     if (getBooleanSetting("index.merge.scheduler.auto_throttle")) {
       cms.enableAutoIOThrottle();
@@ -710,8 +722,12 @@ public class IndexState implements Closeable {
 
   public void start() throws Exception {
     // start all local shards
+    
     for(ShardState shard : shards.values()) {
       shard.start();
+      if (writableShard == null || shard.shardOrd > writableShard.shardOrd) {
+        writableShard = shard;
+      }
     }
 
     if (suggesterSettings != null) {
@@ -1009,8 +1025,34 @@ public class IndexState implements Closeable {
       throw new IllegalArgumentException("shardOrd=" + shardOrd + " already exists in index + \"" + name + "\"");
     }
     ShardState shard = new ShardState(this, shardOrd, doCreate);
+    // nocommit fail if there is already a shard here?
     shards.put(shardOrd, shard);
     return shard;
+  }
+
+  /** Returns the shard that should be used for writing new documents, possibly creating and starting a new shard if the current one is full. */
+  public ShardState getWritableShard() throws Exception {
+    verifyStarted(null);
+
+    synchronized (this) {
+
+      // nocommit make this tunable:
+      if (writableShard.writer.maxDoc() > 50000000) {
+        System.out.println("NEW SHARD ORD " + (writableShard.shardOrd+1));
+        ShardState nextShard = addShard(writableShard.shardOrd+1, true);
+
+        // nocommit hmm we can't do this now ... we need to get all in-flight ops to finish first
+        writableShard.finishWriting();
+        // nocommit we should close IW after forceMerge finishes
+
+        nextShard.start();
+        writableShard = nextShard;
+      }
+
+      writableShard.startIndexingChunk();
+    }
+
+    return writableShard;
   }
 
   public ShardState getShard(int shardOrd) {

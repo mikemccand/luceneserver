@@ -443,7 +443,7 @@ Package p = Server.class.getPackage();
           IndexState state;
           if (handler.requiresIndexName) {
             String indexName = request.getString("indexName");
-            state = globalState.get(indexName);
+            state = globalState.getIndex(indexName);
           } else {
             state = null;
           }
@@ -903,6 +903,7 @@ Package p = Server.class.getPackage();
     private volatile boolean stop;
     
     public BinaryServer(String host, int port) throws IOException {
+      setName("BinaryServer " + host + ":" + port);
       serverSocket = new ServerSocket();
       serverSocket.bind(new InetSocketAddress(host, port));
       actualPort = serverSocket.getLocalPort();

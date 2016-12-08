@@ -143,7 +143,7 @@ public class CopyFilesHandler extends Handler {
   public void handleBinary(InputStream streamIn, DataInput in, DataOutput out, OutputStream streamOut) throws Exception {
 
     String indexName = in.readString();
-    IndexState state = globalState.get(indexName);
+    IndexState state = globalState.getIndex(indexName);
     ShardState shardState = state.getShard(0);
     if (shardState.isReplica() == false) {
       throw new IllegalArgumentException("index \"" + indexName + "\" is not a replica or was not started yet");
