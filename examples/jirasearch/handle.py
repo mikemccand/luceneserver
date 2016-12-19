@@ -864,12 +864,12 @@ def renderJiraHits(w, text, groups, userDrillDowns):
 
     # hack alert!  really i should index a separate text+highlight field for this...
     if key.lower().replace('-', ' ') == lowerText:
-      key = '<b>%s</b>' % key
-    
-    if fields['status'] in ('Open', 'Reopened', 'In Progress'):
-      skey = key
+      skey = '<b>%s</b>' % key
     else:
-      skey = '<s>%s</s>' % key
+      skey = key
+    
+    if fields['status'] not in ('Open', 'Reopened', 'In Progress'):
+      skey = '<s>%s</s>' % skey
 
     w('<tr><td><br><a href="http://issues.apache.org/jira/browse/%s"><font size=+2>%s: %s</font></a></td></tr>' % \
       (key, skey, fixHilite(fields['summary'])))
