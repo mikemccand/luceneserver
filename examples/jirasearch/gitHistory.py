@@ -206,7 +206,7 @@ def refresh():
       return parseLog(f)
     else:
       print('WARNING: failed to run "git fetch origin master"')
-      return []
+      return {}, set()
   finally:
     os.chdir(cwd)
 
