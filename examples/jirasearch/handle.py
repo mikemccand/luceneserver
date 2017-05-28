@@ -281,7 +281,7 @@ jiraSpec.facetFields = (
   ('Type', 'issueType', False, None, True),
   ('Priority', 'facetPriority', False, None, False),
   ('Labels', 'labels', False, None, True),
-  ('Attachment?', 'hasAttachment', False, None, False),
+  ('Attachment?', 'attachments', False, None, False),
   ('Commits?', 'hasCommits', False, None, False),
   ('Has votes?', 'hasVotes', True, None, False),
   ('Reporter', 'reporter', False, None, True),
