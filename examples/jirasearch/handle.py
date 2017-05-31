@@ -1398,7 +1398,7 @@ def handleQuery(path, isMike, environ):
   sawGroupDDField = False
 
   for userLabel, dim, ign, ign, doMorePopup in spec.facetFields:
-    if dim in ('fixVersions', 'committedPaths'):
+    if dim in ('fixVersions', 'committedPaths', 'attachments'):
       topN = MAX_INT
     else:
       topN = 7
