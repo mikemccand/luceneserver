@@ -546,7 +546,6 @@ class RenderFacets:
       w('<td style="padding-bottom:10px">')
     else:
       w('<td>')
-    
     ddName = path[0]
     top = values[0]
     topCount = top[1]
@@ -607,7 +606,7 @@ class RenderFacets:
         color = 'black'
       else:
         color = 'red'
-      w('<font color=%s><b>%s</b></font>' % (color, name))
+      w('<a name="%s"><font color=%s><b>%s</b></font></a>' % (path[0], color, name))
       w('<table class=facet cellpadding=0 cellspacing=0>')
       w('<tr>')
       w('<td>')
@@ -850,6 +849,32 @@ def toAgo(seconds):
     return addUnit('%.1f' % (seconds/24/3600/30.5), 'month')
   else:
     return addUnit('%.1f' % (seconds/24/3600/365), 'year')
+
+def renderNavSummary(w, facets, drillDowns):
+  w('<b>Filters:</b>&nbsp;')
+  for idx, (userLabel, dim, ign, facetSort, doMorePopup) in enumerate(jiraSpec.facetFields):
+    if facets[idx] is None:
+      # no facet counts for this dim for this query
+      continue
+    if idx > 0:
+      w(',&nbsp;&nbsp;')
+    if False:
+      w('<select name=%s>' % dim)
+      w('<option>%s</option>' % userLabel)
+      w('</select>')
+
+    ddValues = None
+    for field, ddv in drillDowns:
+      if field == dim:
+        ddValues = ddv
+        break
+
+    if ddValues is not None:
+      w('<a href="#%s"><b><font color=red>%s (%s)</font></b></a>' % (dim, userLabel, ','.join([x[0] for x in ddValues])))
+    else:
+      w('<a href="#%s">%s</a>' % (dim, userLabel))
+      
+  w('<br>')
   
 def renderJiraHits(w, text, groups, userDrillDowns):
 
@@ -1940,6 +1965,7 @@ def handleQuery(path, isMike, environ):
         renderGroupHeader(w, group, groupDDField, hitsPerGroup)
         renderJiraHits(w, text, group['hits'], userDrillDowns)
     else:
+      renderNavSummary(w, facets, drillDowns)
       renderJiraHits(w, text, result['groups'], userDrillDowns)
 
     #w('</div>')
