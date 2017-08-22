@@ -29,7 +29,7 @@ testDeps = [
   ('junit', 'junit', '4.10')
   ]
   
-LUCENE_VERSION = '6.4.0-SNAPSHOT'
+LUCENE_VERSION = '6.3.0-SNAPSHOT'
 LUCENE_SERVER_BASE_VERSION = '0.1.1'
 LUCENE_SERVER_VERSION = '%s-SNAPSHOT' % LUCENE_SERVER_BASE_VERSION
 
@@ -431,7 +431,7 @@ def compileSourcesAndDeps(jarVersion):
 
   if not os.path.exists('lucene6x'):
     print('init: cloning lucene branch_6x to ./lucene6x...')
-    run('git clone -b branch_6x https://git-wip-us.apache.org/repos/asf/lucene-solr.git lucene6x')
+    run('git clone -b branch_6_3 https://github.com/apache/lucene-solr.git lucene6x')
 
   compileLuceneModules(luceneDeps)
 
