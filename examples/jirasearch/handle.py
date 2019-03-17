@@ -891,7 +891,7 @@ def renderJiraHits(w, text, groups, userDrillDowns):
     if key.lower().replace('-', ' ') == lowerText:
       key = '<b>%s</b>' % key
     
-    if fields['status'] in ('Open', 'Reopened', 'In Progress'):
+    if fields['status'] in ('Open', 'Reopened', 'In Progress', 'Patch Available', 'Waiting for user', 'Waiting for infra'):
       skey = key
     else:
       skey = '<s>%s</s>' % key
