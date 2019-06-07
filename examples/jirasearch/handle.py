@@ -870,7 +870,13 @@ def renderNavSummary(w, facets, drillDowns):
         break
 
     if ddValues is not None:
-      w('<a href="#%s"><b><font color=red>%s (%s)</font></b></a>' % (dim, userLabel, ','.join([x[0] for x in ddValues])))
+      l = []
+      for x in ddValues:
+        if len(x) == 1:
+          l.append(str(x[0]))
+        else:
+          l.append(str(x[0] + '...'))
+      w('<a href="#%s"><b><font color=red>%s (%s)</font></b></a>' % (dim, userLabel, ','.join(l)))
     else:
       w('<a href="#%s">%s</a>' % (dim, userLabel))
       
@@ -894,10 +900,7 @@ def renderJiraHits(w, text, groups, userDrillDowns):
     if fields['status'] in ('Open', 'Reopened', 'In Progress', 'Patch Available', 'Waiting for user', 'Waiting for infra'):
       skey = key
     else:
-      skey = key
-    
-    if fields['status'] not in ('Open', 'Reopened', 'In Progress'):
-      skey = '<s>%s</s>' % skey
+      skey = '<s>%s</s>' % key
 
     w('<tr><td><br><a href="http://issues.apache.org/jira/browse/%s"><font size=+2>%s: %s</font></a></td></tr>' % \
       (key, skey, fixHilite(fields['summary'])))
