@@ -893,6 +893,8 @@ def renderJiraHits(w, text, groups, userDrillDowns):
     fields = group['fields']
     key = fields['key'].upper()
 
+    keyOrig = key
+
     # hack alert!  really i should index a separate text+highlight field for this...
     if key.lower().replace('-', ' ') == lowerText:
       key = '<b>%s</b>' % key
@@ -903,7 +905,7 @@ def renderJiraHits(w, text, groups, userDrillDowns):
       skey = '<s>%s</s>' % key
 
     w('<tr><td><br><a href="http://issues.apache.org/jira/browse/%s"><font size=+2>%s: %s</font></a></td></tr>' % \
-      (key, skey, fixHilite(fields['summary'])))
+      (keyOrig, skey, fixHilite(fields['summary'])))
 
     w('<tr><td><em><font size=-1>%s ago&nbsp;&nbsp;%d comments&nbsp;&nbsp;%d votes&nbsp;&nbsp;%d watches&nbsp;&nbsp;%s</em></font></td></tr>' % \
       (toAgo(now-fields['updated']),
