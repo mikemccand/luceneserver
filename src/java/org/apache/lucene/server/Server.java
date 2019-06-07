@@ -120,12 +120,12 @@ import net.minidev.json.parser.JSONParser;
 import net.minidev.json.parser.ParseException;
 
 public class Server {
-public static final int BINARY_MAGIC = 0x3414f5c;
-private static final boolean VERBOSE = false;
-public static final int DEFAULT_PORT = 4000;
-public static final String SERVER_VERSION = computeVersion();
-private static String computeVersion() {
-Package p = Server.class.getPackage();
+  public static final int BINARY_MAGIC = 0x3414f5c;
+  private static final boolean VERBOSE = false;
+  public static final int DEFAULT_PORT = 4000;
+  public static final String SERVER_VERSION = computeVersion();
+  private static String computeVersion() {
+    Package p = Server.class.getPackage();
     String s;
     if (p != null) {
       s = p.getImplementationVersion();

@@ -48,7 +48,7 @@ else:
     else:
       raise RuntimeError('unknown arg %s' % arg)
 
-userHost = 'changingbits@web406.webfaction.com'
+userHost = 'changingbits@web504.webfaction.com'
 #userHost = 'mike@10.17.4.12'
 sshIdent = ''
 #sshIdent = '-i /home/mike/.ssh/aws_changingbits.pem'

@@ -158,8 +158,9 @@ def createSchema(svr):
                                'search': False,
                                'multiValued': True,
                                'facet': 'hierarchy'},
-            'hasAttachment': {'type': 'boolean',
-                              'facet': 'flat'},
+            'attachments': {'type': 'atom',
+                            'multiValued': True,
+                            'facet': 'flat'},
             'hasCommits': {'type': 'boolean',
                            'facet': 'flat'},
             'commentCount': {'type': 'int',
@@ -559,7 +560,6 @@ def buildFullSuggest(svr):
           didAttach = True
 
       if didAttach:
-        hasAttachment = True
         #prettyPrintJSON(change)
         if 'author' in change:
           addUser(allUsers, change['author'], project, key)
@@ -791,20 +791,40 @@ def indexDocs(svr, issues, printIssue=False, updateSuggest=False):
     doc['facetComponents'] = l
     doc['components'] = l2
 
-    hasAttachment = False
+    attachments = set()
+    #print('\nISSUE: %s' % key.upper())
     for change in issue['changelog']['histories']:
+      #print('  change: %s' % str(change))
       didAttach = False
       for item in change['items']:
         if item['field'] == 'Attachment':
           didAttach = True
+          if 'toString' in item and item['toString'] is not None:
+            name = item['toString'].lower()
+            if '.patch' in name or '.diff' in name:
+              attachments.add('Patch')
+            elif name.endswith('.png') or name.endswith('.gif') or name.endswith('.jpg'):
+              attachments.add('Image')
+            elif name.endswith('.java'):
+              attachments.add('Java Source')
+            elif name.endswith('.bz2') or name.endswith('.rar') or name.endswith('.tgz') or name.endswith('.tar.gz') or name.endswith('.zip') or name.endswith('.tar'):
+              attachments.add('Archive')
+            elif name.endswith('.jar'):
+              attachments.add('JAR')
+            elif name.endswith('.txt'):
+              attachments.add('Text File')
+            else:
+              attachments.add('Other')
+          else:
+            attachments.add('Other')
 
       if didAttach:
-        hasAttachment = True
         #prettyPrintJSON(change)
         if 'author' in change:
           addUser(allUsers, change['author'], project)
-
-    doc['hasAttachment'] = hasAttachment
+    if len(attachments) == 0:
+      attachments.add('None')
+    doc['attachments'] = list(attachments)
                 
     comments = fields.get('comment', '')
     subDocs = []
