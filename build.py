@@ -293,7 +293,7 @@ class ReadEvents:
         lines.append(l)
 
 def fetchMavenJAR(org, name, version, destFileName):
-  url = 'http://central.maven.org/maven2/%s/%s/%s/%s-%s.jar' % (org.replace('.', '/'), name, version, name, version)
+  url = 'https://repo.maven.apache.org/maven2/%s/%s/%s/%s-%s.jar' % (org.replace('.', '/'), name, version, name, version)
   print('Download %s -> %s...' % (url, destFileName))
   urllib.request.urlretrieve(url, destFileName)
   print('  done: %.1f KB' % (os.path.getsize(destFileName)/1024.))
@@ -338,12 +338,14 @@ def compileLuceneModules(deps):
       if anyChanges('analysis/%s' % part, 'build/analysis/%s/lucene-%s-%s.jar' % (part, dep, LUCENE_VERSION)):
         print('build lucene %s JAR...' % dep)
         os.chdir('analysis/%s' % part)
-        run('ant jar')
+        # TODO: we disable compiler warnings because recent java (15+) is angry!
+        run('ant -Djavac.args= -Djavac.doclint.args= jar')
         os.chdir('../..')
     elif anyChanges(dep, 'build/%s/lucene-%s-%s.jar' % (dep, dep, LUCENE_VERSION)):
       print('build lucene %s JAR...' % dep)
       os.chdir(dep)
-      run('ant jar')
+      # TODO: we disable compiler warnings because recent java (15+) is angry!
+      run('ant -Djavac.args= -Djavac.doclint.args= jar')
       os.chdir('..')
   os.chdir(ROOT_DIR)
 
@@ -431,7 +433,7 @@ def compileSourcesAndDeps(jarVersion):
 
   if not os.path.exists('lucene6x'):
     print('init: cloning lucene branch_6x to ./lucene6x...')
-    run('git clone -b branch_6_3 https://github.com/apache/lucene-solr.git lucene6x')
+    run('git clone --depth 1 -b branch_6_3 https://github.com/apache/lucene-solr.git lucene6x')
 
   compileLuceneModules(luceneDeps)
 
