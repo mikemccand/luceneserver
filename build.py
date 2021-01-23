@@ -14,7 +14,7 @@ import os
 import urllib.request
 
 # version of lucene we build against
-LUCENE_VERSION = '6.4.0'
+LUCENE_VERSION = '6.4.2'
 
 deps = [
   #('org.codehaus.jackson', 'jackson-core-asl', '1.9.13'),
