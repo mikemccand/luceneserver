@@ -91,13 +91,13 @@ your shell!
 
 # Live documentation
 
-Once the server is running, load `http://localhost:4000/docs` to see
-minimial documentation of all REST commands and their accepted
+Once the server is running, load [http://localhost:4000/docs](http://localhost:4000/docs) to see
+minimal documentation of all REST commands and their accepted
 parameters.
 
 # Example indexing tool
 
-The `scripts/indexTaxis.py` shows an example of using a Python client
+The [scripts/indexTaxis.py](scripts/indexTaxis.py) shows an example of using a Python client
 to bulk-index documents from the [New York City taxi ride
 data](http://www.nyc.gov/html/tlc/html/about/trip_record_data.shtml),
 optionally spawning replicas as well.  It will build the release
