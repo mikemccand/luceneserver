@@ -68,7 +68,7 @@ import org.apache.lucene.expressions.js.JavascriptCompiler;
 import org.apache.lucene.facet.FacetsConfig;
 import org.apache.lucene.index.DocValuesType;
 import org.apache.lucene.index.IndexOptions;
-import org.apache.lucene.queries.function.ValueSource;
+import org.apache.lucene.search.DoubleValuesSource;
 import org.apache.lucene.search.similarities.BM25Similarity;
 import org.apache.lucene.search.similarities.ClassicSimilarity;
 import org.apache.lucene.search.similarities.Similarity;
@@ -382,9 +382,9 @@ public class RegisterFieldsHandler extends Handler {
     Map<String,FieldDef> allFields = new HashMap<String,FieldDef>(state.getAllFields());
     allFields.putAll(pendingFieldDefs);
 
-    ValueSource values;
+    DoubleValuesSource values;
     try {
-      values = expr.getValueSource(new FieldDefBindings(allFields));
+      values = expr.getDoubleValuesSource(new FieldDefBindings(allFields));
     } catch (RuntimeException re) {
       // Dynamic error (e.g. referred to a field that
       // doesn't exist):

@@ -79,12 +79,6 @@ import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.ReaderUtil;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queries.CommonTermsQuery;
-import org.apache.lucene.queries.function.FunctionValues;
-import org.apache.lucene.queries.function.ValueSource;
-import org.apache.lucene.queries.function.valuesource.DoubleFieldSource;
-import org.apache.lucene.queries.function.valuesource.FloatFieldSource;
-import org.apache.lucene.queries.function.valuesource.IntFieldSource;
-import org.apache.lucene.queries.function.valuesource.LongFieldSource;
 import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
@@ -95,6 +89,8 @@ import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.Collector;
 import org.apache.lucene.search.ConstantScoreQuery;
 import org.apache.lucene.search.DisjunctionMaxQuery;
+import org.apache.lucene.search.DoubleValues;
+import org.apache.lucene.search.DoubleValuesSource;
 import org.apache.lucene.search.FieldDoc;
 import org.apache.lucene.search.FuzzyQuery;
 import org.apache.lucene.search.IndexSearcher;
@@ -941,14 +937,20 @@ public class SearchHandler extends Handler {
         if (fd.valueSource != null) {
           List<LeafReaderContext> leaves = s.getIndexReader().leaves();
           LeafReaderContext leaf = leaves.get(ReaderUtil.subIndex(hit.doc, leaves));
-          Map<String,Object> context = new HashMap<String,Object>();
 
           int docID = hit.doc - leaf.docBase;
 
-          assert Float.isNaN(hit.score) == false || fd.valueSource.getSortField(false).needsScores() == false;
-          context.put("scorer", new CannedScorer(docID, hit.score));
-          FunctionValues segValues = fd.valueSource.getValues(context, leaf);
-          result.put(name, segValues.doubleVal(docID));
+          assert Float.isNaN(hit.score) == false || fd.valueSource.needsScores() == false;
+          final DoubleValues scoreValues;
+          if (fd.valueSource.needsScores()) {
+            scoreValues = DoubleValuesSource.fromScorer(new CannedScorer(docID, hit.score));
+          } else {
+            scoreValues = null;
+          }
+          DoubleValues segValues = fd.valueSource.getValues(leaf, scoreValues);
+          if (segValues.advanceExact(docID)) {
+            result.put(name, segValues.doubleValue());
+          }
         } else {
           Object v = doc.get(name);
           if (v != null) {
@@ -1840,16 +1842,16 @@ public class SearchHandler extends Handler {
               range = null;
             }
 
-            ValueSource valueSource;
+            DoubleValuesSource valueSource;
             if (fd.valueSource == null) {
               if (fd.valueType == FieldDef.FieldValueType.INT) {
-                valueSource = new IntFieldSource(fd.name);
+                valueSource = DoubleValuesSource.fromIntField(fd.name);
               } else if (fd.valueType == FieldDef.FieldValueType.LONG) {
-                valueSource = new LongFieldSource(fd.name);
+                valueSource = DoubleValuesSource.fromLongField(fd.name);
               } else if (fd.valueType == FieldDef.FieldValueType.DOUBLE) {
-                valueSource = new DoubleFieldSource(fd.name);
+                valueSource = DoubleValuesSource.fromDoubleField(fd.name);
               } else if (fd.valueType == FieldDef.FieldValueType.FLOAT) {
-                valueSource = new FloatFieldSource(fd.name);
+                valueSource = DoubleValuesSource.fromFloatField(fd.name);
               } else {
                 fr.fail("numericRange", "currently only supported for virtual and numeric fields");
 
@@ -1859,7 +1861,15 @@ public class SearchHandler extends Handler {
             } else {
               valueSource = fd.valueSource;
             }
-            ddq.add(fd.name, range.getQuery(null, valueSource));
+            final Query query;
+            if (range instanceof LongRange) {
+              query = ((LongRange)range).getQuery(null, valueSource.toLongValuesSource());
+            } else if (range instanceof DoubleRange) {
+              query = ((DoubleRange)range).getQuery(null, valueSource);
+            } else {
+              throw new UnsupportedOperationException(); // what kind of range is this
+            }
+            ddq.add(fd.name, query);
           } else {
             String[] path;
             if (fr.isString("value")) {
@@ -2177,9 +2187,9 @@ public class SearchHandler extends Handler {
           expr = null;
         }
 
-        ValueSource values;
+        DoubleValuesSource values;
         try {
-          values = expr.getValueSource(bindings);
+          values = expr.getDoubleValuesSource(bindings);
         } catch (RuntimeException re) {
           // Dynamic error (e.g. referred to a field that
           // doesn't exist):
