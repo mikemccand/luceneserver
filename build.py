@@ -13,43 +13,57 @@ import sys
 import os
 import urllib.request
 
+# version of lucene we build against
+LUCENE_VERSION = '6.4.2'
+
 deps = [
   #('org.codehaus.jackson', 'jackson-core-asl', '1.9.13'),
   #('org.codehaus.jackson', 'jackson-mapper-asl', '1.9.13'),
   ('com.fasterxml.jackson.core', 'jackson-core', '2.8.2'),
   #('com.fasterxml.jackson.core', 'jackson-mapper', '2.8.2'),
   ('commons-codec', 'commons-codec', '1.10'),
-  ('net.minidev', 'json-smart', '1.2')
+  ('net.minidev', 'json-smart', '1.2'),
+  ('org.apache.lucene', 'lucene-core', LUCENE_VERSION),
+  ('org.apache.lucene', 'lucene-analyzers-common', LUCENE_VERSION),
+  ('org.apache.lucene', 'lucene-analyzers-icu', LUCENE_VERSION),
+    ('com.ibm.icu', 'icu4j', '56.1'),
+  ('org.apache.lucene', 'lucene-facet', LUCENE_VERSION),
+  ('org.apache.lucene', 'lucene-codecs', LUCENE_VERSION),
+  ('org.apache.lucene', 'lucene-grouping', LUCENE_VERSION),
+  ('org.apache.lucene', 'lucene-highlighter', LUCENE_VERSION),
+  ('org.apache.lucene', 'lucene-join', LUCENE_VERSION),
+  ('org.apache.lucene', 'lucene-misc', LUCENE_VERSION),
+  ('org.apache.lucene', 'lucene-queries', LUCENE_VERSION),
+  ('org.apache.lucene', 'lucene-queryparser', LUCENE_VERSION),
+  ('org.apache.lucene', 'lucene-suggest', LUCENE_VERSION),
+  ('org.apache.lucene', 'lucene-expressions', LUCENE_VERSION),
+    ('org.antlr', 'antlr4-runtime', '4.5.1-1'),
+    ('org.ow2.asm', 'asm', '5.1'),
+    ('org.ow2.asm', 'asm-commons', '5.1'),
+  ('org.apache.lucene', 'lucene-replicator', LUCENE_VERSION),
+    ('org.apache.httpcomponents', 'httpclient', '4.4.1'),
+    ('org.apache.httpcomponents', 'httpcore', '4.4.1'),
+    ('org.eclipse.jetty', 'jetty-server', '9.3.14.v20161028'),
+    ('javax.servlet', 'javax.servlet-api', '3.1.0'),
+    ('org.eclipse.jetty', 'jetty-servlet', '9.3.14.v20161028'),
+    ('org.eclipse.jetty', 'jetty-util', '9.3.14.v20161028'),
+    ('org.eclipse.jetty', 'jetty-io', '9.3.14.v20161028'),
+    ('org.eclipse.jetty', 'jetty-continuation', '9.3.14.v20161028'),
+    ('org.eclipse.jetty', 'jetty-http', '9.3.14.v20161028'),
+    ('commons-logging', 'commons-logging', '1.1.3'),
+  ('org.apache.lucene', 'lucene-sandbox', LUCENE_VERSION),
   ]
 
 testDeps = [
   ('de.thetaphi', 'forbiddenapis', '2.2'),
   ('com.carrotsearch.randomizedtesting', 'junit4-ant', '2.4.0'),
   ('com.carrotsearch.randomizedtesting', 'randomizedtesting-runner', '2.4.0'),
+  ('org.apache.lucene', 'lucene-test-framework', LUCENE_VERSION),
   ('junit', 'junit', '4.10')
   ]
   
-LUCENE_VERSION = '6.3.0-SNAPSHOT'
 LUCENE_SERVER_BASE_VERSION = '0.1.1'
 LUCENE_SERVER_VERSION = '%s-SNAPSHOT' % LUCENE_SERVER_BASE_VERSION
-
-luceneDeps = ('core',
-              'analyzers-common',
-              'analyzers-icu',
-              'facet',
-              'codecs',
-              'grouping',
-              'highlighter',
-              'join',
-              'misc',
-              'queries',
-              'queryparser',
-              'suggest',
-              'expressions',
-              'replicator',
-              'sandbox')
-
-luceneTestDeps = ('test-framework',)
 
 TEST_HEAP = '512m'
 
@@ -329,26 +343,6 @@ def anyChanges(srcDir, destJAR):
 
   return False
 
-def compileLuceneModules(deps):
-  os.chdir('lucene6x/lucene')
-  for dep in deps:
-    if dep.startswith('analyzers-'):
-      # lucene analyzers have two level hierarchy!
-      part = dep[10:]
-      if anyChanges('analysis/%s' % part, 'build/analysis/%s/lucene-%s-%s.jar' % (part, dep, LUCENE_VERSION)):
-        print('build lucene %s JAR...' % dep)
-        os.chdir('analysis/%s' % part)
-        # TODO: we disable compiler warnings because recent java (15+) is angry!
-        run('ant -Djavac.args= -Djavac.doclint.args= jar')
-        os.chdir('../..')
-    elif anyChanges(dep, 'build/%s/lucene-%s-%s.jar' % (dep, dep, LUCENE_VERSION)):
-      print('build lucene %s JAR...' % dep)
-      os.chdir(dep)
-      # TODO: we disable compiler warnings because recent java (15+) is angry!
-      run('ant -Djavac.args= -Djavac.doclint.args= jar')
-      os.chdir('..')
-  os.chdir(ROOT_DIR)
-
 def compileChangedSources(srcPath, destPath, classPath):
   changedSources = []
   for root, dirNames, fileNames in os.walk(srcPath):
@@ -375,15 +369,6 @@ def getCompileClassPath():
   l = []
   for org, name, version in deps:
     l.append('lib/%s-%s.jar' % (name, version))
-  for dep in luceneDeps:
-    if dep.startswith('analyzers-'):
-      l.append('lucene6x/lucene/build/analysis/%s/lucene-%s-%s.jar' % (dep[10:], dep, LUCENE_VERSION))
-      libDir = 'lucene6x/lucene/analysis/%s/lib' % dep[10:]
-    else:
-      l.append('lucene6x/lucene/build/%s/lucene-%s-%s.jar' % (dep, dep, LUCENE_VERSION))
-      libDir = 'lucene6x/lucene/%s/lib' % dep
-    if os.path.exists(libDir):
-      l.append('%s/*' % libDir)
     
   return l
 
@@ -392,11 +377,6 @@ def getTestClassPath():
   l.append('build/classes/java')
   for org, name, version in testDeps:
     l.append('lib/%s-%s.jar' % (name, version))
-  for dep in luceneTestDeps:
-    if dep.startswith('analyzers-'):
-      l.append('lucene6x/lucene/build/analysis/%s/lucene-%s-%s.jar' % (dep[10:], dep, LUCENE_VERSION))
-    else:
-      l.append('lucene6x/lucene/build/%s/lucene-%s-%s.jar' % (dep, dep, LUCENE_VERSION))
   return l
 
 def getArg(option):
@@ -430,12 +410,6 @@ def compileSourcesAndDeps(jarVersion):
     destFileName = 'lib/%s-%s.jar' % (dep[1], dep[2])
     if not os.path.exists(destFileName):
       fetchMavenJAR(*(dep + (destFileName,)))
-
-  if not os.path.exists('lucene6x'):
-    print('init: cloning lucene branch_6x to ./lucene6x...')
-    run('git clone --depth 1 -b branch_6_3 https://github.com/apache/lucene-solr.git lucene6x')
-
-  compileLuceneModules(luceneDeps)
 
   # compile luceneserver sources
   jarFileName = 'build/luceneserver-%s.jar' % jarVersion
@@ -519,16 +493,6 @@ def main():
         z.write(jarFileName, '%s/lib/luceneserver-%s.jar' % (rootDirName, jarVersion))
         for org, name, version in deps:
           z.write('lib/%s-%s.jar' % (name, version), '%s/lib/%s-%s.jar' % (rootDirName, name, version))
-        for dep in luceneDeps:
-          if dep.startswith('analyzers-'):
-            z.write('lucene6x/lucene/build/analysis/%s/lucene-%s-%s.jar' % (dep[10:], dep, LUCENE_VERSION), '%s/lib/lucene-%s-%s.jar' % (rootDirName, dep, LUCENE_VERSION))
-            libDir = 'lucene6x/lucene/analysis/%s/lib' % dep[10:]
-          else:
-            z.write('lucene6x/lucene/build/%s/lucene-%s-%s.jar' % (dep, dep, LUCENE_VERSION), '%s/lib/lucene-%s-%s.jar' % (rootDirName, dep, LUCENE_VERSION))
-            libDir = 'lucene6x/lucene/%s/lib' % dep
-          if os.path.exists(libDir):
-            for name in os.listdir(libDir):
-              z.write('%s/%s' % (libDir, name), '%s/lib/%s' % (rootDirName, name))
         z.write('scripts/indexTaxis.py', '%s/scripts/indexTaxis.py' % rootDirName)
         z.write('CHANGES.txt', '%s/CHANGES.txt' % rootDirName)
         z.write('README.md', '%s/README.md' % rootDirName)
@@ -544,8 +508,6 @@ def main():
       verbose = getFlag('-verbose')
 
       jarFileName = compileSourcesAndDeps(LUCENE_SERVER_VERSION)
-
-      compileLuceneModules(luceneTestDeps)
 
       for dep in testDeps:
         destFileName = 'lib/%s-%s.jar' % (dep[1], dep[2])
@@ -649,7 +611,7 @@ def main():
       suiteCount = 0
       while True:
         for jvm in jvms:
-          if jvm.isAlive():
+          if jvm.is_alive():
             break
         else:
           break

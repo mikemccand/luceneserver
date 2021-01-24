@@ -21,11 +21,7 @@ import java.util.Map;
 
 import org.apache.lucene.expressions.Bindings;
 import org.apache.lucene.index.DocValuesType;
-import org.apache.lucene.queries.function.ValueSource;
-import org.apache.lucene.queries.function.valuesource.DoubleFieldSource;
-import org.apache.lucene.queries.function.valuesource.FloatFieldSource;
-import org.apache.lucene.queries.function.valuesource.IntFieldSource;
-import org.apache.lucene.queries.function.valuesource.LongFieldSource;
+import org.apache.lucene.search.DoubleValuesSource;
 
 /** Implements {@link Bindings} on top of the registered
  *  fields. */
@@ -39,9 +35,9 @@ public final class FieldDefBindings extends Bindings {
   }
 
   @Override
-  public ValueSource getValueSource(String name) {
+  public DoubleValuesSource getDoubleValuesSource(String name) {
     if (name.equals("_score")) {
-      return getScoreValueSource();
+      return DoubleValuesSource.SCORES;
     }
     FieldDef fd = fields.get(name);
     if (fd == null) {
@@ -51,13 +47,13 @@ public final class FieldDefBindings extends Bindings {
       return fd.valueSource;
     } else if (fd.fieldType != null && fd.fieldType.docValuesType() == DocValuesType.NUMERIC) {
       if (fd.valueType == FieldDef.FieldValueType.INT) {
-        return new IntFieldSource(name);
+        return DoubleValuesSource.fromIntField(name);
       } else if (fd.valueType == FieldDef.FieldValueType.FLOAT) {
-        return new FloatFieldSource(name);
+        return DoubleValuesSource.fromFloatField(name);
       } else if (fd.valueType == FieldDef.FieldValueType.LONG) {
-        return new LongFieldSource(name);
+        return DoubleValuesSource.fromLongField(name);
       } else if (fd.valueType == FieldDef.FieldValueType.DOUBLE) {
-        return new DoubleFieldSource(name);
+        return DoubleValuesSource.fromDoubleField(name);
       } else {
         assert false: "unknown numeric field type: " + fd.valueType;
         return null;

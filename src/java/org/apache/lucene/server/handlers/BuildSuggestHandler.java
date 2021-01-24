@@ -32,6 +32,7 @@ import org.apache.lucene.analysis.tokenattributes.OffsetAttribute;
 import org.apache.lucene.expressions.Expression;
 import org.apache.lucene.expressions.js.JavascriptCompiler;
 import org.apache.lucene.facet.taxonomy.SearcherTaxonomyManager.SearcherAndTaxonomy;
+import org.apache.lucene.search.DoubleValuesSource;
 import org.apache.lucene.search.suggest.DocumentDictionary;
 import org.apache.lucene.search.suggest.DocumentValueSourceDictionary;
 import org.apache.lucene.search.suggest.InputIterator;
@@ -474,7 +475,8 @@ public class BuildSuggestHandler extends Handler {
         
         dict = new DocumentValueSourceDictionary(searcher.searcher.getIndexReader(),
                                                  suggestField,
-                                                 expr.getValueSource(indexState.exprBindings),
+                                                 // nocommit, should we be converting to long?
+                                                 expr.getDoubleValuesSource(indexState.exprBindings).toLongValuesSource(),
                                                  payloadField);
       }
 

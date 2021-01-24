@@ -29,7 +29,7 @@ import java.util.TimeZone;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.FieldType;
 import org.apache.lucene.index.DocValuesType;
-import org.apache.lucene.queries.function.ValueSource;
+import org.apache.lucene.search.DoubleValuesSource;
 import org.apache.lucene.search.similarities.Similarity;
 import org.apache.lucene.util.CloseableThreadLocal;
 
@@ -80,7 +80,7 @@ public class FieldDef implements Closeable {
   public final boolean highlighted;
 
   /** Only set for a virtual field (expression). */
-  public final ValueSource valueSource;
+  public final DoubleValuesSource valueSource;
 
   /** True if this field is indexed as a dimensional point */
   public final boolean usePoints;
@@ -103,7 +103,7 @@ public class FieldDef implements Closeable {
   public FieldDef(String name, FieldType fieldType, FieldValueType valueType, String faceted,
                   String postingsFormat, String docValuesFormat, boolean multiValued, boolean usePoints,
                   Similarity sim, Analyzer indexAnalyzer, Analyzer searchAnalyzer, boolean highlighted,
-                  ValueSource valueSource, String dateTimeFormat) {
+                  DoubleValuesSource valueSource, String dateTimeFormat) {
     this.name = name;
     this.fieldType = fieldType;
     if (fieldType != null) {
