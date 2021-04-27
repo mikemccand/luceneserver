@@ -150,6 +150,8 @@ def parseLog(f=None):
       author = None
     elif len(line) == 0:
       pass
+    elif line.startswith('Merge: '):
+      pass
     elif line.startswith('Author: '):
       # TODO: we could offer facets on this?
       author = line[8:line.find(' <')].strip()
@@ -180,7 +182,13 @@ def parseLog(f=None):
       letter = line[0]
       if letter not in ('M', 'A', 'D', 'R'):
         raise RuntimeError('WEIRD LETTER %s in line %s' % (letter, line))
-      path = line[1:].strip()
+
+      # #16: take care even for "files moved" which looks something like this:
+      #
+      #   R100    lucene/contrib/queries/lib/jakarta-regexp-LICENSE-ASL.txt       lucene/contrib/sandbox/lib/jakarta-regexp-LICENSE-ASL.txt
+      #
+      path = line.split('\t', 1)[1]
+      
       fixed = fixPath(path)
       if fixed is not None:
         s = '%s:%s' % (letter, fixed)
@@ -199,7 +207,7 @@ def refresh():
   cwd = os.getcwd()
   try:
     os.chdir(localconstants.LUCENE_TRUNK_GIT_CLONE)
-    if os.system('git pull origin master') == 0:
+    if os.system('git pull origin main') == 0:
       s = os.popen('git log --reverse --name-status %s..HEAD' % maxRev).read()
       open(GIT_HISTORY_FILE, 'ab').write(s.encode('utf-8'))
       f = io.StringIO(s)
@@ -220,7 +228,7 @@ if __name__ == '__main__':
     #print('%s' % k)
     sum += len(v)
     #for x in v:
-      #print('  %s' % x[1])
+      #print('  %s' % str(x))
   print('  %d total paths' % sum)
 
   x, changedIssues = refresh()
