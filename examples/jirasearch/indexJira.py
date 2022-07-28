@@ -283,7 +283,7 @@ def removeAllGhosts():
       v = pickle.loads(v)
       for ent in v['changelog']['histories']:
         for d in ent['items']:
-          if d['field'] == 'Key':
+          if 'field' in d and d['field'] == 'Key':
             oldKey = d['fromString']
             print('issue %s renamed to %s; now remove %s' % (oldKey, k, oldKey))
             toDelete.append(oldKey)
@@ -482,7 +482,7 @@ def main():
             # Remove ghost of any just renamed issues:
             for ent in issue['changelog']['histories']:
               for d in ent['items']:
-                if d['field'] == 'Key':
+                if 'field' in d and d['field'] == 'Key':
                   oldKey = d['fromString']
                   print('issue %s renamed to %s; now remove %s' % (oldKey, issue['key'], oldKey))
                   c.execute('DELETE FROM issues WHERE key = ?', (oldKey,))
@@ -561,7 +561,7 @@ def buildFullSuggest(svr):
     for change in issue['changelog']['histories']:
       didAttach = False
       for item in change['items']:
-        if item['field'] == 'Attachment':
+        if 'field' in item and item['field'] == 'Attachment':
           didAttach = True
 
       if didAttach:
