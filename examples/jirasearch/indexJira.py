@@ -46,7 +46,11 @@ DB_PATH = localconstants.DB_PATH
 
 MY_EPOCH = datetime.datetime(year=2014, month=1, day=1)
 
-issueToCommitPaths = gitHistory.parseLog()
+if True:
+  issueToCommitPaths = gitHistory.parseLog()
+else:
+  issueToCommitPaths = {}
+
 try:
   with open('%s/userNamesMap.pk' % localconstants.ROOT_STATE_PATH, 'rb') as f:
     userNameToDisplayName = pickle.loads(f.read())
@@ -55,7 +59,7 @@ except FileNotFoundError:
 except:
   print('WARNING: unable to load prior user names map; starting new one')
   userNameToDisplayName = {}
-
+    
 # For some insane reason, Doug has no display name ;)
 userNameToDisplayName['cutting@apache.org'] = 'Doug Cutting'
 
@@ -408,7 +412,7 @@ def main():
         print('Last Jira update: %s' % lastUpdate)
         break
       if lastUpdate is None:
-        lastUpdate = now - datetime.timedelta(days=10)
+        lastUpdate = now - datetime.timedelta(days=14)
     finally:
       db.close()
       db = None
@@ -541,7 +545,8 @@ def buildFullSuggest(svr):
     key = issue['key'].lower()
     fields = issue['fields']
     project = fixProject(fields['project']['name'])
-    addUser(allUsers, fields['reporter'], project, key)
+    if fields['reporter'] is not None:
+      addUser(allUsers, fields['reporter'], project, key)
     assignee = fields['assignee']
     if assignee is not None:
       addUser(allUsers, assignee, project, key)
@@ -743,8 +748,9 @@ def indexDocs(svr, issues, printIssue=False, updateSuggest=False):
       doc['facetPriority'] = p['name']
       doc['priority'] = int(p['id'])
 
-    doc['reporter'] = fields['reporter']['displayName']
-    addUser(allUsers, fields['reporter'], project)
+    if fields['reporter'] is not None:
+      doc['reporter'] = fields['reporter']['displayName']
+      addUser(allUsers, fields['reporter'], project)
     assignee = fields['assignee']
     if assignee is not None:
       doc['assignee'] = assignee['displayName']
@@ -792,12 +798,12 @@ def indexDocs(svr, issues, printIssue=False, updateSuggest=False):
     doc['components'] = l2
 
     attachments = set()
-    #print('\nISSUE: %s' % key.upper())
+    #print('\nISSUE: %s' % key.upper().strip())
     for change in issue['changelog']['histories']:
       #print('  change: %s' % str(change))
       didAttach = False
       for item in change['items']:
-        if item['field'] == 'Attachment':
+        if 'field' in item and item['field'] == 'Attachment':
           didAttach = True
           if 'toString' in item and item['toString'] is not None:
             name = item['toString'].lower()
