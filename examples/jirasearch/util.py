@@ -28,14 +28,14 @@ local = threading.local()
 nonceLock = threading.Lock()
 nonce = 0
 
-if not os.path.exists(localconstants.logDir):
-  os.makedirs(localconstants.logDir)
+if not os.path.exists(localconstants.LOG_DIR):
+  os.makedirs(localconstants.LOG_DIR)
 
 now = datetime.datetime.now()
 suffix = ''
 while True:
   fileName = '%s/%04d%02d%02d-%02d%02d%02d%s.log' % \
-             (localconstants.logDir, now.year, now.month, now.day, now.hour, now.minute, now.second, suffix)
+             (localconstants.LOG_DIR, now.year, now.month, now.day, now.hour, now.minute, now.second, suffix)
   if os.path.exists(fileName):
     if suffix == '':
       suffix = '-0'
@@ -47,6 +47,12 @@ while True:
 logFile = open(fileName, 'wb')
 
 logFileLock = threading.Lock()
+
+def get_or_none(obj, attr):
+    if obj is None or not hasattr(obj, attr):
+        return None
+    else:
+        getattr(obj, attr)
 
 def setNonce(environ):
   global nonce

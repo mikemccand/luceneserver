@@ -38,7 +38,7 @@ Handles incoming queries for the search UI.
 
 TRACE = False
 
-if not localconstants.isDev:
+if not localconstants.IS_DEV:
   TRACE = False
 
 allProjects = ('Tika', 'Solr', 'Lucene', 'Infrastructure')

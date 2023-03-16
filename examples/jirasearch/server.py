@@ -53,7 +53,7 @@ Entry point when you run the UI server from the command-line (not via Apache).
 """
 
 LUCENE_SERVER_VERSION = localconstants.LUCENE_SERVER_VERSION
-isDev = localconstants.isDev
+IS_DEV = localconstants.IS_DEV
 
 if False:
   # TODO: messy
@@ -139,7 +139,7 @@ def application(environ, startResponse):
   global handle
   global lastImportTime
 
-  if isDev:
+  if IS_DEV:
     t = os.path.getmtime('handle.py')
     if t > lastImportTime:
       print('Reload handle.py')
@@ -192,7 +192,7 @@ def main():
     try:
       idx = sys.argv.index('-port')
     except ValueError:
-      if isDev:
+      if IS_DEV:
         port = 10001
       else:
         port = 10000
@@ -204,7 +204,7 @@ def main():
     print('Ready on port %s' % port)
     httpd.serve_forever()
   finally:
-    if isDev:
+    if IS_DEV:
       svr.killServer()
 
 if __name__ == '__main__':
