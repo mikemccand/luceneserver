@@ -421,7 +421,7 @@ def main():
   tup = server.split(':')
   host = tup[0]
   if len(tup) == 1:
-    port = 4000
+    port = 8888
   elif len(tup) == 2:
     port = int(tup[1])
   else:

@@ -899,14 +899,16 @@ def renderJiraHits(w, text, groups, userDrillDowns):
 
     # hack alert!  really i should index a separate text+highlight field for this...
     if key.lower().replace('-', ' ') == lowerText:
-      key = '<b>%s</b>' % key
+      key = '<b>#%s</b>' % key
+    else:
+      key = '#' + key
     
     if 'closed' in fields['status']:
       skey = key
     else:
       skey = '<s>%s</s>' % key
 
-    issue_url = f'http://github.com/apache/{project}/issues/{key}'
+    issue_url = f'http://github.com/apache/{project}/issues/{key_orig}'
 
     w(f'<tr><td><br><a href="{issue_url}"><font size=+2>{skey}: {fix_hilite(fields["title"])}</font></a></td></tr>')
 
@@ -938,7 +940,7 @@ def renderJiraHits(w, text, groups, userDrillDowns):
           commentURL += ';a=commitdiff'
       else:
         commentURL = 'http://issues.apache.org/jira/browse/%s?focusedCommentId=%s&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-%s' % \
-                     (key, fields['comment_id'], fields['comment_id'])
+                     (key_orig, fields['comment_id'], fields['comment_id'])
 
       #authorDD = '<a href="" onclick="g(fcmd(event), \'allUsers\', \'%s\');return false;"><b>%s</b></a>' % (author, nonBreakingSpace(fix_hilite(author, 'allUsers')))
       authorDD = '<b>%s</b>' % fix_hilite(author, 'all_users', True)
