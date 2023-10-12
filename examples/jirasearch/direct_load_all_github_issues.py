@@ -6,16 +6,16 @@ import sys
 import pickle
 import sqlite3
 import time
+from localconstants import DB_PATH, GITHUB_API_TOKEN
 
 # TODO
 #   - should we bother loading all reactions to each comment!?
 #   - make histogram of PR age / complexity / engagement
 
-DB_PATH = 'github_issues.db'
-
 def http_load_as_json(url):
-    headers = {'Authorization': f'token {github_api_token}',
-               'Accept': 'application/vnd.github.full+json'}
+    headers = {'Authorization': f'token {GITHUB_API_TOKEN}',
+               'Accept': 'application/vnd.github.full+json',
+               'X-GitHub-Api-Version': '2022-11-28'}
     response = requests.get(url, headers=headers)
     if response.status_code != 200:
         raise RuntimeError(f'got {response.status_code} response loading {url}\n\n {response.text}')
@@ -83,7 +83,7 @@ def create_db():
     db.commit()
 
 if __name__ == '__main__':
-    global github_api_token, db
+    global db
 
     do_create = '-create' in sys.argv
     if do_create:
@@ -91,7 +91,6 @@ if __name__ == '__main__':
         if os.path.exists(DB_PATH):
             raise RuntimeError(f'please first remove DB {DB_PATH} with -create')
 
-    github_api_token = sys.argv[1]
     db = sqlite3.connect(DB_PATH)
 
     if do_create:

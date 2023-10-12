@@ -32,6 +32,7 @@ when you run this.
 """
 
 # TODO
+#   - separate out tool to incrementally update the sqllite DB, from NRT indexing?  but share its code, or maybe just return list of issues updated
 #   - pull out mentions / @calls
 #   - hmm: fix suggest to build jira AND github
 #   - separate user login vs display name more consistently
@@ -43,8 +44,9 @@ when you run this.
 all_projects = ('lucene',)
 
 # e.g.: "Migrated from [LUCENE-373](https://issues.apache.org/jira/browse/LUCENE-373) by Andrew Stevens, 1 vote, updated Jul 28 2015"
+# e.g.: "Migrated from [LUCENE-2160](https://issues.apache.org/jira/browse/LUCENE-2160) by John Wang"
 
-re_jira_migrated = re.compile(r'Migrated from \[(LUCENE-\d+)\].*? by (.*?)(?:, (\d+) votes?)?, (?:resolved|updated) (.*)$', re.MULTILINE)
+re_jira_migrated = re.compile(r'Migrated from \[(LUCENE-\d+)\].*? by (.*?)(?:, (\d+) votes?)?(?:, (resolved|updated) (.*))?$', re.MULTILINE)
 re_jira_creator = re.compile(r'(.*?) \(@(.*?)\)')
 re_github_issue_url = re.compile('^https://api.github.com/repos/apache/(.*?)/issues')
 reCommitURL = re.compile(r'\[(.*?)\]')
@@ -191,6 +193,8 @@ def create_schema(svr):
                             'facet': 'flat'},
             'has_commits': {'type': 'boolean',
                            'facet': 'flat'},
+            'is_draft': {'type': 'boolean',
+                         'facet': 'flat'},
             'comment_count': {'type': 'int',
                               'sort': True,
                               'store': True},
@@ -765,19 +769,19 @@ def extract_project(issue):
   return m.group(1)
 
 def extract_reporter(issue):
-  m = re_jira_migrated.search(issue['body'])
-  if m is not None:
-    m2 = re_jira_creator.match(m.group(2))
-    if m2 is not None:
-      name = m2.group(1)
-      login = m2.group(2)
-    else:
-      name = m.group(2)
-      login = None
-    return {'name': name, 'login': login}
-  else:
-    print(json.dumps(issue, indent=2))
-    return {'name': None, 'login': issue['creator']['login']}
+  if issue['body'] is not None:
+    m = re_jira_migrated.search(issue['body'])
+    if m is not None:
+      m2 = re_jira_creator.match(m.group(2))
+      if m2 is not None:
+        name = m2.group(1)
+        login = m2.group(2)
+      else:
+        name = m.group(2)
+        login = None
+      return {'name': name, 'login': login}
+  # print(json.dumps(issue, indent=2))
+  return {'name': None, 'login': issue['user']['login']}
 
 def index_docs(svr, issues, printIssue=False, updateSuggest=False):
 
@@ -826,20 +830,27 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
            'parent': True,
            'title': issue['title']}
 
-    if reactions is not None:
-      # print(f'reactions: {reactions}')
-      reaction_count = 0
+    reaction_count = issue['reactions']['total_count']
+    doc['reaction_count'] = reaction_count
+    
+    if reactions is not None and len(reactions) > 0:
+      print(f'reactions: {reactions}')
+      if reaction_count != len(reactions):
+        print(f'WARNING: issue {issue["number"]} claims {reaction_count} reactions but saw {len(reactions)}')
+      if len(reactions) > 0:
+        print(json.dumps(issue, indent=2))
       reaction_names = set()
-      for reaction in reactions:
-        if reaction['count'] > 0:
-          reaction_names.add(reaction)
-          reaction_count += reactions[reaction]
+      for k, v in issue['reactions'].items():
+        if k in ('url', 'total_count'):
+          continue
+        assert type(v) is int
+        if v > 0:
+          reaction_names.add(k)
       doc['reactions'] = list(reaction_names)
-      doc['reaction_count'] = reaction_count
 
     for event in events:
-      if event['event'] != 'closed':
-        print(f'event: {json.dumps(event, indent=2)}')
+      #if event['event'] != 'closed':
+        #print(f'event: {json.dumps(event, indent=2)}')
       #print(f'event: {event.actor.login} {event.event} {event.created_at} {event.label} {event.assignee} {event.assigner} {event.review_requester} {event.requested_reviewer} {event.dismissed_review} {getattr(event, "team", None)} {event.milestone} {event.rename} {event.lock_reason}')
 
       add_user(all_users, event['actor'], project)
@@ -905,9 +916,10 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
             doc['reaction_count'] += int(m.group(3))
           else:
             doc['reaction_count'] = int(m.group(3))
-        print(f'parse closed: {m.group(4)}')
-        closed_dt = datetime.datetime.strptime(m.group(4).strip(), '%b %d %Y')
-        doc['closed'] = int(float(closed_dt.timestamp()))
+        if m.group(4) == 'resolved':
+          closed_dt = datetime.datetime.strptime(m.group(5).strip(), '%b %d %Y')
+          #doc['closed'] = int(float(closed_dt.timestamp()))
+          doc['closed'] = int(closed_dt.timestamp())
     else:
       # this is OK, e.g. https://github.com/apache/lucene/pull/945
       # print(f'WARNING: issue {number} has no body!')
