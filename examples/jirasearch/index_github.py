@@ -16,7 +16,7 @@ import datetime
 import localconstants
 import util
 import gitHistory
-from load_all_github_issues import load_full_issue
+from direct_load_all_github_issues import http_load_as_json, load_full_issue
 
 from util import get_or_none
 
@@ -33,14 +33,18 @@ when you run this.
 
 # TODO
 #   - pull out mentions / @calls
-
-# fields to add
-#   - has votes / vote count facet
+#   - hmm: fix suggest to build jira AND github
+#   - separate user login vs display name more consistently
+#   - parse legacy jira attachments comment, but also new github issue attachments
+#   - add
+#     - has votes / vote count facet
 
 # all_projects = ('Infrastructure', 'Tika', 'Solr', 'Lucene')
 all_projects = ('lucene',)
 
-re_jira_migrated = re.compile(r'Migrated from \[(LUCENE-\d+)\].*? by (.*?)(?:, (\d+) votes?)?, resolved (.*)$', re.MULTILINE)
+# e.g.: "Migrated from [LUCENE-373](https://issues.apache.org/jira/browse/LUCENE-373) by Andrew Stevens, 1 vote, updated Jul 28 2015"
+
+re_jira_migrated = re.compile(r'Migrated from \[(LUCENE-\d+)\].*? by (.*?)(?:, (\d+) votes?)?, (?:resolved|updated) (.*)$', re.MULTILINE)
 re_jira_creator = re.compile(r'(.*?) \(@(.*?)\)')
 re_github_issue_url = re.compile('^https://api.github.com/repos/apache/(.*?)/issues')
 reCommitURL = re.compile(r'\[(.*?)\]')
@@ -55,6 +59,7 @@ reCode2 = re.compile('{code}(.*?){code}', re.DOTALL)
 reUserName = re.compile(r'(\[~.*?\])')
 
 DB_PATH = localconstants.DB_PATH
+GITHUB_API_TOKEN = localconstants.GITHUB_API_TOKEN
 
 MY_EPOCH = datetime.datetime(year=2014, month=1, day=1)
 
@@ -81,16 +86,20 @@ def prettyPrintJSON(obj):
                    indent=4, separators=(',', ': ')))
 
 def parse_date_time(s):
-  if s.endswith('+0000'):
-    s = s[:-5]
-  i = s.find('.')
-  if i != -1:
-    fraction = float(s[i:])
-    s = s[:i]
-  else:
-    fraction = 0.0
-  dt = datetime.datetime.strptime(s, "%Y-%m-%dT%H:%M:%S")
-  return dt + datetime.timedelta(microseconds=int(fraction*1000000))
+  if False:
+    if s.endswith('+0000'):
+      s = s[:-5]
+    i = s.find('.')
+    if i != -1:
+      fraction = float(s[i:])
+      s = s[:i]
+    else:
+      fraction = 0.0
+    dt = datetime.datetime.strptime(s, "%Y-%m-%dT%H:%M:%S")
+    return dt + datetime.timedelta(microseconds=int(fraction*1000000))
+
+  # GitHub uses ISO8601:
+  return datetime.datetime.fromisoformat(s)
 
 ICU_RULES = open('Latin-dont-break-issues.rbbi').read()
 
@@ -200,6 +209,9 @@ def create_schema(svr):
             'labels': {'type': 'atom',
                        'multiValued': True,
                        'facet': 'flat'},
+            'reactions': {'type': 'atom',
+                          'multiValued': True,
+                          'facet': 'flat'},
             'created': {'type': 'long',
                         'store': True,
                         'sort': True},
@@ -315,7 +327,10 @@ def create_schema(svr):
 
 def removeAllGhosts():
   # Remove ghost of renamed issues:
+
+  # we need read/write access here:
   db = sqlite3.connect(DB_PATH)
+  
   try:
     toDelete = []
     for k, v in c.execute('SELECT key, body FROM issues'):
@@ -333,14 +348,16 @@ def removeAllGhosts():
   finally:
     db.close()
 
-def all_issues():
+def connect_db_readonly():
   path = f'file:{DB_PATH}?mode=ro'
-  print(f'Using path {path}')
-  db = sqlite3.connect(path, uri=True, timeout=120)
+  return sqlite3.connect(path, uri=True, timeout=120)
+
+def all_issues():
+  db = connect_db_readonly()
   try:
     c = db.cursor()
     for k, v in c.execute('SELECT key, pickle FROM issues'):
-      if k in ('last_update', 'next_url'):
+      if k in ('last_update', 'page_upto'):
         continue
       try:
         yield pickle.loads(v)
@@ -352,7 +369,7 @@ def all_issues():
     db.close()
 
 def specificIssues(issues):
-  db = sqlite3.connect(f'file:{DB_PATH}?mode=ro', uri=True)
+  db = connect_db_readonly()
   try:
     c = db.cursor()
     for issue in issues:
@@ -367,7 +384,7 @@ def specificIssues(issues):
     db.close()
 
 def issuesUpdatedAfter(minTimeStamp):
-  db = sqlite3.connect(DB_PATH)
+  db = connect_db_readonly()
   try:
     c = db.cursor()
     for k, v in c.execute('SELECT key, pickle FROM issues'):
@@ -436,71 +453,78 @@ def main():
   elif svr.send('indexStatus', {'indexName': 'jira'})['status'] != 'started':
     svr.send('startIndex', {'indexName': 'jira'})
 
-  if getFlag('-buildFullSuggest'):
-    buildFullSuggest(svr)
+  if getFlag('-build_full_suggest'):
+    build_full_suggest(svr)
     
   if getFlag('-nrt'):
+    nrtIndexForever()
 
-    now = datetime.datetime.utcnow()
 
-    # First, catch up since last commit:
-    if False:
-      commitUserData = svr.send('getCommitUserData', {'indexName': 'jira'})
-      last_commit_time = pickle.loads(eval(commitUserData['last_commit_time']))
-      print('Last commit time %s (%s ago); now catch up' %
-            (last_commit_time, now - last_commit_time))
-      index_docs(svr, issuesUpdatedAfter(last_commit_time), updateSuggest=True)
+def nrtIndexForever():
+  now = datetime.datetime.utcnow()
 
-    db = sqlite3.connect(DB_PATH)
-    c = db.cursor()
+  # First, catch up since last commit:
+  if False:
+    commitUserData = svr.send('getCommitUserData', {'indexName': 'jira'})
+    last_commit_time = pickle.loads(eval(commitUserData['last_commit_time']))
+    print('Last commit time %s (%s ago); now catch up' %
+          (last_commit_time, now - last_commit_time))
+    index_docs(svr, issuesUpdatedAfter(last_commit_time), updateSuggest=True)
 
-    last_update_utc = None
-    rows = c.execute('SELECT pickle FROM issues WHERE key="last_update"').fetchall()
-    if len(rows) == 1:
-      last_update_utc = pickle.loads(rows[0][0])
-    else:
-      raise RuntimeError(f'should be one row with "last_update" key but found {len(rows)}')
-    if last_update_utc is None:
-      print('WARNING: no last_update -- crawling all updates from two weeks ago until now')
-      last_update_utc = now - datetime.timedelta(days=14)
+  # not read only, because we write new issue/pr updates into it:
+  db = sqlite3.connect(DB_PATH)
+  c = db.cursor()
 
-    g = github.Github(github_access_token)
-    rate_limit = g.get_rate_limit()
-    print(f'\n\nRate limit: {rate_limit.core}')
-    
-    repo = g.get_repo('apache/lucene')
-    
-    first = False
-    lastSuggestBuild = time.time()
-    lastGITBuild = 0
-    lastCommit = time.time()
-    # Force a git refresh on startup:
-    any_updates_since_git = True
+  last_update_utc = None
+  rows = c.execute('SELECT pickle FROM issues WHERE key="last_update"').fetchall()
+  if len(rows) == 1:
+    last_update_utc = pickle.loads(rows[0][0])
+  else:
+    raise RuntimeError(f'should be one row with "last_update" key but found {len(rows)}')
+  if last_update_utc is None:
+    print('WARNING: no last_update -- crawling all updates from two weeks ago until now')
+    last_update_utc = now - datetime.timedelta(days=14)
 
+  first = False
+  lastSuggestBuild = time.time()
+  lastGITBuild = 0
+  lastCommit = time.time()
+  # Force a git refresh on startup:
+  any_updates_since_git = True
+
+  while True:
+
+    nrt_started_utc = datetime.datetime.utcnow()
+
+    since_utc = last_update_utc - datetime.timedelta(seconds=60)
+
+    print('\n%s: nrt index' % datetime.datetime.now())
+    print(f'  use since={since_utc} ({(nrt_started_utc-since_utc).total_seconds()} seconds ago)')
+    print(f'  GitHub rate_limit={g.get_rate_limit()}')
+
+    page = 1
+
+    # in case we need to load multiple pages to get the updated issues:
     while True:
 
-      nrt_started_utc = datetime.datetime.utcnow()
-
-      since_utc = last_update_utc - datetime.timedelta(seconds=60)
-
-      print('\n%s: nrt index' % datetime.datetime.now())
-      print(f'  use since={since_utc} ({(nrt_started_utc-since_utc).total_seconds()} seconds ago)')
-      print(f'  GitHub rate_limit={g.get_rate_limit()}')
-      updated_issues = repo.get_issues(state='all', sort='updated', direction='asc', since=since_utc)
-      print(f'  {updated_issues.totalCount} issues updated to load')
+      # hopefully we never wind up throttling here due to too many issue updates versus GitHub API rate limit!
+      batch = http_load_as_json(f'https://api.github.com/repos/apache/lucene/issues?state=all&per_page=100&direction=asc&since={since_utc.isoformat()}&page={page}')
+      if page == 1:
+        total_count = batch['total_count']
+      print(f'  {total_count} issues updated to load')
 
       full_issues = []
 
-      for issue in updated_issues:
+      for issue in batch:
         any_updates_since_git = True
 
         now = datetime.datetime.now()
 
-        labels, comments, comment_reactions, events, reactions, timeline = load_full_issue(issue)
+        comments, events, reactions, timeline = load_full_issue(issue)
 
         c.execute('REPLACE INTO issues (key, pickle) VALUES (?, ?)',
-                  (str(issue.number), pickle.dumps((issue, labels, comments, comment_reactions, events, reactions, timeline))))
-        full_issues.append((issue, labels, comments, comment_reactions, events, reactions, timeline))
+                  (str(issue.number), pickle.dumps((issue, comments, events, reactions, timeline))))
+        full_issues.append((issue, comments, events, reactions, timeline))
 
         # Remove ghost of any just renamed issues:
         # nocommit TODO
@@ -512,42 +536,45 @@ def main():
                 print('issue %s renamed to %s; now remove %s' % (oldKey, issue['key'], oldKey))
                 c.execute('DELETE FROM issues WHERE key = ?', (oldKey,))
 
-      if len(full_issues) != updated_issues.totalCount:
-        print(f'WARNING: iterated through {len(full_issues)} issues but GitHub issues API claimed we would see {updated_issues.totalCount}')
+      page += 1
+      if not batch['incomplete_results']:
+        break
 
-      index_start_time_sec = time.time()
-      index_docs(svr, full_issues, printIssue=True, updateSuggest=True)
-      print(f'  {(time.time() - index_start_time_sec):.1f} sec to index')
+    if len(full_issues) != total_count:
+      print(f'WARNING: iterated through {len(full_issues)} issues but GitHub issues API claimed we would see {total_count}')
 
-      c.execute('REPLACE INTO issues (key, pickle) VALUES (?, ?)', ('last_update', pickle.dumps(nrt_started_utc),))
-      db.commit()
+    index_start_time_sec = time.time()
+    index_docs(svr, full_issues, printIssue=True, updateSuggest=True)
+    print(f'  {(time.time() - index_start_time_sec):.1f} sec to index')
 
-      total_issue_count = c.execute('SELECT COUNT(*) FROM issues').fetchone()[0]
+    c.execute('REPLACE INTO issues (key, pickle) VALUES (?, ?)', ('last_update', pickle.dumps(nrt_started_utc),))
+    db.commit()
 
-      last_update_utc = nrt_started_utc
+    total_issue_count = c.execute('SELECT COUNT(*) FROM issues').fetchone()[0]
 
-      print(f'  loaded and indexed {len(full_issues)} issues; {total_issue_count} issues in DB')
- 
-      if False:
-        # Check for git commits every 30 minutes:
-        if time.time() - lastGITBuild > 30*60 and any_updates_since_git:
-          lastGITBuild = time.time()
-          newIssueToCommitPaths, committedIssues = gitHistory.refresh()
-          # merge new git history into our in-memory version:
-          mergeIssueCommits(issueToCommitPaths, newIssueToCommitPaths)
-          print('  update from git commits...')
-          index_docs(svr, specificIssues(committedIssues), printIssue=True)
-          print('  done update from git commits...')
-          any_updates_since_git = False
+    last_update_utc = nrt_started_utc
 
-        # Commit once per day, so if server goes down we only need to
-        # reindex at most past day's worth of updated issues:
-        if now - last_commit_time > datetime.timedelta(days=1):
-          commit(svr, now)
-          last_commit_time = now
+    print(f'  loaded and indexed {len(full_issues)} issues; {total_issue_count} issues in DB')
 
-      time.sleep(30.0)
+    # Check for git commits every 30 minutes:
+    if time.time() - lastGITBuild > 30*60 and any_updates_since_git:
+      lastGITBuild = time.time()
+      newIssueToCommitPaths, committedIssues = gitHistory.refresh()
+      # merge new git history into our in-memory version:
+      mergeIssueCommits(issueToCommitPaths, newIssueToCommitPaths)
+      print('  update from git commits...')
+      index_docs(svr, specificIssues(committedIssues), printIssue=True)
+      print('  done update from git commits...')
+      any_updates_since_git = False
 
+    # Commit once per day, so if server goes down we only need to
+    # reindex at most past day's worth of updated issues:
+    if now - last_commit_time > datetime.timedelta(days=1):
+      commit(svr, now)
+      last_commit_time = now
+
+    time.sleep(5.0)
+  
 def mergeIssueCommits(issueToCommitPaths, newIssueToCommitPaths):
   for issue, ent in newIssueToCommitPaths.items():
     old = issueToCommitPaths.get(issue)
@@ -573,24 +600,23 @@ def build_full_suggest(svr):
   suggestFile = open('%s/jira.suggest' % localconstants.ROOT_STATE_PATH, 'wb')
   allUsers = {}
 
-  for issue, labels, comments, comment_reactions, events, reactions, timeline in all_issues():
-    key = issue.number
-    fields = issue['fields']
-    project = fixProject(fields['project']['name'])
-    if fields['reporter'] is not None:
-      add_user(allUsers, fields['reporter'], project, key)
-    assignee = fields['assignee']
-    if assignee is not None:
-      add_user(allUsers, assignee, project, key)
-    
-    #print('issue: %s' % key)
-    updated = parse_date_time(fields['created'])
-    for x in fields['comment']['comments']:
-      if x['comment_body'] != 'Closed after release.':
-        updated = max(updated, parse_date_time(x['created']))
-      add_user(allUsers, x['author'], project, key)
+  for issue, comments, events, reactions, timeline in all_issues():
+    key = issue['number']
+    project = extract_project(issue)
+    reporter = extract_reporter(issue)
+    add_user(allUsers, reporter, project, key)
 
-    for change in issue['changelog']['histories']:
+    if issue['assignees'] is not None and len(issue['assignees']) > 0:
+      for x in issue['assignees']:
+        add_user(all_users, x, project, key)
+    
+    updated = parse_date_time(fields['created_at'])
+    for comment in comments:
+      if comment['body'] != 'Closed after release.':
+        updated = max(updated, parse_date_time(comment['created']))
+      add_user(allUsers, comment['user'], project, key)
+
+    for change in events:
       didAttach = False
       for item in change['items']:
         if 'field' in item and item['field'] == 'Attachment':
@@ -694,9 +720,10 @@ def commit(svr, timeStamp):
   print('Commit took %.1f msec' % (1000*(time.time()-t0)))
 
 def is_commit_user(user):
+  #print(f'{user=}')
   for s in ('Commit Tag Bot', 'ASF subversion and git services', 'ASF GitHub Bot'):
-    if (user.name is not None and s in user.name) or \
-       (user.login is not None and s in user.login):
+    if ('name' in user and user['name'] is not None and s in user['name']) or \
+       ('login' in user and user['login'] is not None and s in user['login']):
       return True
   return False
 
@@ -724,11 +751,6 @@ def add_user(all_users, user, project, key=None):
   if login != '???' and display_name != '???':
     login_to_name[login] = display_name
 
-def fixProject(name):
-  if name == 'Lucene - Core':
-    name = 'Lucene'
-  return name
-
 class User:
   name = None
   login = None
@@ -738,9 +760,24 @@ class User:
     self.login = login
 
 def extract_project(issue):
-  m = re_github_issue_url.match(issue.url)
+  m = re_github_issue_url.match(issue['url'])
   assert m is not None
   return m.group(1)
+
+def extract_reporter(issue):
+  m = re_jira_migrated.search(issue['body'])
+  if m is not None:
+    m2 = re_jira_creator.match(m.group(2))
+    if m2 is not None:
+      name = m2.group(1)
+      login = m2.group(2)
+    else:
+      name = m.group(2)
+      login = None
+    return {'name': name, 'login': login}
+  else:
+    print(json.dumps(issue, indent=2))
+    return {'name': None, 'login': issue['creator']['login']}
 
 def index_docs(svr, issues, printIssue=False, updateSuggest=False):
 
@@ -755,19 +792,24 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
   issue_count = 0
   first = True
   
-  for issue, labels, comments, comment_reactions, events, reactions, timeline in issues:
+  for issue, comments, events, reactions, timeline in issues:
 
     project = extract_project(issue)
-
-    issue_count += 1
-
-    if printIssue:
-      print('  %s' % issue.number)
 
     if project not in all_projects:
       # This can happen when the issue is renamed to a project outside
       # of the ones we index:
       continue
+
+    issue_count += 1
+
+    number = issue['number']
+
+    print(f'\n\nnow index issue {number}')
+    #print(json.dumps(issue, indent=2))
+
+    if printIssue:
+      print(f'  {number}')
 
     # All users who have done something on this issue:
     all_users = {}
@@ -775,48 +817,51 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
     # TODO: break out issue type by the labels?
     # TODO: break out issue module by the labels?
 
-    number = issue.number
+    # TODO: does issue title have markup?
+
     key = str(number)
 
     doc = {'key': str(number),
            'number': number,
            'parent': True,
-           'title': issue.title}
+           'title': issue['title']}
 
     if reactions is not None:
-      print(f'reactions: {reactions}')
-      if False:
-        reaction_count = 0
-        reaction_names = set()
-        for reaction in ('+1', '-1', 'laugh', 'confused', 'heart', 'hooray', 'eyes', 'rocket'):
-          if reactions[reaction] > 0:
-            reaction_names.add(reaction)
-            reaction_count += reactions[reaction]
-        doc['reactions'] = list(reaction_names)
-        doc['reaction_count'] = reaction_count
+      # print(f'reactions: {reactions}')
+      reaction_count = 0
+      reaction_names = set()
+      for reaction in reactions:
+        if reaction['count'] > 0:
+          reaction_names.add(reaction)
+          reaction_count += reactions[reaction]
+      doc['reactions'] = list(reaction_names)
+      doc['reaction_count'] = reaction_count
 
     for event in events:
-      print(f'event: {event.actor.login} {event.event} {event.created_at} {event.label} {event.assignee} {event.assigner} {event.review_requester} {event.requested_reviewer} {event.dismissed_review} {getattr(event, "team", None)} {event.milestone} {event.rename} {event.lock_reason}')
+      if event['event'] != 'closed':
+        print(f'event: {json.dumps(event, indent=2)}')
+      #print(f'event: {event.actor.login} {event.event} {event.created_at} {event.label} {event.assignee} {event.assigner} {event.review_requester} {event.requested_reviewer} {event.dismissed_review} {getattr(event, "team", None)} {event.milestone} {event.rename} {event.lock_reason}')
+
+      add_user(all_users, event['actor'], project)
 
     # who opened the issue/PR
-    if issue.user is not None:
-      doc['reporter'] = issue.user.login
-      add_user(all_users, issue.user, project)
+    if issue['user'] is not None:
+      doc['reporter'] = issue['user']['login']
+      add_user(all_users, issue['user'], project)
 
     # TODO: what is body vs body_text?  markup removed?
-    if issue.body is not None:
-      doc['body'] = cleanGitHubMarkup(number, issue.body)
+    if issue['body'] is not None:
+      doc['body'] = clean_github_markdown(number, issue['body'])
 
-    if issue.locked:
-      doc['locked'] = issue.lock_reason
+    if issue['locked']:
+      doc['locked'] = issue['lock_reason']
 
     doc['project'] = project
 
-    doc['status'] = issue.state
-    if hasattr(issue, 'state_reason') and issue.state_reason is not None:
-      doc['status'] += f' ({issue.state_reason})'
+    doc['status'] = issue['state']
+    if 'state_reason' in issue and issue['state_reason'] is not None:
+      doc['status'] += f' ({issue["state_reason"]})'
 
-    #print(key)
     if False:
       p = fields['priority']
       if p is not None:
@@ -824,41 +869,36 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
         doc['priority'] = int(p['id'])
 
     # milestone
-    if issue.milestone is not None:
-      doc['milestone'] = issue.milestone.title
+    if issue['milestone'] is not None:
+      doc['milestone'] = issue['milestone']['title']
 
     # assignee / assignees
     # TODO: what to do about multiple assignees?  does it really happen?
-    if issue.assignees is not None and len(issue.assignees) > 0:
+    if issue['assignees'] is not None and len(issue['assignees']) > 0:
       assignees = []
-      print(f'multiple assignees!! {len(issue.assignees)}')
-      for x in issue.assignees:
-        assignees.append(x.login)
-        print(f' n{x}')
+      #print(f'multiple assignees!! {len(issue["assignees"])}')
+      #print(f'  assignee={issue["assignee"]}')
+      if len(issue['assignees']) > 1:
+        print(f'multiple assignees!! {len(issue["assignees"])}')
+        print(f'  assignees={json.dumps(issue["assignees"], indent=2)}')
+        print(f'  assignee={json.dumps(issue["assignee"], indent=2)}')
+        
+      for x in issue['assignees']:
+        assignees.append(x['login'])
         add_user(all_users, x, project)
-        doc['assignee'] = x.login
-    elif issue.assignee is not None:
-      doc['assignee'] = issue.assignee.login
-      add_user(all_users, issue.assignee, project)
+        doc['assignee'] = x['login']
+    elif issue['assignee'] is not None:
+      doc['assignee'] = issue['assignee']['login']
+      add_user(all_users, issue['assignee'], project)
     else:
       doc['assignee'] = 'Unassigned'
 
-    if issue.body is not None:
-      m = re_jira_migrated.search(issue.body)
+    if issue['body'] is not None:
+      m = re_jira_migrated.search(issue['body'])
       if m is not None:
         # try to preserve original Jira metadata if possible:
         doc['old_jira_id'] = m.group(1)
 
-        m2 = re_jira_creator.match(m.group(2))
-        if m2 is not None:
-          name = m2.group(1)
-          login = m2.group(2)
-        else:
-          name = m.group(2)
-          login = None
-        doc['reporter'] = name
-        # TODO: break into id and display name
-        add_user(all_users, User(name, login), project)
         # TODO: turn into datetime or long?
         if m.group(3) is not None:
           if 'reaction_count' in doc:
@@ -868,14 +908,18 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
         print(f'parse closed: {m.group(4)}')
         closed_dt = datetime.datetime.strptime(m.group(4).strip(), '%b %d %Y')
         doc['closed'] = int(float(closed_dt.timestamp()))
-      elif hasattr(issue, 'creator') and issue.creator is not None:
-        raise RuntimeError('foobar')
-        doc['reporter'] = issue.creator.login
-        add_user(all_users, issue.creator, project)
     else:
       # this is OK, e.g. https://github.com/apache/lucene/pull/945
       # print(f'WARNING: issue {number} has no body!')
       pass
+
+    reporter = extract_reporter(issue)
+    if reporter['login'] is not None:
+      s = reporter['login']
+    else:
+      s = reporter['name']
+    if s is not None:
+      doc['reporter'] = s
 
     doc['has_reactions'] = doc.get('reaction_count', 0) > 0
 
@@ -949,31 +993,32 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
 
     has_commits = False
     
-    doc['comment_count'] = issue.comments
-    doc['is_pull_request'] = issue.pull_request is not None
+    doc['comment_count'] = issue['comments']
+    doc['is_pull_request'] = 'pull_request' in issue
     # TODO: merged_at?
 
-    if issue.created_at is not None:
-      doc['created'] = int(issue.created_at.timestamp())
-    if issue.closed_at is not None:
-      doc['closed'] = int(issue.closed_at.timestamp())
-    doc['updated'] = int(issue.updated_at.timestamp())
-    updated = issue.updated_at
-    if issue.closed_by is not None:
-      doc['closed_by'] = issue.closed_by.login
+    if issue['created_at'] is not None:
+      print(f'{issue["created_at"]}')
+      doc['created'] = int(parse_date_time(issue['created_at']).timestamp())
+    if issue['closed_at'] is not None:
+      doc['closed'] = int(parse_date_time(issue['closed_at']).timestamp())
+    updated = parse_date_time(issue['updated_at'])
+    doc['updated'] = int(updated.timestamp())
 
-    if hasattr(issue, 'draft'):
+    # TODO: is there a closed_by user?
+
+    if 'draft' in issue:
       print('NOTE HAS DRAFT')
-      doc['is_draft'] = issue.draft
+      doc['is_draft'] = issue['draft']
 
     labels = []
     facet_modules = []
     jira_resolution = None
-    for x in issue.labels:
+    for x in issue['labels']:
       if type(x) is str:
         label = x
       else:
-        label = x.name
+        label = x['name']
       print(f'  label: {label}')
       if label.startswith('type:'):
         if 'issue_type' in doc:
@@ -1001,27 +1046,29 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
         doc['legacy_jira_labels'].append(label[18:])
       else:
         labels.append(label)
-      
     doc['labels'] = labels
     doc['facet_modules'] = facet_modules
-    for i, x in enumerate(comments):
-      #print(f'comment: {x.user} {x.url} {x.created_at} {x.updated_at} {list(x.get_reactions())}\n  {x.body}')
-      #print(f'comment: {dir(x)} {dir(comment_reactions[i])}')
-      add_user(all_users, x.user, project)
-      # each comment has an array of reactions:
-      for reaction in list(comment_reactions[i]):
-        print(f'  comment reaction: {reaction.user} {reaction.content} {reaction.created_at}')
-        add_user(all_users, reaction.user, project)
-
     comments_text = []
     last_contributor = None
-    for i, comment in enumerate(comments):
+
+    # for i, comment in enumerate(comments):
+    for comment in comments:
+      # print(f'comment: {comment}')
+      add_user(all_users, comment['user'], project)
+
+      # TODO: we don't bother loading these from GitHub now:
+      if False:
+        # each comment has an array of reactions:
+        for reaction in list(comment_reactions[i]):
+          print(f'  comment reaction: {reaction.user} {reaction.content} {reaction.created_at}')
+          add_user(all_users, reaction.user, project)
+
       subDoc = {}
-      subDoc['author'] = comment.user.login
+      subDoc['author'] = comment['user']['login']
 
       # TODO: fixme to detect migrated Jira comment, and new GitHub style commit comment
-      isCommit = is_commit_user(comment.user)
-      body = comment.body
+      isCommit = is_commit_user(comment['user'])
+      body = comment['body']
       if isCommit:
         subDoc['author'] = 'commitbot'
         has_commits = True
@@ -1065,18 +1112,14 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
       elif subDoc['author'] is not None:
         last_contributor = subDoc['author']
 
-      add_user(all_users, comment.user, project)
-      # TODO: md -> text
-      subDoc['comment_body'] = body
-      if False and debug:
-        print('  after clean: %s' % subDoc['body'])
+      subDoc['comment_body'] = clean_github_markdown(number, body)
       comments_text.append(subDoc['comment_body'])
 
-      subDoc['comment_id'] = comment.id
-      # Disregard the bulk-update after 4.3 release:
+      subDoc['comment_id'] = comment['id']
+      # Disregard the bulk-update after X.Y release:
       if subDoc['comment_body'] != 'Closed after release.':
-        updated = max(updated, comment.created_at)
-      subDoc['created'] = int(float(comment.created_at.strftime('%s.%f')))
+        updated = max(updated, parse_date_time(comment['created_at']))
+      subDoc['created'] = int(float(parse_date_time(comment['created_at']).strftime('%s.%f')))
 
       # TODO: why store this twice in each child doc!?
       subDoc['key'] = key
@@ -1116,7 +1159,7 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
     doc['other_text'] = other_text
 
     update = {'term': {'field': 'number', 'term': str(number)}, 'parent': {'fields': doc}, 'children': subDocs}
-    print(f'\nDOC: {json.dumps(update, indent=2)}')
+    # print(f'\nDOC: {json.dumps(update, indent=2)}')
 
     if False:
       print(f'\n\n{number}:')
@@ -1157,18 +1200,25 @@ def mapUserName(user):
   else:
     return user
 
-def cleanGitHubMarkup(key, s):
+re_github_md_link = re.compile(r'\[(.*?)\]\((.*?)\)')
+
+def clean_github_markdown(key, s):
   # TODO: fixme!!
-  return s
+  s0 = re_github_md_link.sub(r'\1', s)
+
+  if False:
+    if s != s0:
+      print(f'\nfixed link(s) from {s} to {s0}')
+    
+  return s0
 
 if __name__ == '__main__':
   if '-help' in sys.argv:
     print('''
-Usage: python3 indexJira.py <options>:
+Usage: python3 index_github.py <options>:
     -server host[:port]  Where Lucene Server is running
     -reindex  Fully reindex
     -nrt  Run forever, indexing jira issues as they are changed
-    -github_access_token Token
     -delete  If -reindex is specified, this will first delete the entire index, instead of updating it in place
     -build_full_suggest  Rebuild the infix suggester
     [-help] prints this message

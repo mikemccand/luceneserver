@@ -133,7 +133,7 @@ def main(g, db):
             labels, comments, comment_reactions, events, reactions, timeline = load_full_issue(issue)
 
             c.execute('REPLACE INTO issues (key, pickle) VALUES (?, ?)',
-                      (str(issue.number), pickle.dumps((issue, labels, comments, comment_reactions, events, reactions, timeline))))
+                      (str(issue['number']), pickle.dumps((issue, labels, comments, comment_reactions, events, reactions, timeline))))
 
             next_url = issues._PaginatedList__nextUrl
             if next_url != last_next_url:
@@ -182,8 +182,9 @@ if __name__ == '__main__':
             print(f'\nNow resume after {(now - t0):.2f} second wait')
             db = sqlite3.connect(DB_PATH)
         else:
-            db.commit()
-            db.close()
+            # main already closes db:
+            #db.commit()
+            #db.close()
             print('All done!')
             break
 
