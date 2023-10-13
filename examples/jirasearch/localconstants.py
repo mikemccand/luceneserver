@@ -20,3 +20,9 @@ IS_DEV = True
 
 GITHUB_API_TOKEN = '9b6e21b251034e635fc2d5ad8d6cae19a7beef94'
 
+# why github?
+#   - buggy search: /pull search will silently not search issues
+#   - does not convey jira tags well
+#   - want more intelligence extracted, e.g. are we falling behind on PRs?
+#   - missing faceting
+

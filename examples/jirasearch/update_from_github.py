@@ -5,18 +5,49 @@ import sqlite3
 import time
 
 from localconstants import DB_PATH, GITHUB_API_TOKEN
-from direct_load_all_github_issues import http_load_as_json, load_full_issue
+from direct_load_all_github_issues import http_load_as_json, load_full_issue, maybe_load_user
+
+try:
+  with open('%s/user_names_map.pk' % localconstants.ROOT_STATE_PATH, 'rb') as f:
+    login_to_name = pickle.load(f)
+except FileNotFoundError:
+  login_to_name = {}
+except:
+  print('WARNING: unable to load prior user names map; starting new one')
+  login_to_name = {}
 
 def main():
-  while True:
-      refresh_latest_issues()
-      time.sleep(5.0)
-
-def refresh_latest_issues():
-  now = datetime.datetime.utcnow()
-
   # not read only, because we write new issue/pr updates into it:
   db = sqlite3.connect(DB_PATH)
+
+  # nocommit one time user table update:
+  c = db.cursor()
+  for k, v in c.execute('SELECT key, pickle FROM issues WHERE key not in ("last_update", "page_upto")'):
+    issue, comments, events, reactions, timeline = pickle.loads(v)
+    maybe_load_user(c, issue['user']['login'], login_to_name)
+    for comment in comments:
+        maybe_load_user(c, comment['user']['login'], login_to_name)
+    for change in events:
+        maybe_load_user(c, change['actor']['login'], login_to_name)
+    for change in timeline:
+        maybe_load_user(c, change['actor']['login'], login_to_name)
+
+  if False:
+      # nocommit
+      c = db.cursor()
+      c.execute('CREATE TABLE users (login TEXT UNIQUE PRIMARY KEY, pickle BLOB)')
+      db.commit()
+
+  c = db.cursor()
+  total_issue_count = c.execute('SELECT COUNT(*) FROM issues').fetchone()[0]
+  print(f'{total_issue_count} issues in DB')
+  while True:
+    refresh_latest_issues(db)
+    time.sleep(5.0)
+
+def refresh_latest_issues(db):
+  now = datetime.datetime.utcnow()
+
   c = db.cursor()
 
   # when did we last pull updates from GitHub?
@@ -59,6 +90,11 @@ def refresh_latest_issues():
 
       now = datetime.datetime.now()
       comments, events, reactions, timeline = load_full_issue(issue)
+
+      maybe_load_user(c, issue['user']['login'], login_to_name)
+      for comment in comments:
+          maybe_load_user(c, comment['user']['login'], login_to_name)
+      # nocommit what about events/timeline users?
 
       c.execute('REPLACE INTO issues (key, pickle) VALUES (?, ?)',
                 (str(issue['number']), pickle.dumps((issue, comments, events, reactions, timeline))))

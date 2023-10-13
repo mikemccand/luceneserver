@@ -6,7 +6,7 @@ import sys
 import pickle
 import sqlite3
 import time
-from localconstants import DB_PATH, GITHUB_API_TOKEN
+from localconstants import DB_PATH, GITHUB_API_TOKEN, ROOT_STATE_PATH
 
 # TODO
 #   - should we bother loading all reactions to each comment!?
@@ -61,6 +61,14 @@ def main():
             # GitHub response is denormalized -- we must load a few more URLs to get all content:
             comments, events, reactions, timeline = load_full_issue(issue)
 
+            maybe_load_user(c, issue['user']['login'], login_to_name)
+            for comment in comments:
+                maybe_load_user(c, comment['user']['login'], login_to_name)
+            for change in events:
+                maybe_load_user(c, change['actor']['login'], login_to_name)
+            for change in timeline:
+                maybe_load_user(c, change['actor']['login'], login_to_name)
+
             c.execute('REPLACE INTO issues (key, pickle) VALUES (?, ?)',
                       (str(issue['number']), pickle.dumps((issue, comments, events, reactions, timeline))))
             
@@ -80,7 +88,24 @@ def create_db():
     c.execute('CREATE TABLE issues (key TEXT UNIQUE PRIMARY KEY, pickle BLOB)')
     c.execute('INSERT INTO issues VALUES (?, ?)', ('last_update', pickle.dumps(datetime.datetime.utcnow())))
     c.execute('INSERT INTO issues VALUES (?, ?)', ('page_upto', pickle.dumps(1)))
+
+    c.execute('CREATE TABLE users (login TEXT UNIQUE PRIMARY KEY, pickle BLOB)')
     db.commit()
+
+def maybe_load_user(c, login, login_to_name):
+  print(f'maybe load login={login}')
+  if login in login_to_name:
+      return
+  
+  print(f'now load full user for login {login}')
+  user = http_load_as_json(f'https://api.github.com/users/{login}')
+  name = user['name']
+  print(f'  --> name: {name}')
+  c.execute('INSERT INTO users (login, pickle) VALUES (?, ?)', (login, pickle.dumps(user)))
+  login_to_name[login] = name
+
+  # yes, O(N^2) but N is smallish, and this cost is paid once on initial GitHub crawl
+  open('%s/user_names_map.pk' % ROOT_STATE_PATH, 'wb').write(pickle.dumps(login_to_name))
 
 if __name__ == '__main__':
     global db

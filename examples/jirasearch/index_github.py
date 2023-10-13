@@ -13,6 +13,7 @@ import json
 import server
 import os
 import datetime
+from datetime import timezone
 import localconstants
 import util
 import gitHistory
@@ -32,6 +33,9 @@ when you run this.
 """
 
 # TODO
+#   - how to get display name for users
+#   - how to get attachments info!?
+#   - ooh can we use blame API?  https://docs.gitlab.com/ee/api/repository_files.html
 #   - separate out tool to incrementally update the sqllite DB, from NRT indexing?  but share its code, or maybe just return list of issues updated
 #   - pull out mentions / @calls
 #   - hmm: fix suggest to build jira AND github
@@ -63,7 +67,7 @@ reUserName = re.compile(r'(\[~.*?\])')
 DB_PATH = localconstants.DB_PATH
 GITHUB_API_TOKEN = localconstants.GITHUB_API_TOKEN
 
-MY_EPOCH = datetime.datetime(year=2014, month=1, day=1)
+MY_EPOCH = datetime.datetime(year=2014, month=1, day=1, tzinfo=timezone.utc)
 
 if True:
   issueToCommitPaths = gitHistory.parseLog()
@@ -71,7 +75,7 @@ else:
   issueToCommitPaths = {}
 
 try:
-  with open('%s/userNamesMap.pk' % localconstants.ROOT_STATE_PATH, 'rb') as f:
+  with open('%s/user_names_map.pk' % localconstants.ROOT_STATE_PATH, 'rb') as f:
     login_to_name = pickle.loads(f.read())
 except FileNotFoundError:
   login_to_name = {}
@@ -80,7 +84,7 @@ except:
   login_to_name = {}
     
 # For some insane reason, Doug has no display name ;)
-login_to_name['cutting@apache.org'] = 'Doug Cutting'
+login_to_name['cutting'] = 'Doug Cutting'
 
 def prettyPrintJSON(obj):
   print(json.dumps(obj,
@@ -216,6 +220,9 @@ def create_schema(svr):
             'reactions': {'type': 'atom',
                           'multiValued': True,
                           'facet': 'flat'},
+            'events': {'type': 'atom',
+                       'multiValued': True,
+                       'facet': 'flat'},
             'created': {'type': 'long',
                         'store': True,
                         'sort': True},
@@ -360,9 +367,7 @@ def all_issues():
   db = connect_db_readonly()
   try:
     c = db.cursor()
-    for k, v in c.execute('SELECT key, pickle FROM issues'):
-      if k in ('last_update', 'page_upto'):
-        continue
+    for k, v in c.execute('SELECT key, pickle FROM issues WHERE key not in ("last_update", "page_upto")'):
       try:
         yield pickle.loads(v)
       except:
@@ -602,46 +607,53 @@ def build_full_suggest(svr):
   print('Build suggest...')
   t0 = time.time()
   suggestFile = open('%s/jira.suggest' % localconstants.ROOT_STATE_PATH, 'wb')
-  allUsers = {}
+  all_users = {}
 
   for issue, comments, events, reactions, timeline in all_issues():
     key = issue['number']
     project = extract_project(issue)
     reporter = extract_reporter(issue)
-    add_user(allUsers, reporter, project, key)
+    add_user(all_users, reporter, project, key)
 
     if issue['assignees'] is not None and len(issue['assignees']) > 0:
       for x in issue['assignees']:
         add_user(all_users, x, project, key)
     
-    updated = parse_date_time(fields['created_at'])
+    updated = parse_date_time(issue['created_at'])
     for comment in comments:
       if comment['body'] != 'Closed after release.':
-        updated = max(updated, parse_date_time(comment['created']))
-      add_user(allUsers, comment['user'], project, key)
+        updated = max(updated, parse_date_time(comment['created_at']))
+      add_user(all_users, comment['user'], project, key)
+
+    for change in timeline:
+      print(f'tl: {change["event"]}')
 
     for change in events:
+      print(f'ev: {change["event"]}')
+    
+    for change in events:
       didAttach = False
-      for item in change['items']:
-        if 'field' in item and item['field'] == 'Attachment':
-          didAttach = True
+      if False:
+        for item in change['items']:
+          if 'field' in item and item['field'] == 'Attachment':
+            didAttach = True
 
-      if didAttach:
-        #prettyPrintJSON(change)
-        if 'author' in change:
-          add_user(allUsers, change['author'], project, key)
+        if didAttach:
+          #prettyPrintJSON(change)
+          if 'author' in change:
+            add_user(all_users, change['author'], project, key)
 
     weight = (updated-MY_EPOCH).total_seconds()
 
     # Index project as a context, so we can suggest within project:
-    suggestFile.write(('%d\x1f%s: %s\x1f%s\x1f%s\n' % (weight, key.upper(), fields['title'], key, project)).encode('utf-8'))
+    suggestFile.write(('%d\x1f%s: %s\x1f%s\x1f%s\n' % (weight, str(key), issue['title'], key, project)).encode('utf-8'))
 
-  for userDisplayName, (count, projects) in sorted(allUsers.items(), key = lambda x: (-x[1][0], x[0])):
+  for userDisplayName, (count, projects) in sorted(all_users.items(), key = lambda x: (-x[1][0], x[0])):
     suggestFile.write(('%d\x1f%s\x1fuser %s\x1f%s\n' % \
                        (count, userDisplayName, userDisplayName, '\x1f'.join(projects))).encode('utf-8'))
 
   for project in all_projects:
-    suggestFile.write(('1000000000\x1f%s\x1fproject %s\x1f%s\n' % (project, project, '\x1f'.join(allProjects))).encode('utf-8'))
+    suggestFile.write(('1000000000\x1f%s\x1fproject %s\x1f%s\n' % (project, project, '\x1f'.join(all_projects))).encode('utf-8'))
   
   suggestFile.close()
 
@@ -714,8 +726,6 @@ def full_reindex(svr, doDelete):
   print('Done full index')
   commit(svr, startTime)
 
-  open('%s/userNamesMap.pk' % localconstants.ROOT_STATE_PATH, 'wb').write(pickle.dumps(login_to_name))
-
 def commit(svr, timeStamp):
   t0 = time.time()
   svr.send('setCommitUserData', {'indexName': 'jira',
@@ -742,7 +752,7 @@ def add_user(all_users, user, project, key=None):
   else:
     login = '???'
     
-  if display_name == 'cutting@apache.org':
+  if display_name in ('cutting', 'cutting@apache.org'):
     display_name = 'Doug Cutting'
   if is_commit_user(user):
     display_name = 'commitbot'
@@ -753,6 +763,7 @@ def add_user(all_users, user, project, key=None):
   l[1].add(project)
 
   if login != '???' and display_name != '???':
+    print(f'{login} -> {display_name}')
     login_to_name[login] = display_name
 
 class User:
@@ -780,8 +791,8 @@ def extract_reporter(issue):
         name = m.group(2)
         login = None
       return {'name': name, 'login': login}
-  # print(json.dumps(issue, indent=2))
-  return {'name': None, 'login': issue['user']['login']}
+
+  return {'name': login_to_name.get(login, None), 'login': login}
 
 def index_docs(svr, issues, printIssue=False, updateSuggest=False):
 
@@ -848,15 +859,25 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
           reaction_names.add(k)
       doc['reactions'] = list(reaction_names)
 
-    for event in events:
+    events = set()
+
+    for change in events:
       #if event['event'] != 'closed':
         #print(f'event: {json.dumps(event, indent=2)}')
       #print(f'event: {event.actor.login} {event.event} {event.created_at} {event.label} {event.assignee} {event.assigner} {event.review_requester} {event.requested_reviewer} {event.dismissed_review} {getattr(event, "team", None)} {event.milestone} {event.rename} {event.lock_reason}')
-
       add_user(all_users, event['actor'], project)
+      events.add(change['event'])
+
+    # TODO: what really is the difference between events and timeline?
+    for change in timeline:
+      add_user(all_users, change['actor'], project)
+      events.add(change['event'])
+
+    doc['events'] = list(events)
 
     # who opened the issue/PR
     if issue['user'] is not None:
+      #print(f'user: {issue["user"]}')
       doc['reporter'] = issue['user']['login']
       add_user(all_users, issue['user'], project)
 
@@ -925,7 +946,7 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
       # print(f'WARNING: issue {number} has no body!')
       pass
 
-    reporter = extract_reporter(issue)
+    reporter = extract_reporter(c, issue)
     if reporter['login'] is not None:
       s = reporter['login']
     else:
@@ -1161,8 +1182,8 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
 
     other_text = []
     other_text.append(doc['key'])
-    other_text.extend(doc['key'].split('-'))
-    other_text.append(' '.join(doc['labels']))
+    if len(doc['labels']) > 0:
+      other_text.append(' '.join(doc['labels']))
     print(f'{number}: other {other_text}')
 
     # NOTE: wasteful ... ideally, we could somehow make queries run "against" the parent doc?
