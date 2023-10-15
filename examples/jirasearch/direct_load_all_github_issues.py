@@ -4,45 +4,20 @@ import datetime
 import requests
 import sys
 import pickle
-import sqlite3
 import time
+import local_db
 from localconstants import DB_PATH, GITHUB_API_TOKEN, ROOT_STATE_PATH
 
 # TODO
 #   - should we bother loading all reactions to each comment!?
 #   - make histogram of PR age / complexity / engagement
 
-def http_load_as_json(url):
-    headers = {'Authorization': f'token {GITHUB_API_TOKEN}',
-               'Accept': 'application/vnd.github.full+json',
-               'X-GitHub-Api-Version': '2022-11-28'}
-    response = requests.get(url, headers=headers)
-    if response.status_code != 200:
-        raise RuntimeError(f'got {response.status_code} response loading {url}\n\n {response.text}')
-    if not response.headers['Content-Type'].startswith('application/json'):
-        raise RuntimeError(f'got {response.headers["Content-Type"]} but expected application/json when loading {url}')
-
-    # print(f'\n{url}\n  response headers: {response.headers}')
-    
-    # wait due to GitHub API throttling:
-    remaining = int(response.headers['X-RateLimit-Remaining'])
-    if remaining < 10:
-        reset_at = int(response.headers['X-RateLimit-Reset'])
-        wait_seconds = reset_at - time.time() + 5
-        if wait_seconds > 0:
-            db.commit()
-            print(f'Now wait due to throttling ({remaining} requests remaining (reset at {reset_at}; wait for {wait_seconds} seconds)')
-            time.sleep(wait_seconds)
-        
-    # print(response.headers)
-    return json.loads(response.text)
-
 def load_full_issue(issue):
-    comments = http_load_as_json(issue['comments_url'])
+    comments = local_db.http_load_as_json(issue['comments_url'])
     # TODO: responses to each comment?
-    events = http_load_as_json(issue['events_url'])
-    reactions = http_load_as_json(issue['reactions']['url'])
-    timeline = http_load_as_json(issue['timeline_url'])
+    events = local_db.http_load_as_json(issue['events_url'])
+    reactions = local_db.http_load_as_json(issue['reactions']['url'])
+    timeline = local_db.http_load_as_json(issue['timeline_url'])
     return comments, events, reactions, timeline
 
 def main():
@@ -55,19 +30,24 @@ def main():
     while True:
         count = c.execute('SELECT COUNT(*) FROM issues').fetchone()[0]
         print(f'\n\n{time.time() - start_time_sec:.1f}s: {count-2} issues in DB; page={page}')
-        batch = http_load_as_json(f'https://api.github.com/repos/apache/lucene/issues?state=all&per_page=20&direction=asc&page={page}')
+        batch = local_db.http_load_as_json(f'https://api.github.com/repos/apache/lucene/issues?state=all&per_page=20&direction=asc&page={page}')
         for issue in batch:
             print(f'  load issue {issue["number"]}')
             # GitHub response is denormalized -- we must load a few more URLs to get all content:
             comments, events, reactions, timeline = load_full_issue(issue)
 
-            maybe_load_user(c, issue['user']['login'], login_to_name)
+            local_db.maybe_load_user(c, issue['user']['login'])
             for comment in comments:
-                maybe_load_user(c, comment['user']['login'], login_to_name)
+                local_db.maybe_load_user(c, comment['user']['login'])
             for change in events:
-                maybe_load_user(c, change['actor']['login'], login_to_name)
+                local_db.maybe_load_user(c, change['actor']['login'])
             for change in timeline:
-                maybe_load_user(c, change['actor']['login'], login_to_name)
+                if 'actor' in change:
+                    local_db.maybe_load_user(c, change['actor']['login'])
+                elif 'user' in change:
+                    local_db.maybe_load_user(c, change['user']['login'])
+                else:
+                    raise RuntimeError(f'unhandled timeline change:\n{json.dumps(change, indent=2)}')
 
             c.execute('REPLACE INTO issues (key, pickle) VALUES (?, ?)',
                       (str(issue['number']), pickle.dumps((issue, comments, events, reactions, timeline))))
@@ -92,21 +72,6 @@ def create_db():
     c.execute('CREATE TABLE users (login TEXT UNIQUE PRIMARY KEY, pickle BLOB)')
     db.commit()
 
-def maybe_load_user(c, login, login_to_name):
-  print(f'maybe load login={login}')
-  if login in login_to_name:
-      return
-  
-  print(f'now load full user for login {login}')
-  user = http_load_as_json(f'https://api.github.com/users/{login}')
-  name = user['name']
-  print(f'  --> name: {name}')
-  c.execute('INSERT INTO users (login, pickle) VALUES (?, ?)', (login, pickle.dumps(user)))
-  login_to_name[login] = name
-
-  # yes, O(N^2) but N is smallish, and this cost is paid once on initial GitHub crawl
-  open('%s/user_names_map.pk' % ROOT_STATE_PATH, 'wb').write(pickle.dumps(login_to_name))
-
 if __name__ == '__main__':
     global db
 
@@ -116,7 +81,7 @@ if __name__ == '__main__':
         if os.path.exists(DB_PATH):
             raise RuntimeError(f'please first remove DB {DB_PATH} with -create')
 
-    db = sqlite3.connect(DB_PATH)
+    db = local_db.get()
 
     if do_create:
        create_db()

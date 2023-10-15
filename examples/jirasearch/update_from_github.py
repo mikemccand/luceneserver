@@ -1,36 +1,43 @@
 import pickle
 import json
 import datetime
-import sqlite3
 import time
+import local_db
 
 from localconstants import DB_PATH, GITHUB_API_TOKEN
-from direct_load_all_github_issues import http_load_as_json, load_full_issue, maybe_load_user
-
-try:
-  with open('%s/user_names_map.pk' % localconstants.ROOT_STATE_PATH, 'rb') as f:
-    login_to_name = pickle.load(f)
-except FileNotFoundError:
-  login_to_name = {}
-except:
-  print('WARNING: unable to load prior user names map; starting new one')
-  login_to_name = {}
+from direct_load_all_github_issues import load_full_issue
 
 def main():
   # not read only, because we write new issue/pr updates into it:
-  db = sqlite3.connect(DB_PATH)
+  db = local_db.get()
 
+  # nocommit
+  login_to_name = local_db.get_login_to_name()
+  print(f'{len(login_to_name)} unique users')
+  
   # nocommit one time user table update:
   c = db.cursor()
-  for k, v in c.execute('SELECT key, pickle FROM issues WHERE key not in ("last_update", "page_upto")'):
-    issue, comments, events, reactions, timeline = pickle.loads(v)
-    maybe_load_user(c, issue['user']['login'], login_to_name)
-    for comment in comments:
-        maybe_load_user(c, comment['user']['login'], login_to_name)
-    for change in events:
-        maybe_load_user(c, change['actor']['login'], login_to_name)
-    for change in timeline:
-        maybe_load_user(c, change['actor']['login'], login_to_name)
+
+  total_issue_count = c.execute('SELECT COUNT(*) FROM issues').fetchone()[0]
+  print(f'{total_issue_count} issues in DB')
+
+  if False:
+      for k, v in c.execute('SELECT key, pickle FROM issues WHERE key not in ("last_update", "page_upto")').fetchall():
+        issue, comments, events, reactions, timeline = pickle.loads(v)
+        print(f'check {issue["number"]}')
+        local_db.maybe_load_user(c, issue['user']['login'])
+        for comment in comments:
+            local_db.maybe_load_user(c, comment['user']['login'])
+        for change in events:
+            local_db.maybe_load_user(c, change['actor']['login'])
+        for change in timeline:
+            # change['event'] can be reviewed, committed
+            if 'actor' in change:
+                local_db.maybe_load_user(c, change['actor']['login'])
+            elif 'user' in change:
+                local_db.maybe_load_user(c, change['user']['login'])
+            else:
+                raise RuntimeError(f'unhandled timeline change:\n{json.dumps(change, indent=2)}')
 
   if False:
       # nocommit
@@ -66,7 +73,7 @@ def refresh_latest_issues(db):
 
   since_utc = last_update_utc - datetime.timedelta(seconds=60)
 
-  print('\n%s: now refresh latest updates' % datetime.datetime.now())
+  print(f'\n{datetime.datetime.now()}: now refresh latest updates (GitHub ratelimit_remaining={local_db.ratelimit_remaining})')
   print(f'  use since={since_utc} ({(nrt_started_utc-since_utc).total_seconds()} seconds ago)')
 
   page = 1
@@ -77,7 +84,7 @@ def refresh_latest_issues(db):
   while True:
 
     # hopefully we never wind up throttling here due to too many issue updates versus GitHub API rate limit!
-    batch = http_load_as_json(f'https://api.github.com/repos/apache/lucene/issues?state=all&per_page=100&direction=asc&since={since_utc.isoformat()}&page={page}')
+    batch = local_db.http_load_as_json(f'https://api.github.com/repos/apache/lucene/issues?state=all&per_page=100&direction=asc&since={since_utc.isoformat()}&page={page}')
     # print(f'got: {json.dumps(batch, indent=2)} len={len(batch)}')
 
     if len(batch) == 0:
@@ -91,9 +98,9 @@ def refresh_latest_issues(db):
       now = datetime.datetime.now()
       comments, events, reactions, timeline = load_full_issue(issue)
 
-      maybe_load_user(c, issue['user']['login'], login_to_name)
+      local_db.maybe_load_user(c, issue['user']['login'])
       for comment in comments:
-          maybe_load_user(c, comment['user']['login'], login_to_name)
+          local_db.maybe_load_user(c, comment['user']['login'])
       # nocommit what about events/timeline users?
 
       c.execute('REPLACE INTO issues (key, pickle) VALUES (?, ?)',

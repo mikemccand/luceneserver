@@ -1,4 +1,3 @@
-import sqlite3
 import shutil
 import traceback
 import github
@@ -12,12 +11,13 @@ import math
 import json
 import server
 import os
+import local_db
 import datetime
 from datetime import timezone
 import localconstants
 import util
 import gitHistory
-from direct_load_all_github_issues import http_load_as_json, load_full_issue
+from direct_load_all_github_issues import load_full_issue
 
 from util import get_or_none
 
@@ -33,6 +33,10 @@ when you run this.
 """
 
 # TODO
+#   - should i track uers's email too, and use that to resolve the commit event in timelines?
+#   - don't save login_to_name as pk -- regen from DB every start?
+#   - can/should I also search individual commits?
+#     - which committers commit other people's PRs often?
 #   - how to get display name for users
 #   - how to get attachments info!?
 #   - ooh can we use blame API?  https://docs.gitlab.com/ee/api/repository_files.html
@@ -340,7 +344,7 @@ def removeAllGhosts():
   # Remove ghost of renamed issues:
 
   # we need read/write access here:
-  db = sqlite3.connect(DB_PATH)
+  db = local_db.get()
   
   try:
     toDelete = []
@@ -359,15 +363,11 @@ def removeAllGhosts():
   finally:
     db.close()
 
-def connect_db_readonly():
-  path = f'file:{DB_PATH}?mode=ro'
-  return sqlite3.connect(path, uri=True, timeout=120)
-
 def all_issues():
-  db = connect_db_readonly()
+  db = local_db.get(read_only=True)
   try:
     c = db.cursor()
-    for k, v in c.execute('SELECT key, pickle FROM issues WHERE key not in ("last_update", "page_upto")'):
+    for k, v in c.execute('SELECT key, pickle FROM issues WHERE key not in ("last_update", "page_upto")').fetchall():
       try:
         yield pickle.loads(v)
       except:
@@ -377,8 +377,8 @@ def all_issues():
   finally:
     db.close()
 
-def specificIssues(issues):
-  db = connect_db_readonly()
+def specific_issues(issues):
+  db = db.get(read_only=True)
   try:
     c = db.cursor()
     for issue in issues:
@@ -393,7 +393,7 @@ def specificIssues(issues):
     db.close()
 
 def issuesUpdatedAfter(minTimeStamp):
-  db = connect_db_readonly()
+  db = local_db.get(read_only=True)
   try:
     c = db.cursor()
     for k, v in c.execute('SELECT key, pickle FROM issues'):
@@ -481,7 +481,7 @@ def nrtIndexForever():
     index_docs(svr, issuesUpdatedAfter(last_commit_time), updateSuggest=True)
 
   # not read only, because we write new issue/pr updates into it:
-  db = sqlite3.connect(DB_PATH)
+  db = local_db.get()
   c = db.cursor()
 
   last_update_utc = None
@@ -517,7 +517,7 @@ def nrtIndexForever():
     while True:
 
       # hopefully we never wind up throttling here due to too many issue updates versus GitHub API rate limit!
-      batch = http_load_as_json(f'https://api.github.com/repos/apache/lucene/issues?state=all&per_page=100&direction=asc&since={since_utc.isoformat()}&page={page}')
+      batch = local_db.http_load_as_json(f'https://api.github.com/repos/apache/lucene/issues?state=all&per_page=100&direction=asc&since={since_utc.isoformat()}&page={page}')
       if page == 1:
         total_count = batch['total_count']
       print(f'  {total_count} issues updated to load')
@@ -572,7 +572,7 @@ def nrtIndexForever():
       # merge new git history into our in-memory version:
       mergeIssueCommits(issueToCommitPaths, newIssueToCommitPaths)
       print('  update from git commits...')
-      index_docs(svr, specificIssues(committedIssues), printIssue=True)
+      index_docs(svr, specific_issues(committedIssues), printIssue=True)
       print('  done update from git commits...')
       any_updates_since_git = False
 
