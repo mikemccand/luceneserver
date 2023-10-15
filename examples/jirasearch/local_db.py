@@ -11,6 +11,7 @@ db = None
 ratelimit_remaining = None
 
 _login_to_name = None
+_jira_to_github_account_map = None
 
 def get_login_to_name():
     global _login_to_name
@@ -29,7 +30,32 @@ def get_login_to_name():
             _login_to_name[login] = name
         #t1 = time.time()
         #print(f'{1000*(t1-t0):.1f} msec to compute _login_to_name; {len(_login_to_name)} unique users')
+        # For some insane reason, Doug has no display name ;)
+        _login_to_name['cutting'] = 'Doug Cutting'
+
+        
     return _login_to_name
+
+def get_jira_to_github_account_map():
+  global _jira_to_github_account_map
+  if _jira_to_github_account_map is None:
+      _jira_to_github_account_map = {}
+      with open('account-map.csv.20220722.verified', encoding='utf-8') as f:
+          for line in f.readlines():
+              if line.startswith('#'):
+                  continue
+              line = line.strip()
+              if len(line) == 0:
+                  continue
+              if line == 'JiraName,GitHubAccount,JiraDispName':
+                  # header line
+                  continue
+              tup = line.split(',')
+              if len(tup) != 3:
+                  raise RuntimeError(f'expected three entries on line, but got {len(tup)}: {tup}')
+              jira_login, github_login, jira_display_name = tup
+              _jira_to_github_account_map[jira_login] = (github_login, jira_display_name)
+  return _jira_to_github_account_map
 
 def get(read_only=False):
   global db

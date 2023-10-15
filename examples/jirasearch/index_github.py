@@ -18,6 +18,7 @@ import localconstants
 import util
 import gitHistory
 from direct_load_all_github_issues import load_full_issue
+from update_from_github import refresh_latest_issues
 
 from util import get_or_none
 
@@ -33,8 +34,11 @@ when you run this.
 """
 
 # TODO
+#   - how to map Jira username to GH login?
+#   - add attrs
+#     - watched_by (user) / has_watchers?
+#     - is_mentioned (user) / has_mentions?
 #   - should i track uers's email too, and use that to resolve the commit event in timelines?
-#   - don't save login_to_name as pk -- regen from DB every start?
 #   - can/should I also search individual commits?
 #     - which committers commit other people's PRs often?
 #   - how to get display name for users
@@ -77,18 +81,6 @@ if True:
   issueToCommitPaths = gitHistory.parseLog()
 else:
   issueToCommitPaths = {}
-
-try:
-  with open('%s/user_names_map.pk' % localconstants.ROOT_STATE_PATH, 'rb') as f:
-    login_to_name = pickle.loads(f.read())
-except FileNotFoundError:
-  login_to_name = {}
-except:
-  print('WARNING: unable to load prior user names map; starting new one')
-  login_to_name = {}
-    
-# For some insane reason, Doug has no display name ;)
-login_to_name['cutting'] = 'Doug Cutting'
 
 def prettyPrintJSON(obj):
   print(json.dumps(obj,
@@ -367,7 +359,7 @@ def all_issues():
   db = local_db.get(read_only=True)
   try:
     c = db.cursor()
-    for k, v in c.execute('SELECT key, pickle FROM issues WHERE key not in ("last_update", "page_upto")').fetchall():
+    for k, v in c.execute('SELECT key, pickle FROM issues WHERE key not in ("last_update", "page_upto")'):
       try:
         yield pickle.loads(v)
       except:
@@ -438,6 +430,7 @@ def getFlag(option):
     return False
 
 def main():
+
   server = getArg('-server')
   if server is None:
     server = '127.0.0.1'
@@ -466,10 +459,10 @@ def main():
     build_full_suggest(svr)
     
   if getFlag('-nrt'):
-    nrtIndexForever()
+    nrt_index_forever()
 
 
-def nrtIndexForever():
+def nrt_index_forever():
   now = datetime.datetime.utcnow()
 
   # First, catch up since last commit:
@@ -762,9 +755,10 @@ def add_user(all_users, user, project, key=None):
   l[0] += 1
   l[1].add(project)
 
-  if login != '???' and display_name != '???':
-    print(f'{login} -> {display_name}')
-    login_to_name[login] = display_name
+  if False:
+    if login != '???' and display_name != '???':
+      print(f'{login} -> {display_name}')
+      login_to_name[login] = display_name
 
 class User:
   name = None
@@ -780,19 +774,26 @@ def extract_project(issue):
   return m.group(1)
 
 def extract_reporter(issue):
+  login = issue['user']['login']
   if issue['body'] is not None:
+    # if this is a migrated Jira issue, the login will be 'asfimport', so we
+    # do a bit more work to extract the original (Jira) username ... hmm, but
+    # this may not be the same as the GH login?
     m = re_jira_migrated.search(issue['body'])
     if m is not None:
       m2 = re_jira_creator.match(m.group(2))
       if m2 is not None:
         name = m2.group(1)
+        # already mapped to GH login during migration:
         login = m2.group(2)
       else:
+        # we matched a "by so-and-so" but there was no @jira-username in there.  pretend name is jira login:
         name = m.group(2)
-        login = None
+        login = f'jira:{name}'
+        print(f'WARNING: jira migrated issue but could not map login {name}:\n{json.dumps(issue, indent=2)}')
       return {'name': name, 'login': login}
 
-  return {'name': login_to_name.get(login, None), 'login': login}
+  return {'name': local_db.get_login_to_name().get(login, None), 'login': login}
 
 def index_docs(svr, issues, printIssue=False, updateSuggest=False):
 
@@ -870,7 +871,13 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
 
     # TODO: what really is the difference between events and timeline?
     for change in timeline:
-      add_user(all_users, change['actor'], project)
+      if 'actor' in change:
+        add_user(all_users, change['actor'], project)
+      elif 'user' in change:
+        add_user(all_users, change['user'], project)
+      elif change['event'] != 'committed':
+        # curiously, there is no user login when a commit timeline event happens:
+        raise RuntimeError(f'unhandled timeline change:\n{json.dumps(change, indent=2)}')
       events.add(change['event'])
 
     doc['events'] = list(events)
@@ -946,12 +953,13 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
       # print(f'WARNING: issue {number} has no body!')
       pass
 
-    reporter = extract_reporter(c, issue)
+    reporter = extract_reporter(issue)
     if reporter['login'] is not None:
       s = reporter['login']
     else:
       s = reporter['name']
     if s is not None:
+      print(f'reporter -> {s}')
       doc['reporter'] = s
 
     doc['has_reactions'] = doc.get('reaction_count', 0) > 0
@@ -1224,9 +1232,9 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
                        'source': {'localFile': os.path.abspath(suggestFile.name)}})
       print('updateSuggest: %s' % res)
 
-def mapUserName(user):
+def map_user_name(user):
   user = user.group(1)
-  mapped = login_to_name.get(user[2:-1])
+  mapped = local_db.get_login_to_name().get(user[2:-1])
   if mapped is not None:
     #print('map %s to %s' % (user, mapped))
     return '[%s]' % mapped

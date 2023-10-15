@@ -22,9 +22,8 @@ def main():
   print(f'{total_issue_count} issues in DB')
 
   if False:
-      for k, v in c.execute('SELECT key, pickle FROM issues WHERE key not in ("last_update", "page_upto")').fetchall():
+      for k, v in c.execute('SELECT key, pickle FROM issues WHERE key not in ("last_update", "page_upto")'):
         issue, comments, events, reactions, timeline = pickle.loads(v)
-        print(f'check {issue["number"]}')
         local_db.maybe_load_user(c, issue['user']['login'])
         for comment in comments:
             local_db.maybe_load_user(c, comment['user']['login'])
@@ -124,6 +123,7 @@ def refresh_latest_issues(db):
   total_issue_count = c.execute('SELECT COUNT(*) FROM issues').fetchone()[0]
 
   print(f'  loaded and indexed {len(issue_numbers_refreshed)} issues; {total_issue_count} issues in DB')
+  return issue_numbers_refreshed
 
 if __name__ == '__main__':
     main()

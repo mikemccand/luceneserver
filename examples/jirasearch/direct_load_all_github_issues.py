@@ -46,7 +46,8 @@ def main():
                     local_db.maybe_load_user(c, change['actor']['login'])
                 elif 'user' in change:
                     local_db.maybe_load_user(c, change['user']['login'])
-                else:
+                elif change['event'] != 'committed':
+                    # curiously, there is no user login when a commit timeline event happens:
                     raise RuntimeError(f'unhandled timeline change:\n{json.dumps(change, indent=2)}')
 
             c.execute('REPLACE INTO issues (key, pickle) VALUES (?, ?)',

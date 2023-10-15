@@ -1,0 +1,380 @@
+#
+# NOTE: this comes from Lucene's Jira -> GitHub migration tooling: https://github.com/apache/lucene-jira-archive/raw/main/migration/mappings-data/account-map.csv.20220722.verified
+#
+
+JiraName,GitHubAccount,JiraDispName
+mikemccand,mikemccand,Michael McCandless
+rcmuir,rmuir,Robert Muir
+rmuir,rmuir,Robert Muir
+uschindler,uschindler,Uwe Schindler
+thetaphi,uschindler,Uwe Schindler
+jpountz,jpountz,Adrien Grand
+dweiss,dweiss,Dawid Weiss
+simonw,s1monw,Simon Willnauer
+dsmiley,dsmiley,David Smiley
+shaie,shaie,Shai Erera
+yseeley@gmail.com,yonik,Yonik Seeley
+yonik@apache.org,yonik,Yonik Seeley
+gsingers,gsingers,Grant Ingersoll
+romseygeek,romseygeek,Alan Woodward
+ivera,iverase,Ignacio Vera
+anshum,anshumg,Anshum Gupta
+anshumg,anshumg,Anshum Gupta
+shalin,shalinmangar,Shalin Shekhar Mangar
+erickerickson,ErickErickson,Erick Erickson
+sokolov,msokolov,Michael Sokolov
+msokolov@gmail.com,msokolov,Mike Sokolov
+rjernst,rjernst,Ryan Ernst
+jim.ferenczi,jimczi,Jim Ferenczi
+janhoy,janhoy,Jan Høydahl
+tomoko,mocobeta,Tomoko Uchida
+thelabdude,thelabdude,Timothy Potter
+nknize,nknize,Nick Knize
+cpoerschke,cpoerschke,Christine Poerschke
+Gromov,donnerpeter,Peter Gromov
+martijn.v.groningen,martijnvg,Martijn van Groningen
+gsmiller,gsmiller,Greg Miller
+cutting,cutting,Doug Cutting
+cutting@apache.org,cutting,cutting@apache.org
+broustant,bruno-roustant,Bruno Roustant
+mdrob,madrob,Mike Drob
+mkhl,mkhludnev,Mikhail Khludnev
+mkhludnev,mkhludnev,Mikhail Khludnev
+teofili,tteofili,Tommaso Teofili
+elyograg,elyograg,Shawn Heisey
+koji,kojisekig,Koji Sekiguchi
+atris,atris,Atri Sharma
+julietibs,jtibshirani,Julie Tibshirani
+ehatcher,erikhatcher,Erik Hatcher
+mayya,mayya-sharipova,Mayya Sharipova
+jakarta@ehatchersolutions.com,erikhatcher,Erik Hatcher
+atri,atris,Atri Sharma
+dnhatn,dnhatn,Nhat Nguyen
+varun,vthacker,Varun Thacker
+zacharymorn,zacharymorn,Zach Chen
+danmuzi,danmuzi,Namgyu Kim
+ichattopadhyaya,chatman,Ishan Chattopadhyaya
+ctargett,ctargett,Cassandra Targett
+tallison,tballison,Tim Allison
+tallison@mitre.org,tballison,Tim Allison
+tallison@apache.org,tballison,Tim Allison
+areek,areek,Areek Zillur
+ChrisLu,LuXugang,Lu Xugang
+gworah,gautamworah96,Gautam Worah
+bmargulies,bimargulies-google,Benson Margulies
+lucacavanna,javanna,Luca Cavanna
+mbraun688,michaelbraun,Michael Braun
+mayyas,mayya-sharipova,Mayya Sharipova
+abenedetti,alessandrobenedetti,Alessandro Benedetti
+alessandro.benedetti,alessandrobenedetti,Alessandro Benedetti
+arafalov,arafalov,Alexandre Rafalovitch
+tflobbe,tflobbe,Tomas Eduardo Fernandez Lobbe
+jimczi,jimczi,Jim Ferenczi
+toke,tokee,Toke Eskildsen
+simonwillnauer,s1monw,Simon Willnauer
+billy,sleepsort,Han Jiang
+magibney,magibney,Michael Gibney
+zhai7631,zhaih,Patrick Zhai
+andyetitmoves,andyetitmoves,Ramkumar Aiyengar
+jtibshirani,jtibshirani,Julie Tibshirani
+gus,gus-asf,Gus Heck
+vigyas,vigyasharma,Vigya Sharma
+bruno.roustant,bruno-roustant,Bruno Roustant
+krisden,risdenk,Kevin Risden
+caomanhdat,CaoManhDat,Cao Manh Dat
+jdconradson,jdconrad,Jack Conradson
+jdyer,jdyer1,James Dyer
+lvl,LucVL,Luc Vanlerberghe
+gerlowskija,gerlowskija,Jason Gerlowski
+jbernste,joel-bernstein,Joel Bernstein
+yutinggan,Yuti-G,Yuting Gan
+mattweber,mattweber,Matt Weber
+nik9000@gmail.com,nik9000,Nik Everett
+dancollins,dcollins53,Daniel Collins
+kkewwei,kkewwei,kkewwei
+asalamon74,asalamon74,Andras Salamon
+noble.paul,noblepaul,Noble Paul
+siren,siren,Sami Siren
+h.kazuaki,hkazuakey,Kazuaki Hiraga
+cbismuth,cbismuth,Christophe Bismuth
+upayavira,upayavira,Upayavira
+houston,HoustonPutman,Houston Putman
+erickoerickson,ErickErickson,Erick Erickson
+imotov,imotov,Igor Motov
+cbuescher,cbuescher,Christoph Büscher
+grant_ingersoll@yahoo.com,gsingers,Grant Ingersoll
+micpalmia,micpalmia,Michele Palmia
+reta,reta,Andriy Redko
+dawidweiss,dweiss,Dawid Weiss
+dawid.weiss,dweiss,Dawid Weiss
+epugh,epugh,Eric Pugh
+Geoffrey Lawson,glawson0,Geoffrey Lawson
+ywelsch,ywelsch,Yannick Welsch
+liupanfeng,HuBlanker,liupanfeng
+stefanvodita,stefanvodita,Stefan Vodita
+xabbu42,xabbu42,Nathan Gass
+xiaoshi_2021,xiaoshi2013,xiaoshi
+KoenDG,KoenDG,Koen De Groote
+tpunder,tpunder,Tim Underwood
+sqshq,sqshq,Alexander Lukyanchikov
+dragonsinth,dragonsinth,Scott Blum
+nik9000,nik9000,Nik Everett
+rbowen,rbowen,Rich Bowen
+sejalpawar,sejal-pawar,Sejal Pawar
+chegar999,ChrisHegarty,Chris Hegarty
+spyk,spyk,Spyros Kapnissis
+kaivalnp,kaivalnp,Kaival Parikh
+markrmiller,markrmiller,Mark Robert Miller
+markrmiller@gmail.com,markrmiller,Mark Miller
+original-brownbear,original-brownbear,Armin Braun
+quentinp,pquentin,Quentin Pradet
+kgeis,kgeis,Ken Geis
+houstonputman,HoustonPutman,Houston Putman
+gritmind,gritmind,Yeongsu Kim
+shahamish150294,shahamish150294,Amish Shah
+jtibs,jtibshirani,Julie Tibshirani
+ChrisHegarty,ChrisHegarty,Chris Hegarty
+pcsanwald,pcsanwald,Paul Sanwald
+craigtaverner,craigtaverner,Craig Taverner
+myusername8,Traktormaster,Nándor Mátravölgyi
+apanimesh061,apanimesh061,Animesh Pandey
+henningandersen,henningandersen,Henning Andersen
+mkrio,mkr,Matthias Krueger
+michi,michaelwechner,Michael Wechner
+martijn,martijnvg,Martijn van Groningen
+imgpulak,imgpulak,Pulak Ghosh
+svamann,salsolatragus,Sven Amann
+dpgove,dennisgove,Dennis Gove
+psomogyi,petersomogyi,Peter Somogyi
+mrkm4ntr,mrkm4ntr,Shintaro Murakami
+bdelacretaz,bdelacretaz,Bertrand Delacretaz
+radu0gheorghe,radu-gheorghe,Radu Gheorghe
+pbruski_,pbruski,Przemek Bruski
+paulmerlin,eskatos,Paul Merlin
+rcmuir ,rmuir,Robert Muir
+gstein@gmail.com,gstein,Greg Stein
+gstein,gstein,Greg Stein
+probakowski,probakowski,Przemko Robakowski
+jnystad,jnystad,Jørgen Nystad
+emetsds,emetsds,Dmitry Emets
+tibounig,tobijdc,Tobias Ibounig
+Daiki Tsuzuku,dtsuzuku-ibm,Daiki Tsuzuku
+christ,christ,Chris Thistlethwaite
+Marvin Justice,mjustice3,Marvin Justice
+zgantner,zenogantner,Zeno Gantner
+szott,saschaszott,Sascha Szott
+xavier.sanchez,xaviersanchez,Xavier Sanchez Loro
+solrtrey,treygrainger,Trey Grainger
+jasonstack,jasonstack,Zhao Yang
+gtroitskiy,gtroitskiy,Grigoriy Troitskiy
+samuelgmartinez,samuelgmartinez,Samuel García Martínez
+aleree,spinscale,Alexander Reelsen
+wuda0112,wuda0112,wuda
+agallou,agallou,Adrien Gallou
+andywebb1975,andywebb1975,Andy Webb
+humbedooh,Humbedooh,Daniel Gruno
+grcevski,grcevski,Nikola Grcevski
+frankmanzhu,frankmanzhu,Frank Zhu
+kwatters,kwatters,Kevin Watters
+TimOwen,timatbw,Tim Owen
+sarowe,sarowe,Steven Rowe
+steve_rowe,sarowe,Steven Rowe
+sarowe@syr.edu,sarowe,Steven Rowe
+gf2121,gf2121,Feng Guo
+mharwood,markharwood,Mark Harwood
+markharw00d@yahoo.co.uk,markharwood,Mark Harwood
+hossman,hossman,Chris M. Hostetter
+hossman_lucene@fucit.org,hossman,Chris M. Hostetter
+munendrasn,munendrasn,Munendra S N
+vajda,ovalhub,Andi Vajda
+manish82,manishbafna,Manish
+manish1982,manishbafna,Manish
+apeteri,apeteri,András Péteri
+tangdh,tang-hi,tang donghai
+mdmarshmallow,mdmarshmallow,Marc D'Mello
+mosadiq,mohammadsadiq,Mohammad Sadiq
+wwm1994,wuwm,Weiming Wu
+hypothesisx86,Tony-X,Tony Xu
+msfroh,msfroh,Michael Froh
+nitiraj,nitirajrathore,Nitiraj Rathore
+ryantxu,ryantxu,Ryan McKinley
+iorixxx,iorixxx,Ahmet Arslan
+kimchy,kimchy,Shay Banon
+dakrone,dakrone,Lee Hinman
+khitrin,khitrin,Nikolay Khitrin
+johtani,johtani,Jun Ohtani
+arcadius,arcadius,Arcadius Ahouansou
+sstults,sstults,Scott Stults
+rnewson,rnewson,Robert Newson
+shikhar,shikhar,Shikhar Bhushan
+softwaredoug,softwaredoug,Doug Turnbull
+ofavre,ofavre,Olivier Favre
+wheijke,wheijke,Wouter Heijke
+tdunning,tdunning,Ted Dunning
+bleskes,bleskes,Boaz Leskes
+hlavki,hlavki,Michal Hlavac
+dadoonet,dadoonet,David Pilato
+oobles,oobles,David Ryan
+michael-o,michael-o,Michael Osipov
+wonlay,wonlay,Lei Wang
+niqueco,niqueco,Nicolás Lichtmaier
+amccurry,amccurry,Aaron McCurry
+mreutegg,mreutegg,Marcel Reutegger
+hani,hani,Hani Suleiman
+zabetak,zabetak,Stamatis Zampetakis
+itsadok,itsadok,Israel Tsadok
+jaywoo123,jaywoo123,Jaewoo Kim
+nhooey,nhooey,Neil Hooey
+steff1193,steff1193,Per Steffensen
+hgadre,hgadre,Hrishikesh Gadre
+lewismc,lewismc,Lewis John McGibbney
+muralikpbhat,muralikpbhat,Murali Krishna P
+mariusneo,mariusneo,Marius Grama
+tsmorton,tsmorton,Tom Morton
+klangman,klangman,Kevin Langman
+sujitpal,sujitpal,Sujit Pal
+ryd,ryd,Jens Muecke
+mlissner,mlissner,Mike Lissner
+mgoddard,mgoddard,Michael Goddard
+clofresh,clofresh,Carlo Cabanilla
+buzztaiki,buzztaiki,Taiki Sugawara
+clintongormley,clintongormley,Clinton Gormley
+ijuma,ijuma,Ismael Juma
+manokovacs,manokovacs,Mano Kovacs
+eelstretching,eelstretching,Stephen Green
+fhopf,fhopf,Florian Hopf
+seanoc5,seanoc5,Sean O'Connor
+weizijun,weizijun,weizijun
+praste,praste,Pushkar Raste
+hshankar,hshankar,Hari Menon
+holograph,holograph,Tomer Gabel
+jprante,jprante,Jörg Prante
+ianribas,ianribas,Ian Ribas
+hendrikmuhs,hendrikmuhs,Hendrik Muhs
+treyhyde,treyhyde,Trey Hyde
+deansg,deansg,Dean Gurvitz
+fizx,fizx,Kyle Maxwell
+pickypg,pickypg,Chris Earle
+nezda,nezda,Luke Nezda
+rragno,rragno,Robert Ragno
+alexklibisz,alexklibisz,Alex Klibisz
+lukhnos,lukhnos,Lukhnos Liu
+spmason,spmason,Steve Mason
+truemped,truemped,Daniel Truemper
+gsmet,gsmet,Guillaume Smet
+MathBunny,MathBunny,Horatiu Lazu
+fulmicoton,fulmicoton,Paul Masurel
+rfscholte,rfscholte,Robert Scholte
+schlosna,schlosna,David Schlosnagle
+chengpohi,chengpohi,chengpohi
+arteam,arteam,Artem Prigoda
+mhugo,mhugo,Hugo Mercier
+upthewaterspout,upthewaterspout,Dan Smith
+pkiraly,pkiraly,Király Péter
+micrenda,micrenda,Michele Renda
+davishmcclurg,davishmcclurg,David Harsha
+mingfai,mingfai,Mingfai Ma
+Julm,Julm,Julien Martin
+daubman,daubman,Aaron Daubman
+tonicava,tonicava,Octavian Mocanu
+kartg,kartg,Kartik Ganesh
+djptek,djptek,Dominic Page
+nmeisels,nmeisels,Nathan Meisels
+asgeirf,asgeirf,Asgeir Frimannsson
+eliaporciani,eliaporciani,Elia Porciani
+kmheibel,kmheibel,Kristin Heibel
+mjhugo,mjhugo,Mike Hugo
+emetsger,emetsger,Elliot Metsger
+iwesp,iwesp,Ingomar Wesp
+marschall,marschall,Philippe Marschall
+brianmeidell,brianmeidell,Brian Meidell
+skybert,skybert,Torstein Krause Johansen
+neilireson,neilireson,Neil Ireson
+rkhmelichek,rkhmelichek,Roman Khmelichek
+mdissel,mdissel,Marco Dissel
+isoboroff,isoboroff,Ian Soboroff
+mumrah,mumrah,David Arthur
+hackerwin7,hackerwin7,hackerwin7
+hrdxwandg,hrdxwandg,hrdxwandg
+brettporter,brettporter,Brett Porter
+cpilsworth,cpilsworth,Chris Pilsworth
+boris-petrov,boris-petrov,Boris Petrov
+edwinyeozl,edwinyeozl,Edwin Yeo Zheng Lin
+nolanlawson,nolanlawson,Nolan Lawson
+mbien,mbien,Michael Bien
+chubbard,chubbard,Charlie Hubbard
+samj1912,samj1912,Sambhav Kothari
+ahubold,ahubold,Andreas Hubold
+afilimonov,afilimonov,Andrei Filimonov
+chrislusf,chrislusf,Chris Lu
+mar-kolya,mar-kolya,Nikolay Martynov
+euske,euske,Yusuke Shinyama
+kevinconaway,kevinconaway,Kevin Conaway
+nithril,nithril,Nicolas Labrot
+camilojd,camilojd,Camilo Díaz Repka
+maxpsq,maxpsq,Massimo Pasquini
+thihy,thihy,thihy
+yangsongbai,yangsongbai,yangsongbai
+melix,melix,Cédric Champeau
+yurymalkov,yurymalkov,Yury Malkov
+stevemer,stevemer,Steve Merritt
+prosanes,prosanes,Pedro Rosanes
+sgonyea,sgonyea,Scott Gonyea
+zhaoyan1117,zhaoyan1117,Yan Zhao
+eribeiro,eribeiro,Edward Ribeiro
+tarrall,tarrall,Robert Tarrall
+fbaligand,fbaligand,Fabien Baligand
+klaporte,klaporte,Ken LaPorte
+stewi2,stewi2,Stefan Will
+pctony,pctony,Tony Stevenson
+apatry,apatry,Alexandre Patry
+kiju98,kiju98,Kiju Kim
+coderplay,coderplay,Min Zhou
+bjornhjelle,bjornhjelle,Bjørn Hjelle
+rishabhmaurya,rishabhmaurya,Rishabh Maurya
+rboulton,rboulton,Richard Boulton
+plaflamme,plaflamme,Philippe Laflamme
+bgfeldm,bgfeldm,Brian Feldman
+speedplane,speedplane,Michael Sander
+quachtaibuu,quachtaibuu,Quách Tài Bửu
+sarxos,sarxos,Bartosz Firyn
+aparo,aparo,Alberto Paro
+nkvoll,nkvoll,Njal Karevoll
+mch2,mch2,Marc Handalian
+baltendo,baltendo,Bernhard Altendorfer
+desruisseaux,desruisseaux,Martin Desruisseaux
+benoitf,benoitf,Florent BENOIT
+m9aertner,m9aertner,Matthias Gärtner
+zzullick,zzullick,Zack Zullick
+scottsom,scottsom,Scott Somerville
+wireframe,wireframe,Ryan Sonnek
+emecas,emecas,Emerson Castaneda
+ljcollins25,ljcollins25,Lance Collins
+cm,cmoen,Christian Moen
+gbowyer@fastmail.co.uk,GregBowyer,Greg Bowyer
+stanislaw.osinski,stanislawosinski,Stanislaw Osinski
+wjp719,wjp719,jianping weng
+daddywri,DaddyWri,Karl Wright
+karl wright,DaddyWri,Karl Wright
+kwright@metacarta.com,DaddyWri,Karl Wright
+otis,otisg,Otis Gospodnetić
+marcussorealheis,marcussorealheis,Marcus Eagan
+pru30,praveennish,Praveen Nishchal
+steffkes,steffkes,Stefan Matheis
+ab,sigram,Andrzej Bialecki
+goankur,goankur,Ankur Goel
+whoschek,whoschek,Wolfgang Hoschek
+shahrs87,shahrs87,Rushabh Shah
+gnewton,gnewton,Glen Newton
+adichad,adichad,Aditya Varun Chadha
+# goller@detego-software.de,???,Christoph Goller
+# markus17,???,Markus Jelsma
+# ???,paul.elschot@xs4all.nl,Paul Elschot
+adam@labkey.com,labkey-adam,Adam Rauch
+bkazar,bmkazar,Baris Kazar
+v.damore@gmail.com,freedev,Vincenzo D'Amore
+wunder,wrunderwood,Walter Underwood
+ilan,murblanc,Ilan Ginzburg
+murblanc,murblanc,Ilan Ginzburg
+matriv,matriv,Marios Trivyzas
+elelliot,elliotzlin,Elliot Lin
