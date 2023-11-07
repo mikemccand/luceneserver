@@ -36,6 +36,10 @@ c = db.cursor()
 c.execute('DROP TABLE IF EXISTS issues')
 c.execute('CREATE TABLE IF NOT EXISTS issues (key text PRIMARY KEY, body text)')
 c.execute('CREATE UNIQUE INDEX idx_issues_key ON issues(key)')
+
+c.execute('CREATE TABLE users (login TEXT UNIQUE PRIMARY KEY, pickle BLOB)')
+c.execute('CREATE TABLE full_issue (key TEXT UNIQUE PRIMARY KEY, pickle BLOB)')
+
 with open('/lucenedata/jirasearch/allIssues.20161017.txt', 'rb') as f:
   while True:
     l = f.readline()

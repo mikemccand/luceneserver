@@ -34,6 +34,20 @@ when you run this.
 """
 
 # TODO
+#   - add property "awaiting approval to run steps" boolean field?
+#   - GRRR the load_issue and load_pr APIs give more info than the list issue/pr!?
+#     - and mergeability is delayed computed in the BG eventgual consistency -- must periodcially resweep the open PRs?
+#   - does timeline show who approved the run steps?
+#   - index some cool PR attrs
+#     - author_association: first time contributor, contributor, member
+#     - mergeable
+#     - changed_files
+#     - mergeable_state
+#     - comments
+#     - draft
+#     - merged x closed?
+#     - etc.
+#   - index this silly "waiting for approval to run something"
 #   - how to map Jira username to GH login?
 #   - add attrs
 #     - watched_by (user) / has_watchers?
@@ -357,32 +371,26 @@ def removeAllGhosts():
 
 def all_issues():
   db = local_db.get(read_only=True)
-  try:
-    c = db.cursor()
-    for k, v in c.execute('SELECT key, pickle FROM issues WHERE key not in ("last_update", "page_upto")'):
+  c = db.cursor()
+  for k, v in c.execute('SELECT key, pickle FROM issues WHERE key not in ("last_update", "page_upto")'):
+    try:
+      yield pickle.loads(v)
+    except:
+      traceback.print_exc()
+      print(k)
+      raise
+
+def specific_issues(issues):
+  db = db.get(read_only=True)
+  c = db.cursor()
+  for issue in issues:
+    for k, v in c.execute('SELECT key, body FROM issues where key = ?', (issue,)):
       try:
         yield pickle.loads(v)
       except:
         traceback.print_exc()
         print(k)
         raise
-  finally:
-    db.close()
-
-def specific_issues(issues):
-  db = db.get(read_only=True)
-  try:
-    c = db.cursor()
-    for issue in issues:
-      for k, v in c.execute('SELECT key, body FROM issues where key = ?', (issue,)):
-        try:
-          yield pickle.loads(v)
-        except:
-          traceback.print_exc()
-          print(k)
-          raise
-  finally:
-    db.close()
 
 def issuesUpdatedAfter(minTimeStamp):
   db = local_db.get(read_only=True)
@@ -616,6 +624,7 @@ def build_full_suggest(svr):
     for comment in comments:
       if comment['body'] != 'Closed after release.':
         updated = max(updated, parse_date_time(comment['created_at']))
+      # nocommit -- must handle "migrated from Jira" too
       add_user(all_users, comment['user'], project, key)
 
     for change in timeline:
@@ -1095,6 +1104,9 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
     # for i, comment in enumerate(comments):
     for comment in comments:
       # print(f'comment: {comment}')
+      if 'JIRA' in comment['body']:
+        print(f'jira comment: {json.dumps(comment["body"], indent=2)}')
+      # nocommit must map / extra jira / github id too?
       add_user(all_users, comment['user'], project)
 
       # TODO: we don't bother loading these from GitHub now:

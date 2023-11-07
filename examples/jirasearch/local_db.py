@@ -85,13 +85,18 @@ def maybe_load_user(c, login):
   # yes, O(N^2) but N is smallish, and this cost is paid once on initial GitHub crawl
   open('%s/user_names_map.pk' % ROOT_STATE_PATH, 'wb').write(pickle.dumps(login_to_name))
 
-def http_load_as_json(url):
+def http_load_as_json(url, do_post=False, token=GITHUB_API_TOKEN):
   global ratelimit_remaining
     
-  headers = {'Authorization': f'token {GITHUB_API_TOKEN}',
-             'Accept': 'application/vnd.github.full+json',
-             'X-GitHub-Api-Version': '2022-11-28'}
-  response = requests.get(url, headers=headers)
+  headers = {
+      # 'Authorization': f'token {GITHUB_API_TOKEN}',
+      'Authorization': f'Bearer {token}',
+      'Accept': 'application/vnd.github.full+json',
+      'X-GitHub-Api-Version': '2022-11-28'}
+  if do_post:
+      response = requests.post(url, headers=headers)
+  else:
+      response = requests.get(url, headers=headers)
   if response.status_code != 200:
     raise RuntimeError(f'got {response.status_code} response loading {url}\n\n {response.text}')
   if not response.headers['Content-Type'].startswith('application/json'):

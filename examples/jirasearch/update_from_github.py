@@ -1,3 +1,4 @@
+import sys
 import pickle
 import json
 import datetime
@@ -15,13 +16,13 @@ def main():
   login_to_name = local_db.get_login_to_name()
   print(f'{len(login_to_name)} unique users')
   
-  # nocommit one time user table update:
   c = db.cursor()
 
   total_issue_count = c.execute('SELECT COUNT(*) FROM issues').fetchone()[0]
   print(f'{total_issue_count} issues in DB')
 
   if False:
+      # nocommit one time user table update:
       for k, v in c.execute('SELECT key, pickle FROM issues WHERE key not in ("last_update", "page_upto")'):
         issue, comments, events, reactions, timeline = pickle.loads(v)
         local_db.maybe_load_user(c, issue['user']['login'])
@@ -44,6 +45,16 @@ def main():
       c.execute('CREATE TABLE users (login TEXT UNIQUE PRIMARY KEY, pickle BLOB)')
       db.commit()
 
+  if False:
+      # nocommit
+      c = db.cursor()
+      c.execute('CREATE TABLE full_issue (key TEXT UNIQUE PRIMARY KEY, pickle BLOB)')
+      db.commit()
+
+  if False:
+    # nocommit -- one time to catch up on all past loaded PRs; newly refreshed PRs will now do this going forwards
+    load_all_full_prs(db)
+
   c = db.cursor()
   total_issue_count = c.execute('SELECT COUNT(*) FROM issues').fetchone()[0]
   print(f'{total_issue_count} issues in DB')
@@ -51,6 +62,46 @@ def main():
     refresh_latest_issues(db)
     time.sleep(5.0)
 
+def load_all_full_prs(db):
+    # the search API only returns a subset of the fields in a PR, so we must separately individually
+    # load the full pr (issues seem to be complete coming from search!?):
+    c = db.cursor()
+    c.execute('SELECT key, pickle FROM issues WHERE key not in ("last_update", "page_upto")')
+    for number, v in c.fetchall():
+        issue, comments, events, reactions, timeline = pickle.loads(v)
+        print(f'{number}')
+        if False and str(number) == '12691':
+            print('\n12691: issue')
+            print(json.dumps(issue, indent=2))
+            print('\n12691: timeline')
+            print(json.dumps(timeline, indent=2))
+            print('\n12691: events')
+            print(json.dumps(events, indent=2))
+            row = c.execute('SELECT pickle FROM full_issue WHERE key=?', (str(number),)).fetchone()
+            print('\n12691: full PR')
+            #full_pr = load_one_full_pr(db, c, number)
+            full_pr = pickle.loads(row[0])
+            print(json.dumps(full_pr, indent=2))
+        #if 'pull_request' in issue and issue.get('state') == 'open':
+        if 'pull_request' in issue:
+            print('  is pull request!')
+            rows = list(c.execute('SELECT pickle FROM full_issue WHERE key=?', (str(number),)).fetchall())
+            if len(rows) == 0:
+                print(f'  pr not yet fully loaded!  load now...')
+                load_one_full_pr(db, c, number)
+
+def load_one_full_pr(db, c, number):
+    print(f'  load full pr {number}')
+    full_pr = local_db.http_load_as_json(f'https://api.github.com/repos/apache/lucene/pulls/{number}')
+    #print(json.dumps(full_pr))
+    s = pickle.dumps(full_pr)
+    #print(s)
+    #print(pickle.loads(s))
+    c.execute('REPLACE INTO full_issue (key, pickle) VALUES (?, ?)',
+              (str(number), s))
+    db.commit()
+    return full_pr
+        
 def refresh_latest_issues(db):
   now = datetime.datetime.utcnow()
 
@@ -105,6 +156,9 @@ def refresh_latest_issues(db):
       c.execute('REPLACE INTO issues (key, pickle) VALUES (?, ?)',
                 (str(issue['number']), pickle.dumps((issue, comments, events, reactions, timeline))))
       issue_numbers_refreshed.append(issue['number'])
+
+      if 'pull_request' in issue:
+          load_one_full_pr(db, c, issue['number'])
 
     if False:
         if not batch['incomplete_results']:

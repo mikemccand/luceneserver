@@ -1,3 +1,4 @@
+import sys
 import pickle
 import sqlite3
 import localconstants
@@ -18,25 +19,36 @@ def main():
   open_pr_count = 0
   closed_pr_count = 0
   histo_by_days = {}
-  for k, v in c.execute('SELECT key, pickle FROM issues'):
+
+  if '-print_full_pr' in sys.argv:
+    i = sys.argv.index('-print_full_pr')
+    pr_number = sys.argv[i+1]
+    blob = c.execute('SELECT pickle FROM issues WHERE key=?', (pr_number,)).fetchone()[0]
+    issue, comments, events, reactions, timeline = pickle.loads(blob)
+    print(f'\nISSUE:\n{json.dumps(issue, indent=2)}')
+    print(f'\nCOMMENTS:\n{json.dumps(comments, indent=2)}')
+    print(f'\nEVENTS:\n{json.dumps(events, indent=2)}')
+    print(f'\nREACTIONS:\n{json.dumps(reactions, indent=2)}')
+    print(f'\nTIMELINE:\n{json.dumps(timeline, indent=2)}')
+
+    blob = c.execute('SELECT pickle FROM full_issue WHERE key=?', (pr_number,)).fetchone()[0]
+    full_issue = pickle.loads(blob)
+    print(f'\nFULL PULL_REQUEST:\n{json.dumps(full_issue, indent=2)}')
+    
+    
+    sys.exit(0)
+    
+  for k, v in c.execute('SELECT key, pickle FROM issues').fetchall():
     if k in ('last_update', 'page_upto'):
       continue
     issue, comments, events, reactions, timeline = pickle.loads(v)
 
+    if issue['number'] == 12557:
+      print(json.dumps(issue, indent=2))
+
     if 'pull_request' in issue:
-        print(f'  {issue["number"]} is pr!')
-        print(f'    {len(comments)} comments')
-        #print(f'    {issue["state"]}')
-        if issue['state'] == 'open':
-            open_pr_count += 1
-            #print(json.dumps(issue, indent=2))
-            created_at = datetime.datetime.fromisoformat(issue['created_at'])
-            age = now - created_at
-            days_age = int(age.total_seconds()/(24*3600.))
-            print(f'    age={age}')
-            histo_by_days[days_age] = 1+histo_by_days.get(days_age, 0)
-        else:
-            closed_pr_count += 1
+      if 'mergeable_state' in issue and issue['mergeable_state'] == 'unknown':
+        print(f'unknown: {issue["html_url"]}')
 
     #print(f'\n issue {issue["number"]}\n{json.dumps(issue, indent=2)}')
     if False and len(events) > 0:
@@ -58,4 +70,3 @@ def main():
   
 if __name__ == '__main__':
   main()
-
