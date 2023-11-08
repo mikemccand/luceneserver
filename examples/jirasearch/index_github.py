@@ -42,7 +42,9 @@ when you run this.
 #   - GRRR the load_issue and load_pr APIs give more info than the list issue/pr!?
 #     - and mergeability is delayed computed in the BG eventgual consistency -- must periodcially resweep the open PRs?
 #   - does timeline show who approved the run steps?
+#   - get pr state in there -- cancelled, merged, draft, open
 #   - index some cool PR attrs
+#     - merged by?
 #     - author_association: first time contributor, contributor, member
 #     - mergeable
 #     - changed_files
@@ -292,6 +294,11 @@ def create_schema(svr):
             'legacy_jira_labels': {'type': 'atom',
                                    'multiValued': True,
                                    'facet': 'flat'},
+            # TODO: hmm can i facet on child doc field?  i block join up to parent (whole issue/pr)...
+            'pr_review_state': {'type': 'atom',
+                                'facet': 'flat'},
+            'comment_type': {'type': 'atom',
+                             'facet': 'flat'},
             'modules': {'type': 'atom',
                         'search': True,
                         'store': True,
@@ -369,32 +376,44 @@ def removeAllGhosts():
 
 def decode_and_load_one_issue(c, pk):
   doc = pickle.loads(pk)
-  print(f'iter: {doc[0]["number"]}')
+  number = doc[0]['number']
+  print(f'iter: {number}')
   if 'pull_request' in doc[0]:
-    rows = list(c.execute('SELECT pickle FROM full_issue WHERE key=?', (str(doc[0]['number']),)).fetchall())
+    rows = list(c.execute('SELECT pickle FROM full_issue WHERE key=?', (str(number),)).fetchall())
     if len(rows) == 0:
-      print(f'WARNING: missing full PR data for {doc["number"]}')
+      print(f'WARNING: missing full PR data for {number}')
       full_pr = None
     elif len(rows) == 1:
       # perfect
       full_pr = pickle.loads(rows[0][0])
     else:
-      raise RuntimeError(f'WTF: expected o or 1 rows for PR {doc["number"]} but saw {len(rows)}')
+      raise RuntimeError(f'WTF: expected o or 1 rows for PR {number} but saw {len(rows)}')
 
-    rows = list(c.execute('SELECT pickle FROM pr_comments WHERE key=?', (str(doc[0]['number']),)).fetchall())
+    rows = list(c.execute('SELECT pickle FROM pr_comments WHERE key=?', (str(number),)).fetchall())
     if len(rows) == 0:
-      print(f'WARNING: missing PR comments data for {doc["number"]}')
+      print(f'WARNING: missing PR comments data for {number}')
       pr_comments = None
     elif len(rows) == 1:
       # perfect
       pr_comments = pickle.loads(rows[0][0])
     else:
-      raise RuntimeError(f'WTF: expected o or 1 rows for PR {doc["number"]} but saw {len(rows)}')
+      raise RuntimeError(f'WTF: expected o or 1 rows for PR {number} but saw {len(rows)}')
+
+    rows = list(c.execute('SELECT pickle FROM pr_reviews WHERE key=?', (str(number),)).fetchall())
+    if len(rows) == 0:
+      print(f'WARNING: missing PR reviews data for {number}')
+      pr_reviews = None
+    elif len(rows) == 1:
+      # perfect
+      pr_reviews = pickle.loads(rows[0][0])
+    else:
+      raise RuntimeError(f'WTF: expected o or 1 rows for PR {number} but saw {len(rows)}')
   else:
     full_pr = None
     pr_comments = None
+    pr_reviews = None
 
-  return doc, full_pr, pr_comments
+  return doc, full_pr, pr_comments, pr_reviews
 
 def all_issues():
   db = local_db.get(read_only=True)
@@ -576,7 +595,7 @@ def build_full_suggest(svr):
   suggestFile = open('%s/suggest.txt' % localconstants.ROOT_STATE_PATH, 'wb')
   all_users = {}
 
-  for (issue, comments, events, reactions, timeline), full_pr, pr_comments in all_issues():
+  for (issue, comments, events, reactions, timeline), full_pr, pr_comments, pr_reviews in all_issues():
     key = issue['number']
     project = extract_project(issue)
     reporter = extract_reporter(issue)
@@ -772,7 +791,7 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
   issue_count = 0
   first = True
   
-  for (issue, comments, events, reactions, timeline), full_pr, pr_comments in issues:
+  for (issue, comments, events, reactions, timeline), full_pr, pr_comments, pr_reviews in issues:
 
     project = extract_project(issue)
 
@@ -1093,93 +1112,109 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
       # TODO: any fun metadata we could extract about pr_comments?
       #    - src path commented on
       #    - src diff commented on
-      index_comments = pr_comments + comments
+      index_comments = [('Review code comment', pr_comments), ('Review text', pr_reviews), ('Comment', comments)]
     else:
-      index_comments = comments
+      index_comments = [('Comment', comments)]
 
     # count both normal comments and PR code comments:
     doc['comment_count'] = len(index_comments)
 
     # for i, comment in enumerate(comments):
-    for comment in index_comments:
-      # print(f'comment: {comment}')
-      #if 'JIRA' in comment['body']:
-      #  print(f'jira comment: {json.dumps(comment, indent=2)}')
-      # nocommit must map / extra jira / github id too?
-      add_user(all_users, comment['user'], project)
+    for comment_cat, comment_list in index_comments:
 
-      author_associations.add(comment['author_association'])
+      for comment in comment_list:
+        # print(f'comment: {comment}')
+        #if 'JIRA' in comment['body']:
+        #  print(f'jira comment: {json.dumps(comment, indent=2)}')
+        # nocommit must map / extra jira / github id too?
+        add_user(all_users, comment['user'], project)
 
-      # TODO: we don't bother loading these from GitHub now:
-      if False:
-        # each comment has an array of reactions:
-        for reaction in list(comment_reactions[i]):
-          print(f'  comment reaction: {reaction.user} {reaction.content} {reaction.created_at}')
-          add_user(all_users, reaction.user, project)
+        author_associations.add(comment['author_association'])
 
-      subDoc = {}
-      subDoc['author'] = comment['user']['login']
+        # TODO: we don't bother loading these from GitHub now:
+        if False:
+          # each comment has an array of reactions:
+          for reaction in list(comment_reactions[i]):
+            print(f'  comment reaction: {reaction.user} {reaction.content} {reaction.created_at}')
+            add_user(all_users, reaction.user, project)
 
-      # TODO: fixme to detect migrated Jira comment, and new GitHub style commit comment
-      isCommit = is_commit_user(comment['user'])
-      body = comment['body']
-      # print(f'  comment body {body}')
-      if isCommit:
-        subDoc['author'] = 'commitbot'
-        has_commits = True
-        m = reCommitURL.findall(body)
-        if len(m) > 0:
-          for y in m:
-            if 'git-wip-us' in y or 'svn.apache.org/r' in y:
-              subDoc['commit_url'] = y.strip()
-              #print('GIT: %s' % subDoc['commitURL'])
-              break
-        if 'commit_url' not in subDoc:
-          # back compat: try old SVN commit Jira comment syntax
-          m = reSVNCommitURL.search(body)
-          if m is not None:
-            subDoc['commit_url'] = m.group(1).strip()
-            #print('SVN: %s' % subDoc['commitURL'])
+        subDoc = {}
+        subDoc['author'] = comment['user']['login']
+        subDoc['comment_type'] = comment_cat
 
-        branch = reInBranch.search(body)
-        if branch is not None:
-          branch = branch.group(1)
-          branch = branch.replace('dev/', '')
-          branch = branch.replace('branches/', '')
-        else:
-          branch = reInBranch2.search(body)
+        if comment_cat == 'Review text' and 'state' in comment:
+          # a pr review
+          # approved, changes requested, etc
+          subDoc['pr_review_state'] = comment['state']
+
+        # TODO: fixme to detect migrated Jira comment, and new GitHub style commit comment
+        isCommit = is_commit_user(comment['user'])
+        body = comment['body']
+        # print(f'  comment body {body}')
+        if isCommit:
+          subDoc['author'] = 'commitbot'
+          has_commits = True
+          m = reCommitURL.findall(body)
+          if len(m) > 0:
+            for y in m:
+              if 'git-wip-us' in y or 'svn.apache.org/r' in y:
+                subDoc['commit_url'] = y.strip()
+                #print('GIT: %s' % subDoc['commitURL'])
+                break
+          if 'commit_url' not in subDoc:
+            # back compat: try old SVN commit Jira comment syntax
+            m = reSVNCommitURL.search(body)
+            if m is not None:
+              subDoc['commit_url'] = m.group(1).strip()
+              #print('SVN: %s' % subDoc['commitURL'])
+
+          branch = reInBranch.search(body)
           if branch is not None:
             branch = branch.group(1)
+            branch = branch.replace('dev/', '')
+            branch = branch.replace('branches/', '')
           else:
-            branch = reInGitBranch.search(body)
+            branch = reInBranch2.search(body)
             if branch is not None:
               branch = branch.group(1)
-              branch = branch.replace('refs/heads/', '')
+            else:
+              branch = reInGitBranch.search(body)
+              if branch is not None:
+                branch = branch.group(1)
+                branch = branch.replace('refs/heads/', '')
 
-        # drop first 2 not-so-useful lines of the commit message,
-        # because we separately extract this info:
-        #   Commit XXX in lucene-solr's branch YYY from ZZZ
-        #   [ <url> ]
+          # drop first 2 not-so-useful lines of the commit message,
+          # because we separately extract this info:
+          #   Commit XXX in lucene-solr's branch YYY from ZZZ
+          #   [ <url> ]
 
-        body = '\n'.join(body.split('\n')[2:])
-        if branch is not None:
-          body = '%s: %s' % (branch, body)
-      elif subDoc['author'] is not None:
-        last_contributor = subDoc['author']
+          body = '\n'.join(body.split('\n')[2:])
+          if branch is not None:
+            body = '%s: %s' % (branch, body)
+        elif subDoc['author'] is not None:
+          last_contributor = subDoc['author']
 
-      subDoc['comment_body'] = clean_github_markdown(number, body)
-      comments_text.append(subDoc['comment_body'])
+        subDoc['comment_body'] = clean_github_markdown(number, body)
+        comments_text.append(subDoc['comment_body'])
 
-      subDoc['comment_id'] = comment['id']
-      # Disregard the bulk-update after X.Y release:
-      if subDoc['comment_body'] != 'Closed after release.':
-        updated = max(updated, parse_date_time(comment['created_at']))
-      subDoc['created'] = int(float(parse_date_time(comment['created_at']).strftime('%s.%f')))
+        subDoc['comment_id'] = comment['id']
+        # Disregard the bulk-update after X.Y release:
+        if comment_cat == 'Review text':
+          if comment['state'] != 'PENDING':
+            created_at = parse_date_time(comment['submitted_at'])
+        else:
+          created_at = parse_date_time(comment['created_at'])
 
-      # TODO: why store this twice in each child doc!?
-      subDoc['key'] = key
-      subDoc['child_key'] = key
-      subDocs.append({'fields': subDoc})
+        if subDoc['comment_body'] != 'Closed after release.':
+          # nocommit also rule out asfimport touching issues on migration from Jira?
+          updated = max(updated, created_at)
+
+        subDoc['created'] = int(float(created_at.strftime('%s.%f')))
+
+        # TODO: why store this twice in each child doc!?
+        subDoc['key'] = key
+        subDoc['child_key'] = key
+        subDocs.append({'fields': subDoc})
 
     doc['author_association'] = list(author_associations)
     

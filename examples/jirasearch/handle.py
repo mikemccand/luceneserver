@@ -276,6 +276,7 @@ jiraSpec.facetFields = (
   ('Project', 'project', False, None, False),
   ('Issue type', 'issue_or_pr', False, None, False),
   ('Author relation', 'author_association', False, None, False),
+  ('Comment type', 'comment_type', False, None, False),
   ('Updated', 'updated', False, None, False),
   ('Updated ago', 'updated_ago', False, None, False),
   ('Comment count', 'comment_count', False, None, False),

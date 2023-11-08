@@ -61,6 +61,15 @@ def main():
       # nocommit -- one time to catch up on all past loaded PRs; newly refreshed PRs will now do this going forwards
       load_all_pr_comments(db)
 
+  if True:
+      # nocommit
+      if False:
+        c = db.cursor()
+        c.execute('CREATE TABLE pr_reviews (key TEXT UNIQUE PRIMARY KEY, pickle BLOB)')
+        db.commit()
+      # nocommit -- one time to catch up on all past loaded PRs; newly refreshed PRs will now do this going forwards
+      load_all_pr_reviews(db)
+
   if False:
     # nocommit -- one time to catch up on all past loaded PRs; newly refreshed PRs will now do this going forwards
     load_all_full_prs(db)
@@ -139,6 +148,30 @@ def load_pr_comments(db, c, number):
   print(f'    got: {all_pr_comments}')
   return all_pr_comments
         
+def load_all_pr_reviews(db):
+    # the search API only returns a subset of the fields in a PR, so we must separately individually
+    # load the full pr comments (issues seem to be complete coming from search!?):
+    c = db.cursor()
+    c.execute('SELECT key, pickle FROM issues WHERE key not in ("last_update", "page_upto")')
+    for number, v in c.fetchall():
+        issue, comments, events, reactions, timeline = pickle.loads(v)
+        if 'pull_request' in issue:
+          print(f'{number} is PR')
+          rows = list(c.execute('SELECT pickle FROM pr_reviews WHERE key=?', (str(number),)).fetchall())
+          if len(rows) == 0:
+              print(f'  pr reviews not yet fully loaded!  load now...')
+              load_pr_reviews(db, c, number)
+
+def load_pr_reviews(db, c, number):
+  print(f'  load full pr reviews {number}')
+  all_pr_reviews = local_db.http_load_as_json(f'https://api.github.com/repos/apache/lucene/pulls/{number}/reviews')
+  s = pickle.dumps(all_pr_reviews)
+  c.execute('REPLACE INTO pr_reviews (key, pickle) VALUES (?, ?)',
+            (str(number), s))
+  db.commit()
+  print(f'    got: {all_pr_reviews}')
+  return all_pr_reviews
+        
 def refresh_latest_issues(db):
   now = datetime.datetime.utcnow()
 
@@ -158,8 +191,7 @@ def refresh_latest_issues(db):
 
   nrt_started_utc = datetime.datetime.utcnow()
 
-  #since_utc = last_update_utc - datetime.timedelta(seconds=60)
-  since_utc = last_update_utc - datetime.timedelta(seconds=7200)
+  since_utc = last_update_utc - datetime.timedelta(seconds=10)
 
   print(f'\n{datetime.datetime.now()}: now refresh latest updates (GitHub ratelimit_remaining={local_db.ratelimit_remaining})')
   print(f'  use since={since_utc} ({(nrt_started_utc-since_utc).total_seconds()} seconds ago)')
@@ -191,9 +223,10 @@ def refresh_latest_issues(db):
 
       print(f'  load {issue["number"]}')
 
-      # nocommit!!
-      if issue['number'] != 12781:
-        print(f'NOCOMMIT: skipping updating {issue["number"]}')
+      number = issue['number']
+
+      if False and number != 12781:
+        print(f'NOCOMMIT: skipping updating {number}')
         continue
 
       now = datetime.datetime.now()
@@ -205,19 +238,17 @@ def refresh_latest_issues(db):
       # nocommit what about events/timeline users?
 
       c.execute('REPLACE INTO issues (key, pickle) VALUES (?, ?)',
-                (str(issue['number']), pickle.dumps((issue, comments, events, reactions, timeline))))
-      issue_numbers_refreshed.append(issue['number'])
+                (str(number), pickle.dumps((issue, comments, events, reactions, timeline))))
+      issue_numbers_refreshed.append(number)
 
-      print(f'ISSUE={json.dumps(issue, indent=2)}')
-      print(f'COMMENTS={json.dumps(comments, indent=2)}')
-
-      reviews = http_load_as_json(f'https://api.github.com/repos/apache/lucene/pulls/{issue["number"]}/reviews')
-      print(f'REVIEWS:\n{json.dumps(reviews, indent=2)}')
+      #print(f'ISSUE={json.dumps(issue, indent=2)}')
+      #print(f'COMMENTS={json.dumps(comments, indent=2)}')
 
       if 'pull_request' in issue:
-          load_one_full_pr(db, c, issue['number'])
-          load_pr_comments(db, c, issue['number'])          
-
+        load_one_full_pr(db, c, number)
+        load_pr_comments(db, c, number)
+        load_pr_reviews(db, c, number)
+        
     if False:
         if not batch['incomplete_results']:
           page += 1
