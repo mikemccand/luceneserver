@@ -36,7 +36,8 @@ import http.cookies
 Handles incoming queries for the search UI.
 """
 
-TRACE = False
+# nocommit
+TRACE = True
 
 if not localconstants.IS_DEV:
   TRACE = False
@@ -257,8 +258,10 @@ jiraSpec.retrieveFields = (
   'vote_count',
   'watch_count',
   'commit_url',
+  'issue_or_pr',
   {'field': 'title', 'highlight': 'whole'},
   {'field': 'body', 'highlight': 'snippets'},
+  {'field': 'comment_body', 'highlight': 'snippets'},
   )
 
 jiraSpec.highlighter = {
@@ -271,13 +274,17 @@ jiraSpec.highlighter = {
 jiraSpec.facetFields = (
   ('Status', 'status', False, None, False),
   ('Project', 'project', False, None, False),
+  ('Issue type', 'issue_or_pr', False, None, False),
+  ('Author relation', 'author_association', False, None, False),
   ('Updated', 'updated', False, None, False),
   ('Updated ago', 'updated_ago', False, None, False),
+  ('Comment count', 'comment_count', False, None, False),
   ('User', 'all_users', False, None, True),
   ('Committed by', 'committed_by', False, None, True),
   ('Last comment user', 'last_contributor', False, None, True),
   ('Fix version', 'fix_versions', True, '-int', True),
   ('Committed paths', 'committed_paths', True, None, False),
+  ('Draft', 'is_draft', False, None, False),
   ('Component', 'facet_modules', True, None, True),
   ('Type', 'issue_type', False, None, True),
   ('Priority', 'facet_priority', False, None, False),
@@ -625,10 +632,11 @@ class RenderFacets:
       else:
         newPath = (label,)
 
-      if label == '1':
-        label = 'Yes'
-      elif label == '0':
-        label = 'No'
+      if ddName != 'comment_count':
+        if label == '1':
+          label = 'Yes'
+        elif label == '0':
+          label = 'No'
 
       w('<tr>')
       w('<td>')
@@ -896,14 +904,17 @@ def renderJiraHits(w, text, groups, userDrillDowns):
     project = fields['project']
 
     key_orig = key
+    if fields['issue_or_pr'] == 'PR':
+      key += ' PR'
 
     # hack alert!  really i should index a separate text+highlight field for this...
     if key.lower().replace('-', ' ') == lowerText:
       key = '<b>#%s</b>' % key
     else:
       key = '#' + key
+    print(f'{key}: {fields["status"]}')
     
-    if 'closed' in fields['status']:
+    if fields['status'] in ('Reopend', 'Open'):
       skey = key
     else:
       skey = '<s>%s</s>' % key
@@ -935,18 +946,19 @@ def renderJiraHits(w, text, groups, userDrillDowns):
       if isCommitUser(author):
         author = 'commitbot'
       if 'commitURL' in fields:
-        commentURL = fields['commitURL']
-        if 'git-wip-us' in commentURL:
-          commentURL += ';a=commitdiff'
+        comment_url = fields['commitURL']
+        if 'git-wip-us' in comment_url:
+          comment_url += ';a=commitdiff'
       else:
-        commentURL = 'http://issues.apache.org/jira/browse/%s?focusedCommentId=%s&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-%s' % \
-                     (key_orig, fields['comment_id'], fields['comment_id'])
+        comment_url = f'https://github.com/apache/{project}/issues/{key_orig}#issuecomment-{fields["comment_id"]}'
+        #commentURL = 'http://issues.apache.org/jira/browse/%s?focusedCommentId=%s&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-%s' % \
+        #                     (key_orig, fields['comment_id'], fields['comment_id'])
 
       #authorDD = '<a href="" onclick="g(fcmd(event), \'allUsers\', \'%s\');return false;"><b>%s</b></a>' % (author, nonBreakingSpace(fix_hilite(author, 'allUsers')))
       authorDD = '<b>%s</b>' % fix_hilite(author, 'all_users', True)
       w('&nbsp;&nbsp;&nbsp;&nbsp;%s&nbsp;<em>%s&nbsp;ago</em>:&nbsp;&nbsp;</td><td><a class="commentsnippet" href="%s">%s</a>' % \
         (authorDD,
-         nonBreakingSpace(toAgo(now - fields['created'])), commentURL, fix_hilite(fields.get('body'))))
+         nonBreakingSpace(toAgo(now - fields['created'])), comment_url, fix_hilite(fields.get('comment_body'))))
       w('</td>')
       w('</tr>')
     w('</table>')
@@ -1081,7 +1093,7 @@ def handleMoreFacets(path, isMike, environ):
                          'numericRange': d})
               break
           else:
-            raise RuntimeError('failed to find numericRange label %s' % value)
+            raise RuntimeError(f'failed to find numericRange label {value} for dimension {field}')
         elif field == 'updated_ago':
           for d in getOldTimeFacets(now):
             if d['label'] == value[0]:
@@ -1089,15 +1101,23 @@ def handleMoreFacets(path, isMike, environ):
                          'numericRange': d})
               break
           else:
-            raise RuntimeError('failed to find numericRange label %s' % value)
+            raise RuntimeError(f'failed to find numericRange label {value} for dimension {field}')
+        elif field == 'comment_count':
+          for d in getCommentCountFacets():
+            if d['label'] == value[0]:
+              l2.append({'field': 'comment_count',
+                         'numericRange': d})
+              break
+          else:
+            raise RuntimeError(f'failed to find numericRange label {value} for dimension {field}')
         else:
           l2.append({'field': field, 'value': value})
 
     query['drillDowns'] = l2
 
   query['facets'] = [{'dim': dim, 'topN': MAX_INT}]
-
   query['facets'].append({'dim': 'updated', 'numericRanges': getTimeFacets(now)})
+  query['facets'].append({'dim': 'comment_count', 'numericRanges': getCommentCountFacets()})
 
   if TRACE:
     print('MoreFacets query:')
@@ -1126,6 +1146,15 @@ def getTimeFacets(now):
     {'label': 'Past week', 'min': now-7*24*3600, 'max': now, 'minInclusive': True, 'maxInclusive': True},
     {'label': 'Past month', 'min': int(now-30.5*24*3600), 'max': now, 'minInclusive': True, 'maxInclusive': True},
     ]
+
+def getCommentCountFacets():
+  return [
+    {'label': '0', 'min': 0, 'max': 0, 'minInclusive': True, 'maxInclusive': True},
+    {'label': '1', 'min': 1, 'max': 1, 'minInclusive': True, 'maxInclusive': True},
+    {'label': '2 - 5', 'min': 2, 'max': 5, 'minInclusive': True, 'maxInclusive': True},
+    {'label': '6 - 10', 'min': 6, 'max': 10, 'minInclusive': True, 'maxInclusive': True},
+    {'label': '10 - 20', 'min': 10, 'max': 20, 'minInclusive': True, 'maxInclusive': True},
+    {'label': '> 20', 'min': 20, 'max': 100000000000, 'minInclusive': True, 'maxInclusive': True}]
 
 def getOldTimeFacets(now):
   return [
@@ -1443,7 +1472,9 @@ def handleQuery(path, isMike, environ):
       d = {'dim': dim, 'numericRanges': getTimeFacets(now)}
     elif dim == 'updated_ago':
       d = {'dim': 'updated_ago', 'numericRanges': getOldTimeFacets(now)}
-    else:
+    elif dim == 'comment_count':
+      d = {'dim': 'comment_count', 'numericRanges': getCommentCountFacets()}
+    else:      
       d = {'dim': dim, 'topN': topN}
     l.append(d)
     if dim == groupDDField:
@@ -1476,6 +1507,7 @@ def handleQuery(path, isMike, environ):
     l2 = []
     for field, values in drillDowns:
       for value in values:
+        # TODO: factor out this identical code w/ handleMoreFacets!!
         if field == 'updated':
           # nocommit should use the 'now' as of when the query had started!
           for d in getTimeFacets(now):
@@ -1493,10 +1525,18 @@ def handleQuery(path, isMike, environ):
               break
           else:
             raise RuntimeError('failed to find numericRange label %s' % value)
+        elif field == 'comment_count':
+          for d in getCommentCountFacets():
+            if d['label'] == value[0]:
+              l2.append({'field': 'comment_count',
+                         'numericRange': d})
+              break
+          else:
+            raise RuntimeError(f'failed to find numericRange label {value} for dimension {field}')
         else:
           l2.append({'field': field, 'value': value})
 
-      if field not in ('updated', 'updated_ago') and not spec.facetByID[field][0]:
+      if field not in ('updated', 'updated_ago', 'comment_count') and not spec.facetByID[field][0]:
         ddExtraMap[field] = len(l)
         l.append({'dim': field, 'labels': values[0]})
                   

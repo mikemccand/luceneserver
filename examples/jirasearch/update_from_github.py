@@ -7,6 +7,7 @@ import local_db
 
 from localconstants import DB_PATH, GITHUB_API_TOKEN
 from direct_load_all_github_issues import load_full_issue
+from local_db import http_load_as_json
 
 def main():
   # not read only, because we write new issue/pr updates into it:
@@ -50,6 +51,15 @@ def main():
       c = db.cursor()
       c.execute('CREATE TABLE full_issue (key TEXT UNIQUE PRIMARY KEY, pickle BLOB)')
       db.commit()
+
+  if False:
+      # nocommit
+      if False:
+        c = db.cursor()
+        c.execute('CREATE TABLE pr_comments (key TEXT UNIQUE PRIMARY KEY, pickle BLOB)')
+        db.commit()
+      # nocommit -- one time to catch up on all past loaded PRs; newly refreshed PRs will now do this going forwards
+      load_all_pr_comments(db)
 
   if False:
     # nocommit -- one time to catch up on all past loaded PRs; newly refreshed PRs will now do this going forwards
@@ -101,6 +111,33 @@ def load_one_full_pr(db, c, number):
               (str(number), s))
     db.commit()
     return full_pr
+
+def load_all_pr_comments(db):
+    # the search API only returns a subset of the fields in a PR, so we must separately individually
+    # load the full pr comments (issues seem to be complete coming from search!?):
+    c = db.cursor()
+    c.execute('SELECT key, pickle FROM issues WHERE key not in ("last_update", "page_upto")')
+    for number, v in c.fetchall():
+        issue, comments, events, reactions, timeline = pickle.loads(v)
+        print(f'{number}')
+        if 'pull_request' in issue:
+            print('  is pull request!')
+            rows = list(c.execute('SELECT pickle FROM pr_comments WHERE key=?', (str(number),)).fetchall())
+            if len(rows) == 0:
+                print(f'  pr comments not yet fully loaded!  load now...')
+                load_pr_comments(db, c, number)
+
+def load_pr_comments(db, c, number):
+  print(f'  load full pr comments {number}')
+  all_pr_comments = local_db.http_load_as_json(f'https://api.github.com/repos/apache/lucene/pulls/{number}/comments')
+  s = pickle.dumps(all_pr_comments)
+  #print(s)
+  #print(pickle.loads(s))
+  c.execute('REPLACE INTO pr_comments (key, pickle) VALUES (?, ?)',
+            (str(number), s))
+  db.commit()
+  print(f'    got: {all_pr_comments}')
+  return all_pr_comments
         
 def refresh_latest_issues(db):
   now = datetime.datetime.utcnow()
@@ -121,7 +158,8 @@ def refresh_latest_issues(db):
 
   nrt_started_utc = datetime.datetime.utcnow()
 
-  since_utc = last_update_utc - datetime.timedelta(seconds=60)
+  #since_utc = last_update_utc - datetime.timedelta(seconds=60)
+  since_utc = last_update_utc - datetime.timedelta(seconds=7200)
 
   print(f'\n{datetime.datetime.now()}: now refresh latest updates (GitHub ratelimit_remaining={local_db.ratelimit_remaining})')
   print(f'  use since={since_utc} ({(nrt_started_utc-since_utc).total_seconds()} seconds ago)')
@@ -133,17 +171,30 @@ def refresh_latest_issues(db):
   # in case we need to load multiple pages to get the updated issues:
   while True:
 
+    # TODO: make it tz aware?
+    since_string = since_utc.isoformat()
+    # Not certain but GH may not like these fractional seconds -- strip them:
+    if '.' in since_string:
+      since_string = since_string[:since_string.index('.')]
+
+    # Add zulu (UTC) timezone:
+    since_string += 'Z'
+
     # hopefully we never wind up throttling here due to too many issue updates versus GitHub API rate limit!
-    batch = local_db.http_load_as_json(f'https://api.github.com/repos/apache/lucene/issues?state=all&per_page=100&direction=asc&since={since_utc.isoformat()}&page={page}')
-    # print(f'got: {json.dumps(batch, indent=2)} len={len(batch)}')
+    batch = local_db.http_load_as_json(f'https://api.github.com/repos/apache/lucene/issues?state=all&per_page=100&direction=asc&since={since_string}&page={page}')
 
     if len(batch) == 0:
-        print('  no more results... finishing')
-        break
+      print('  no more results... finishing')
+      break
 
     for issue in batch:
 
       print(f'  load {issue["number"]}')
+
+      # nocommit!!
+      if issue['number'] != 12781:
+        print(f'NOCOMMIT: skipping updating {issue["number"]}')
+        continue
 
       now = datetime.datetime.now()
       comments, events, reactions, timeline = load_full_issue(issue)
@@ -157,8 +208,15 @@ def refresh_latest_issues(db):
                 (str(issue['number']), pickle.dumps((issue, comments, events, reactions, timeline))))
       issue_numbers_refreshed.append(issue['number'])
 
+      print(f'ISSUE={json.dumps(issue, indent=2)}')
+      print(f'COMMENTS={json.dumps(comments, indent=2)}')
+
+      reviews = http_load_as_json(f'https://api.github.com/repos/apache/lucene/pulls/{issue["number"]}/reviews')
+      print(f'REVIEWS:\n{json.dumps(reviews, indent=2)}')
+
       if 'pull_request' in issue:
           load_one_full_pr(db, c, issue['number'])
+          load_pr_comments(db, c, issue['number'])          
 
     if False:
         if not batch['incomplete_results']:
@@ -169,15 +227,13 @@ def refresh_latest_issues(db):
     page += 1
 
   if False and len(issue_numbers_refreshed) != total_count:
+    # TODO: github API seems not to give us total count?
     print(f'WARNING: iterated through {len(issue_numbers_refreshed)} issues but GitHub issues API claimed we would see {total_count}')
 
   c.execute('REPLACE INTO issues (key, pickle) VALUES (?, ?)', ('last_update', pickle.dumps(nrt_started_utc),))
   db.commit()
 
-  total_issue_count = c.execute('SELECT COUNT(*) FROM issues').fetchone()[0]
-
-  print(f'  loaded and indexed {len(issue_numbers_refreshed)} issues; {total_issue_count} issues in DB')
   return issue_numbers_refreshed
 
 if __name__ == '__main__':
-    main()
+  main()

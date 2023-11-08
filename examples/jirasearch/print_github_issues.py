@@ -5,6 +5,7 @@ import localconstants
 import json
 import datetime
 from datetime import timezone
+from index_github import decode_and_load_one_issue
 
 DB_PATH = localconstants.DB_PATH
 
@@ -15,6 +16,7 @@ def connect_db_readonly():
 def main():
   db = connect_db_readonly()
   c = db.cursor()
+  c2 = db.cursor()
   now = datetime.datetime.now(timezone.utc)
   open_pr_count = 0
   closed_pr_count = 0
@@ -41,10 +43,17 @@ def main():
   for k, v in c.execute('SELECT key, pickle FROM issues').fetchall():
     if k in ('last_update', 'page_upto'):
       continue
-    issue, comments, events, reactions, timeline = pickle.loads(v)
 
-    if issue['number'] == 12557:
-      print(json.dumps(issue, indent=2))
+    (issue, comments, events, reactions, timeline), full_pr, full_pr_comments = decode_and_load_one_issue(c2, v)
+
+    if issue['number'] == 12781:
+      print(f'\nISSUE:\n{json.dumps(issue, indent=2)}')
+      print(f'\nCOMMENTS:\n{json.dumps(comments, indent=2)}')
+      print(f'\nEVENTS:\n{json.dumps(events, indent=2)}')
+      print(f'\nREACTIONS:\n{json.dumps(reactions, indent=2)}')
+      print(f'\nTIMELINE:\n{json.dumps(timeline, indent=2)}')
+      print(f'\nFULL_PR:\n{json.dumps(full_pr, indent=2)}')
+      print(f'\nFULL_PR_COMMENTS:\n{json.dumps(full_pr_comments, indent=2)}')
 
     if 'pull_request' in issue:
       if 'mergeable_state' in issue and issue['mergeable_state'] == 'unknown':
