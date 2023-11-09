@@ -33,6 +33,10 @@ when you run this.
 """
 
 # TODO
+#   - launch as beta publicly, get feedback
+#   - hmm is periodic "git pull" not working in nrt mode?  only seemed to work on restart?
+#   - move this to examples/githubsearch; restore jirasearch to work w/ Jira
+#   - upgrade luceneserver to latest lucene
 #   - somehow tie/present display name for users login
 #   - should we link/associate PRs that related to issues?
 #   - re-run full gibhub -> localdb, removing these separate joined tables!
@@ -377,7 +381,6 @@ def removeAllGhosts():
 def decode_and_load_one_issue(c, pk):
   doc = pickle.loads(pk)
   number = doc[0]['number']
-  print(f'iter: {number}')
   if 'pull_request' in doc[0]:
     rows = list(c.execute('SELECT pickle FROM full_issue WHERE key=?', (str(number),)).fetchall())
     if len(rows) == 0:
@@ -871,12 +874,18 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
       events.add(change['event'])
 
     # TODO: what really is the difference between events and timeline?
+
+    commit_messages = []
     for change in timeline:
       if 'actor' in change:
         add_user(all_users, change['actor'], project)
       elif 'user' in change:
         add_user(all_users, change['user'], project)
-      elif change['event'] != 'committed':
+      elif 'committer' in change:
+        add_user(all_users, change['committer'], project)
+      elif change['event'] == 'committed':
+        commit_messages.append(change['message'])
+      else:
         # curiously, there is no user login when a commit timeline event happens:
         raise RuntimeError(f'unhandled timeline change:\n{json.dumps(change, indent=2)}')
       events.add(change['event'])
@@ -1116,11 +1125,11 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
     else:
       index_comments = [('Comment', comments)]
 
-    # count both normal comments and PR code comments:
-    doc['comment_count'] = len(index_comments)
+    total_comment_count = 0
 
     # for i, comment in enumerate(comments):
     for comment_cat, comment_list in index_comments:
+      total_comment_count += len(comment_list)
 
       for comment in comment_list:
         # print(f'comment: {comment}')
@@ -1216,6 +1225,14 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
         subDoc['child_key'] = key
         subDocs.append({'fields': subDoc})
 
+    subDocs.sort(key=lambda x: x['fields']['created'])
+
+    if number == 12748:
+      print(f'12782 {is_pr}\n  {index_comments=}\n  {pr_comments=}\n  {pr_reviews=}\n  {comments=}\n  {subDocs=}')
+
+    # count both normal comments and PR code comments:
+    doc['comment_count'] = total_comment_count
+
     doc['author_association'] = list(author_associations)
     
     # Compute our own updated instead of using Jira's, to be max(createTime, comments):
@@ -1244,7 +1261,9 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
     other_text.append(doc['key'])
     if len(doc['labels']) > 0:
       other_text.append(' '.join(doc['labels']))
-    # print(f'{number}: other {other_text}')
+
+    # for PRs, include the commit messages:
+    other_text.extend(commit_messages)
 
     # NOTE: wasteful ... ideally, we could somehow make queries run "against" the parent doc?
     # TODO: why not just index child doc text field!?  block join would take care...

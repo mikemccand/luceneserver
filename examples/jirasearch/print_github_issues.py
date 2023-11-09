@@ -22,6 +22,8 @@ def main():
   closed_pr_count = 0
   histo_by_days = {}
 
+  number = int(sys.argv[1])
+
   if '-print_full_pr' in sys.argv:
     i = sys.argv.index('-print_full_pr')
     pr_number = sys.argv[i+1]
@@ -46,7 +48,7 @@ def main():
 
     (issue, comments, events, reactions, timeline), full_pr, full_pr_comments, pr_reviews = decode_and_load_one_issue(c2, v)
 
-    if issue['number'] == 12781:
+    if issue['number'] == number:
       print(f'\nISSUE:\n{json.dumps(issue, indent=2)}')
       print(f'\nCOMMENTS:\n{json.dumps(comments, indent=2)}')
       print(f'\nEVENTS:\n{json.dumps(events, indent=2)}')
@@ -54,7 +56,7 @@ def main():
       print(f'\nTIMELINE:\n{json.dumps(timeline, indent=2)}')
       print(f'\nFULL_PR:\n{json.dumps(full_pr, indent=2)}')
       print(f'\nFULL_PR_COMMENTS:\n{json.dumps(full_pr_comments, indent=2)}')
-      print(f'\nPR_REVIEWS:\n{json.dumps(full_pr_reviews, indent=2)}')
+      print(f'\nPR_REVIEWS:\n{json.dumps(pr_reviews, indent=2)}')
 
     if 'pull_request' in issue:
       if 'mergeable_state' in issue and issue['mergeable_state'] == 'unknown':
