@@ -832,6 +832,7 @@ def makeSort(spec, sort):
   return {'fields': [d]}
 
 def getUTCOffset():
+  # TODO: this is hairy
   if time.localtime(time.time()).tm_isdst and time.daylight:
     return time.altzone
   else:
@@ -894,7 +895,7 @@ def renderNavSummary(w, facets, drillDowns):
   
 def renderJiraHits(w, text, groups, userDrillDowns):
 
-  now = int(time.time() + getUTCOffset())
+  now_utc = int(time.time() + getUTCOffset())
 
   lowerText = text.strip().lower().replace('-', ' ')
 
@@ -924,7 +925,9 @@ def renderJiraHits(w, text, groups, userDrillDowns):
 
     w(f'<tr><td><br><a href="{issue_url}"><font size=+2>{skey}: {fix_hilite(fields["title"])}</font></a></td></tr>')
 
-    w(f'<tr><td><em><font size=-1>{toAgo(now - fields["updated"])} ago&nbsp;&nbsp;' +
+    print(f'{key=} updated={fields["updated"]} vs {now_utc=} delta={now_utc - fields["updated"]}')
+
+    w(f'<tr><td><em><font size=-1>{toAgo(now_utc - fields["updated"])} ago&nbsp;&nbsp;' +
       f'{fields["comment_count"]} comments&nbsp;&nbsp;' +
       f'{fields.get("vote_count", 0)} votes&nbsp;&nbsp;' +
       f'{fields.get("watch_count", 0)} watches&nbsp;&nbsp;' +
@@ -959,7 +962,7 @@ def renderJiraHits(w, text, groups, userDrillDowns):
       authorDD = '<b>%s</b>' % fix_hilite(author, 'all_users', True)
       w('&nbsp;&nbsp;&nbsp;&nbsp;%s&nbsp;<em>%s&nbsp;ago</em>:&nbsp;&nbsp;</td><td><a class="commentsnippet" href="%s">%s</a>' % \
         (authorDD,
-         nonBreakingSpace(toAgo(now - fields['created'])), comment_url, fix_hilite(fields.get('comment_body'))))
+         nonBreakingSpace(toAgo(now_utc - fields['created'])), comment_url, fix_hilite(fields.get('comment_body'))))
       w('</td>')
       w('</tr>')
     w('</table>')

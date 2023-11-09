@@ -781,6 +781,26 @@ def extract_reporter(issue):
 
   return {'name': local_db.get_login_to_name().get(login, None), 'login': login}
 
+def to_utc_epoch_seconds(dt):
+  '''
+  Return the number of seconds since UNIX epoch (12 AM Jan 1 1970) in UTC/Zulu timezone
+  '''
+
+  # good grief this is complex, see https://docs.python.org/3/library/datetime.html#determining-if-an-object-is-aware-or-naive
+  if type(dt) is datetime.time:
+    is_tz_aware = dt.tzinfo is not None and dt.tzinfo.utcoffset(None) is not None
+  else:
+    assert type(dt) is datetime.datetime
+    is_tz_aware = dt.tzinfo is not None and dt.tzinfo.utcoffset(dt) is not None
+    
+  if is_tz_aware and dt.tzinfo == timezone.utc:
+    # good -- this timestampe is TZ aware and is in UTC/Zulu
+    # WTF why doesn't this work?
+    # return dt.timestamp()
+    return int(dt.strftime('%s'))
+  else:
+    raise RuntimeError(f'datetime {dt} is not timezone aware or is not in UTC')
+
 def index_docs(svr, issues, printIssue=False, updateSuggest=False):
 
   bulk = server.ChunkedSend(svr, 'bulkUpdateDocuments', 32768)
@@ -971,9 +991,9 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
           else:
             doc['reaction_count'] = int(m.group(3))
         if m.group(4) == 'resolved':
-          closed_dt = datetime.datetime.strptime(m.group(5).strip(), '%b %d %Y')
-          #doc['closed'] = int(float(closed_dt.timestamp()))
-          doc['closed'] = int(closed_dt.timestamp())
+          # Hmm I'm not sure which TZ we used when migrating from Jira -> Github!  Let's assume UTC:
+          closed_dt = datetime.datetime.strptime(m.group(5).strip() + ' +0000', '%b %d %Y %z')
+          doc['closed'] = to_utc_epoch_seconds(closed_dt)
     else:
       # this is OK, e.g. https://github.com/apache/lucene/pull/945
       # print(f'WARNING: issue {number} has no body!')
@@ -1066,11 +1086,14 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
 
     if issue['created_at'] is not None:
       print(f'{issue["created_at"]}')
-      doc['created'] = int(parse_date_time(issue['created_at']).timestamp())
+      doc['created'] = to_utc_epoch_seconds(parse_date_time(issue['created_at']))
     if issue['closed_at'] is not None:
-      doc['closed'] = int(parse_date_time(issue['closed_at']).timestamp())
+      doc['closed'] = to_utc_epoch_seconds(parse_date_time(issue['closed_at']))
     updated = parse_date_time(issue['updated_at'])
-    doc['updated'] = int(updated.timestamp())
+
+    # this is already UTC?  all timestampes from GH API are Zulu
+    doc['updated'] = to_utc_epoch_seconds(updated)
+    print(f'  set updated number={number} updated={updated} result={doc["updated"]} vs new updated={int(updated.strftime("%s"))}')
 
     # TODO: is there a closed_by user?
 
@@ -1218,7 +1241,7 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
           # nocommit also rule out asfimport touching issues on migration from Jira?
           updated = max(updated, created_at)
 
-        subDoc['created'] = int(float(created_at.strftime('%s.%f')))
+        subDoc['created'] = int(created_at.strftime('%s'))
 
         # TODO: why store this twice in each child doc!?
         subDoc['key'] = key
@@ -1228,7 +1251,7 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
     subDocs.sort(key=lambda x: x['fields']['created'])
 
     if number == 12748:
-      print(f'12782 {is_pr}\n  {index_comments=}\n  {pr_comments=}\n  {pr_reviews=}\n  {comments=}\n  {subDocs=}')
+      print(f'XXX\n{number} {is_pr}\n  {index_comments=}\n  {pr_comments=}\n  {pr_reviews=}\n  {comments=}\n  {subDocs=}')
 
     # count both normal comments and PR code comments:
     doc['comment_count'] = total_comment_count
@@ -1288,9 +1311,6 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
       bulk.add(',')
     first = False
 
-    if key == '12781':
-      print(json.dumps(update, indent=2))
-    
     bulk.add(json.dumps(update))
 
   print(f'  {issue_count} issues indexed')
