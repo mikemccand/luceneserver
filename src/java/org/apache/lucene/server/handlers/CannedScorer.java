@@ -41,11 +41,6 @@ final class CannedScorer extends Scorer {
   }
     
   @Override
-  public int freq() {
-    throw new UnsupportedOperationException(); // TODO: wtf does this class do?
-  }
-
-  @Override
   public DocIdSetIterator iterator() {
     return null;
   }
@@ -53,5 +48,10 @@ final class CannedScorer extends Scorer {
   @Override
   public int docID() {
     return doc;
+  }
+
+  @Override
+  public float getMaxScore(int upTo) {
+    return 1f;
   }
 }

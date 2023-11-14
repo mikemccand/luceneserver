@@ -137,7 +137,7 @@ public class NodeToNodeHandler extends Handler {
             hits[i] = new ScoreDoc(docID, score);
           }
 
-          searchHandler.deliverHits(new QueryID(queryID), new TopDocs(totalHits, hits, 0.0f));
+          searchHandler.deliverHits(new QueryID(queryID), new TopDocs(totalHits, hits));
         }
         break;
         

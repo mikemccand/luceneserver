@@ -284,7 +284,8 @@ public class AddDocumentHandler extends Handler {
     if (fd.fieldType.stored() || fd.fieldType.indexOptions() != IndexOptions.NONE) {
       // We use fieldTypeNoDV because we separately added (above) the doc values field:
       Field f = new MyField(fd.name, fd.fieldTypeNoDV, o);
-      f.setBoost(boost);
+      // nocommit get boosting working via separate DV field, or remove and only allow query time boosting?
+      // f.setBoost(boost);
       doc.add(f);
     }
   }

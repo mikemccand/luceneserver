@@ -20,14 +20,14 @@ package org.apache.lucene.server;
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.DocValuesFormat;
 import org.apache.lucene.codecs.PostingsFormat;
-import org.apache.lucene.codecs.lucene62.Lucene62Codec;
+import org.apache.lucene.codecs.lucene95.Lucene95Codec;
 
 /** Implements per-index {@link Codec}. */
 
-public class ServerCodec extends Lucene62Codec {
+public class ServerCodec extends Lucene95Codec {
 
-  public final static String DEFAULT_POSTINGS_FORMAT = "Lucene50";
-  public final static String DEFAULT_DOC_VALUES_FORMAT = "Lucene54";
+  public final static String DEFAULT_POSTINGS_FORMAT = "Lucene90";
+  public final static String DEFAULT_DOC_VALUES_FORMAT = "Lucene90";
 
   private final IndexState state;
   // nocommit expose compression control

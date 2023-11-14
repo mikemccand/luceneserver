@@ -25,7 +25,10 @@ import java.util.Map;
 
 import org.apache.lucene.server.handlers.NodeToNodeHandler;
 import org.apache.lucene.util.StringHelper;
+import org.apache.lucene.util.BytesRef;
 
+/** Attempts to be a single shared distributed search queue where replicas pull from when they can handle new work, instead of
+ *  hacky load balanced queues in front of each replica.  But does it really work yet? */
 public class SearchQueue {
 
   private final Map<QueryID,QueryAndID> queryQueue = new HashMap<>();
@@ -65,7 +68,7 @@ public class SearchQueue {
       query.nodeID = remoteNodeID;
       queryQueue.put(queryID, query);
       return true;
-    } else if (query.state <= 1 || StringHelper.compare(StringHelper.ID_LENGTH, remoteNodeID, 0, globalState.nodeID, 0) < 0) {
+    } else if (query.state <= 1 || StringHelper.bytesDifference(new BytesRef(remoteNodeID), new BytesRef(globalState.nodeID)) < 0) {
       // break race conditions by letting lower-ID'd node win
       assert query.nodeID == null;
       query.nodeID = remoteNodeID;
@@ -73,7 +76,7 @@ public class SearchQueue {
       queryDone.add(query);
       return true;
     } else {
-      assert StringHelper.compare(StringHelper.ID_LENGTH, remoteNodeID, 0, globalState.nodeID, 0) != 0: "node IDs are not unique?";
+      assert StringHelper.bytesDifference(new BytesRef(remoteNodeID), new BytesRef(globalState.nodeID)) != 0: "node IDs are not unique?";
       return false;
     }
   }

@@ -453,7 +453,7 @@ public class BulkAddDocumentHandler extends Handler {
 
     Throwable t = ctx.getError();
     if (t != null) {
-      IOUtils.reThrow(t);
+      IOUtils.rethrowAlways(t);
       return null;
     } else {
       JSONObject o = new JSONObject();

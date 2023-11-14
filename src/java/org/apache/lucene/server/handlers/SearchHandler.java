@@ -89,6 +89,7 @@ import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.Collector;
 import org.apache.lucene.search.ConstantScoreQuery;
 import org.apache.lucene.search.DisjunctionMaxQuery;
+import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.DoubleValues;
 import org.apache.lucene.search.DoubleValuesSource;
 import org.apache.lucene.search.FieldDoc;
@@ -127,12 +128,11 @@ import org.apache.lucene.search.join.BitSetProducer;
 import org.apache.lucene.search.join.QueryBitSetProducer;
 import org.apache.lucene.search.join.ScoreMode;
 import org.apache.lucene.search.join.ToParentBlockJoinCollector;
-import org.apache.lucene.search.join.ToParentBlockJoinIndexSearcher;
 import org.apache.lucene.search.join.ToParentBlockJoinQuery;
-import org.apache.lucene.search.postingshighlight.PassageFormatter;
-import org.apache.lucene.search.postingshighlight.PassageScorer;
-import org.apache.lucene.search.postingshighlight.PostingsHighlighter;
-import org.apache.lucene.search.postingshighlight.WholeBreakIterator;
+import org.apache.lucene.search.uhighlight.PassageFormatter;
+import org.apache.lucene.search.uhighlight.PassageScorer;
+import org.apache.lucene.search.uhighlight.UnifiedHighlighter;
+import org.apache.lucene.search.uhighlight.WholeBreakIterator;
 import org.apache.lucene.server.Constants;
 import org.apache.lucene.server.FieldDef;
 import org.apache.lucene.server.FieldDefBindings;
@@ -212,7 +212,7 @@ public class SearchHandler extends Handler {
                                                                new StructType(
                                                                    new Param("occur", "Occur.", BOOLEAN_OCCUR_TYPE),
                                                                    new Param("query", "Query for this clause", QUERY_TYPE_WRAP)))),
-                                                       new Param("disableCoord", "If true, coord factors will not be used", new BooleanType(), false),
+                                                       //new Param("disableCoord", "If true, coord factors will not be used", new BooleanType(), false),
                                                        new Param("minimumNumberShouldMatch", "Minimum number of should clauses for a match.", new IntType(), 0)),
                                          new PolyEntry("CommonTermsQuery", "A query that executes high-frequency terms in a optional sub-query to prevent slow queries due to common terms like stopwords (see @lucene:queries:org.apache.lucene.queries.CommonTermsQuery)",
                                                        new Param("terms", "List of terms", new ListType(new StringType())),
@@ -364,8 +364,8 @@ public class SearchHandler extends Handler {
                       new Param("maxPassages", "Maximum number of passages to extract.", new IntType(), 2),
                       new Param("class", "Which implementation to use",
                                 new PolyType(Object.class,
-                                             new PolyEntry("PostingsHighlighter", "PostingsHighlighter",
-                                                           new Param("maxLength", "Only highlight the first N bytes of each item.", new IntType(), PostingsHighlighter.DEFAULT_MAX_LENGTH),
+                                             new PolyEntry("UnifiedHighlighter", "UnifiedHighlighter",
+                                                           new Param("maxLength", "Only highlight the first N bytes of each item.", new IntType(), UnifiedHighlighter.DEFAULT_MAX_LENGTH),
                                                            new Param("maxSnippetLength", "Maximum length (in chars) for each text snippet chunk.", new IntType(), 100),
                                                            new Param("passageScorer.b", "Scoring factor b in PassageScorer", new FloatType(), 0.75f),
                                                            new Param("passageScorer.k1", "Scoring factor k1 in PassageScorer", new FloatType(), 0.8f),
@@ -381,7 +381,7 @@ public class SearchHandler extends Handler {
                                                                                           "sentence", "Sentence instance"),
                                                                              "sentence")))
                                                            )),
-                                "PostingsHighlighter"))),
+                                "UnifiedHighlighter"))),
         new Param("query", "Full query to execute (not using QueryParser).", QUERY_TYPE),
         new Param("grouping", "Whether/how to group search results.",
                   new StructType(
@@ -456,8 +456,8 @@ public class SearchHandler extends Handler {
                                              new OrType(new StringType(), new ListType(new StringType())))))),
         new Param("sort", "Sort hits by field (default is by relevance).",
                   new StructType(
-                      new Param("doMaxScore", "Compute the max score across all hits (costs added CPU).", new BooleanType(), false),
-                      new Param("doDocScores", "Compute the doc score for each collected (costs added CPU).", new BooleanType(), false),
+                      //new Param("doMaxScore", "Compute the max score across all hits (costs added CPU).", new BooleanType(), false),
+                      //new Param("doDocScores", "Compute the doc score for each collected (costs added CPU).", new BooleanType(), false),
                       new Param("fields", "Fields to sort on.", SORT_TYPE))),
         new Param("timeoutSec", "Maximum number of seconds spent on each collection phase; note that for multi-pass searches (e.g. query-time grouping), this timeout applies to each phase.", new FloatType())
                    );
@@ -477,9 +477,9 @@ public class SearchHandler extends Handler {
   }
 
   /** Holds the state for a single {@link
-   *  PostingsHighlighter} instance. */
+   *  UnifiedHighlighter} instance. */
   public final class HighlighterConfig {
-    CachedDocsJSONPostingsHighlighter highlighter;
+    CachedDocsJSONUnifiedHighlighter highlighter;
     int maxPassages;
     String config;
 
@@ -528,7 +528,7 @@ public class SearchHandler extends Handler {
 
   /** Loads docs/fields from a shared cache so we only call
    *  IndexReader.document once per hit */
-  private static class CachedDocsJSONPostingsHighlighter extends PostingsHighlighter {
+  private static class CachedDocsJSONUnifiedHighlighter extends UnifiedHighlighter {
     private final HighlighterConfig config;
     private final IndexState state;
     private final Map<String,FieldHighlightConfig> perFieldConfig;
@@ -536,10 +536,11 @@ public class SearchHandler extends Handler {
     private final BreakIterator defaultBI;
     private final int maxSnippetLength;
 
-    public CachedDocsJSONPostingsHighlighter(IndexState state, HighlighterConfig config,
-                                             Map<String,FieldHighlightConfig> perFieldConfig,
-                                             int maxLength, int maxSnippetLength, PassageScorer scorer, BreakIterator defaultBI) {
-      super(maxLength);
+    public CachedDocsJSONUnifiedHighlighter(IndexState state, IndexSearcher searcher, HighlighterConfig config,
+                                            Map<String,FieldHighlightConfig> perFieldConfig,
+                                            int maxLength, int maxSnippetLength,
+                                            PassageScorer scorer, BreakIterator defaultBI) {
+      super(new UnifiedHighlighter.Builder(searcher, state.indexAnalyzer).withMaxLength(maxLength));
       this.maxSnippetLength = maxSnippetLength;
       this.perFieldConfig = perFieldConfig;
       this.config = config;
@@ -551,11 +552,6 @@ public class SearchHandler extends Handler {
     @Override
     protected PassageScorer getScorer(String fieldName) {
       return scorer;
-    }
-
-    @Override
-    protected Analyzer getIndexAnalyzer(String fieldName) {
-      return state.getField(fieldName).indexAnalyzer;
     }
 
     @Override
@@ -583,18 +579,27 @@ public class SearchHandler extends Handler {
     }
 
     /** Highlights directly to JSONArray[]. */
-    public Map<String,Object[]> highlightToObjects(String fieldsIn[], Query query, IndexSearcher searcher, int docidsIn[], int maxPassagesIn[]) throws IOException {
-      return super.highlightFieldsAsObjects(fieldsIn, query, searcher, docidsIn, maxPassagesIn);
+    public Map<String,Object[]> highlightToObjects(String fieldsIn[], Query query, int docidsIn[], int maxPassagesIn[]) throws IOException {
+      return super.highlightFieldsAsObjects(fieldsIn, query, docidsIn, maxPassagesIn);
     }
 
     // TODO: allow pulling from DV too:
 
     @SuppressWarnings("unchecked")
     @Override
-    protected String[][] loadFieldValues(IndexSearcher searcher, String[] fields, int[] docIDs, int maxLength) throws IOException {
-      String[][] contents = new String[fields.length][docIDs.length];
-      for (int i = 0; i < docIDs.length; i++) {
-        Map<String,Object> doc = config.getDocument(state, searcher, docIDs[i]);
+    protected List<CharSequence[]> loadFieldValues(String[] fields, DocIdSetIterator docIDs, int maxLength) throws IOException {
+
+      List<CharSequence[]> allValues = new ArrayList<>();
+      while (true) {
+        int docID = docIDs.nextDoc();
+        if (docID == DocIdSetIterator.NO_MORE_DOCS) {
+          break;
+        }
+
+        CharSequence[] docFieldValues = new CharSequence[fields.length];
+        allValues.add(docFieldValues);
+
+        Map<String,Object> doc = config.getDocument(state, searcher, docID);
 
         for (int j = 0; j < fields.length; j++) {
           Object o = doc.get(fields[j]);
@@ -640,14 +645,14 @@ public class SearchHandler extends Handler {
                 value = s;
               }
             }
-            contents[j][i] = value;
+            docFieldValues[j] = value;
           } else {
-            contents[j][i] = "";
+            docFieldValues[j] = "";
           }
         }
       }
 
-      return contents;
+      return allValues;
     }
   }
 
@@ -675,7 +680,7 @@ public class SearchHandler extends Handler {
     return bi;
   }
 
-  private HighlighterConfig getHighlighter(IndexState state, Request r, Map<String,FieldHighlightConfig> highlightFields) {
+  private HighlighterConfig getHighlighter(IndexState state, Request r, SearcherAndTaxonomy s, Map<String,FieldHighlightConfig> highlightFields) {
     HighlighterConfig config = new HighlighterConfig();
 
     if (r.hasParam("highlighter")) {
@@ -683,8 +688,8 @@ public class SearchHandler extends Handler {
       config.maxPassages = r.getInt("maxPassages");
 
       final Request.PolyResult pr = r.getPoly("class");
-      if (!pr.name.equals("PostingsHighlighter")) {
-        r.fail("class", "Only PostingsHighlighter is currently supported.");
+      if (pr.name.equals("UnifiedHighlighter") == false) {
+        r.fail("class", "Only UnifiedHighlighter is currently supported.");
       } 
 
       r = pr.r;
@@ -695,23 +700,25 @@ public class SearchHandler extends Handler {
       PassageScorer scorer = new PassageScorer(r.getFloat("passageScorer.k1"), r.getFloat("passageScorer.b"), r.getFloat("passageScorer.pivot"));
 
       final BreakIterator bi = parseBreakIterator(r);
-      config.highlighter = new CachedDocsJSONPostingsHighlighter(state,
-                                                                 config,
-                                                                 highlightFields,
-                                                                 r.getInt("maxLength"),
-                                                                 r.getInt("maxSnippetLength"),
-                                                                 scorer,
-                                                                 bi);
+      config.highlighter = new CachedDocsJSONUnifiedHighlighter(state,
+                                                                s.searcher,
+                                                                config,
+                                                                highlightFields,
+                                                                r.getInt("maxLength"),
+                                                                r.getInt("maxSnippetLength"),
+                                                                scorer,
+                                                                bi);
     } else {
       // Default:
       config.maxPassages = 2;
-      config.highlighter = new CachedDocsJSONPostingsHighlighter(state,
-                                                                 config,
-                                                                 highlightFields,
-                                                                 PostingsHighlighter.DEFAULT_MAX_LENGTH,
-                                                                 100,
-                                                                 new PassageScorer(),
-                                                                 BreakIterator.getSentenceInstance(Locale.ROOT));
+      config.highlighter = new CachedDocsJSONUnifiedHighlighter(state,
+                                                                s.searcher,
+                                                                config,
+                                                                highlightFields,
+                                                                UnifiedHighlighter.DEFAULT_MAX_LENGTH,
+                                                                100,
+                                                                new PassageScorer(),
+                                                                BreakIterator.getSentenceInstance(Locale.ROOT));
     }
 
     return config;
@@ -1059,7 +1066,8 @@ public class SearchHandler extends Handler {
       Request r2 = pr.r;
       BooleanQuery.Builder bq = new BooleanQuery.Builder();
       bq.setMinimumNumberShouldMatch(r2.getInt("minimumNumberShouldMatch"));
-      bq.setDisableCoord(r2.getBoolean("disableCoord"));
+      // nocommit -- it's hardwired gone now I think?  removeme!
+      // bq.setDisableCoord(r2.getBoolean("disableCoord"));
       for(Object o : r2.getList("subQueries")) {
         Request r3 = (Request) o;
         BooleanClause.Occur occur = parseBooleanOccur(r3.getEnum("occur"));
@@ -2327,8 +2335,6 @@ public class SearchHandler extends Handler {
       highlightFields = null;
     }
 
-    HighlighterConfig highlighter = getHighlighter(indexState, r, highlightFields);
-
     diagnostics.put("parsedQuery", q.toString());
 
     TopDocs hits;
@@ -2345,6 +2351,7 @@ public class SearchHandler extends Handler {
 
     // matching finally clause releases this searcher:
     try {
+      HighlighterConfig highlighter = getHighlighter(indexState, r, s, highlightFields);
 
       // nocommit can we ... not do this?  it's awkward that
       // we have to ... but, the 2-pass (query time
@@ -2434,7 +2441,8 @@ public class SearchHandler extends Handler {
         } else {
           searchAfter = null;
         }
-        c = TopScoreDocCollector.create(topHits, searchAfter);
+        // nocommit what totalHitsThreshold to provide?  does Lucene provide a default
+        c = TopScoreDocCollector.create(topHits, searchAfter, 1000);
       } else {
 
         // If any of the sort fields require score, than
@@ -2455,9 +2463,14 @@ public class SearchHandler extends Handler {
           searchAfter = null;
         }
 
-        c = TopFieldCollector.create(sort, topHits, searchAfter, true,
-                                     sortRequest.getBoolean("doDocScores") || forceDocScores,
-                                     sortRequest.getBoolean("doMaxScore"));
+        // nocommit what to specify for totalHitsThreshold?
+        c = TopFieldCollector.create(sort, topHits, searchAfter, 1000);
+
+        // nocommit WTF was that "true" doing?
+        
+        //c = TopFieldCollector.create(sort, topHits, searchAfter, true,
+        //sortRequest.getBoolean("doDocScores") || forceDocScores,
+        //sortRequest.getBoolean("doMaxScore"));
       }
 
       long timeoutMS;
@@ -2600,8 +2613,7 @@ public class SearchHandler extends Handler {
             System.arraycopy(hits.scoreDocs, startHit, newScoreDocs, 0, count);
           }
           hits = new TopDocs(hits.totalHits,
-                             newScoreDocs,
-                             hits.getMaxScore());
+                             newScoreDocs);
         }
       }
 
@@ -2659,7 +2671,7 @@ public class SearchHandler extends Handler {
       Map<String,Object[]> highlights = null;
 
       long t0 = System.nanoTime();
-      if (highlightDocIDs != null && highlightFields != null && !highlightFields.isEmpty()) {
+      if (highlightDocIDs != null && highlightFields != null && highlightFields.isEmpty() == false) {
         int[] maxPassages = new int[highlightFields.size()];
         Arrays.fill(maxPassages, highlighter.maxPassages);
         String[] fieldsArray = new String[highlightFields.size()];
@@ -2675,7 +2687,6 @@ public class SearchHandler extends Handler {
 
         highlights = highlighter.highlighter.highlightToObjects(fieldsArray,
                                                                 queryOrig,
-                                                                s.searcher,
                                                                 highlightDocIDs,
                                                                 maxPassages);
       }
@@ -2843,9 +2854,6 @@ public class SearchHandler extends Handler {
         result.put("totalHits", hits.totalHits);
         JSONArray o2 = new JSONArray();
         result.put("hits", o2);
-        if (!Float.isNaN(hits.getMaxScore())) {
-          result.put("maxScore", hits.getMaxScore());
-        }
 
         for(int hitIndex=0;hitIndex<hits.scoreDocs.length;hitIndex++) {
           ScoreDoc hit = hits.scoreDocs[hitIndex];

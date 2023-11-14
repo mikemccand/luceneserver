@@ -35,9 +35,12 @@ import java.util.regex.Pattern;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
+import org.apache.lucene.analysis.CharFilterFactory;
 import org.apache.lucene.analysis.TokenFilter;
+import org.apache.lucene.analysis.TokenFilterFactory;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.Tokenizer;
+import org.apache.lucene.analysis.TokenizerFactory;
 import org.apache.lucene.analysis.ar.ArabicAnalyzer;
 import org.apache.lucene.analysis.bg.BulgarianAnalyzer;
 import org.apache.lucene.analysis.br.BrazilianAnalyzer;
@@ -54,11 +57,6 @@ import org.apache.lucene.analysis.icu.segmentation.ICUTokenizerConfig;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.analysis.synonym.SynonymFilter;
 import org.apache.lucene.analysis.synonym.SynonymMap;
-import org.apache.lucene.analysis.util.CharFilterFactory;
-import org.apache.lucene.analysis.util.ResourceLoader;
-import org.apache.lucene.analysis.util.ResourceLoaderAware;
-import org.apache.lucene.analysis.util.TokenFilterFactory;
-import org.apache.lucene.analysis.util.TokenizerFactory;
 import org.apache.lucene.codecs.DocValuesFormat;
 import org.apache.lucene.codecs.PostingsFormat;
 import org.apache.lucene.collation.CollationKeyAnalyzer;
@@ -84,8 +82,8 @@ import org.apache.lucene.server.params.IntType;
 import org.apache.lucene.server.params.ListType;
 import org.apache.lucene.server.params.OrType;
 import org.apache.lucene.server.params.Param;
-import org.apache.lucene.server.params.PolyType;
 import org.apache.lucene.server.params.PolyType.PolyEntry;
+import org.apache.lucene.server.params.PolyType;
 import org.apache.lucene.server.params.Request;
 import org.apache.lucene.server.params.StringType;
 import org.apache.lucene.server.params.StructType;
@@ -94,6 +92,8 @@ import org.apache.lucene.server.params.WrapType;
 import org.apache.lucene.util.AttributeFactory;
 import org.apache.lucene.util.CharsRef;
 import org.apache.lucene.util.CharsRefBuilder;
+import org.apache.lucene.util.ResourceLoader;
+import org.apache.lucene.util.ResourceLoaderAware;
 import org.apache.lucene.util.Version;
 
 import com.ibm.icu.lang.UCharacter;
@@ -879,9 +879,9 @@ public class RegisterFieldsHandler extends Handler {
     final ICUTokenizerConfig config = new DefaultICUTokenizerConfig(true, true) {
         
         @Override
-        public BreakIterator getBreakIterator(int script) {
+        public RuleBasedBreakIterator getBreakIterator(int script) {
           if (breakers[script] != null) {
-            return (BreakIterator) breakers[script].clone();
+            return (RuleBasedBreakIterator) breakers[script].clone();
           } else {
             return super.getBreakIterator(script);
           }
@@ -1363,14 +1363,10 @@ public class RegisterFieldsHandler extends Handler {
   /** Parses a Lucene version constant. */
   @SuppressWarnings("deprecation")
   public static Version getVersion(String v) {
-    if (v.equals("LUCENE_60")) {
-      return Version.LUCENE_6_0_0;
-    } else if (v.equals("LUCENE_601")) {
-      return Version.LUCENE_6_0_1;
-    } else if (v.equals("LUCENE_61")) {
-      return Version.LUCENE_6_1_0;
-    } else if (v.equals("LUCENE_62")) {
-      return Version.LUCENE_6_2_0;
+    if (v.equals("LUCENE_980")) {
+      return Version.LUCENE_9_8_0;
+    } else if (v.equals("LUCENE_970")) {
+      return Version.LUCENE_9_7_0;
     } else {
       throw new IllegalArgumentException("unhandled version " + v);
     }

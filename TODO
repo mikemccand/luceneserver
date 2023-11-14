@@ -1,3 +1,9 @@
+get unused import detection, tidy, checkstyle running
+
+expose HNSW/KNN!
+
+finish getting distributed queue approach online
+
 get faster (CSV, chunked json) bulk update document/s
 
 hmm what to do about "index gen" and "searcher version" now that I am sharding!?  i guess it must become a... list?

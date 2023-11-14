@@ -69,13 +69,11 @@ import org.apache.lucene.search.ReferenceManager.RefreshListener;
 import org.apache.lucene.search.ReferenceManager;
 import org.apache.lucene.search.SearcherFactory;
 import org.apache.lucene.search.SearcherLifetimeManager;
-import org.apache.lucene.search.join.ToParentBlockJoinIndexSearcher;
 import org.apache.lucene.search.suggest.Lookup;
 import org.apache.lucene.search.suggest.analyzing.AnalyzingInfixSuggester;
 import org.apache.lucene.server.params.Request;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.NRTCachingDirectory;
-import org.apache.lucene.store.RAMDirectory;
 import org.apache.lucene.util.IOUtils;
 import org.apache.lucene.util.PrintStreamInfoStream;
 
@@ -165,7 +163,7 @@ public class ShardState implements Closeable {
 
   private final List<HostAndPort> replicas = new ArrayList<>();
 
-  public final Map<IndexReader,Map<String,SortedSetDocValuesReaderState>> ssdvStates = new HashMap<>();
+  public final Map<IndexReader.CacheKey,Map<String,SortedSetDocValuesReaderState>> ssdvStates = new HashMap<>();
 
   public final String name;
 
@@ -380,14 +378,10 @@ public class ShardState implements Closeable {
 
       // nocommit don't allow RAMDir
       // nocommit remove NRTCachingDir too?
-      if ((origIndexDir instanceof RAMDirectory) == false) {
-        double maxMergeSizeMB = indexState.getDoubleSetting("nrtCachingDirectory.maxMergeSizeMB");
-        double maxSizeMB = indexState.getDoubleSetting("nrtCachingDirectory.maxSizeMB");
-        if (maxMergeSizeMB > 0 && maxSizeMB > 0) {
-          indexDir = new NRTCachingDirectory(origIndexDir, maxMergeSizeMB, maxSizeMB);
-        } else {
-          indexDir = origIndexDir;
-        }
+      double maxMergeSizeMB = indexState.getDoubleSetting("nrtCachingDirectory.maxMergeSizeMB");
+      double maxSizeMB = indexState.getDoubleSetting("nrtCachingDirectory.maxSizeMB");
+      if (maxMergeSizeMB > 0 && maxSizeMB > 0) {
+        indexDir = new NRTCachingDirectory(origIndexDir, maxMergeSizeMB, maxSizeMB);
       } else {
         indexDir = origIndexDir;
       }
@@ -556,14 +550,10 @@ public class ShardState implements Closeable {
       }
       origIndexDir = indexState.df.open(indexDirFile);
 
-      if (!(origIndexDir instanceof RAMDirectory)) {
-        double maxMergeSizeMB = indexState.getDoubleSetting("nrtCachingDirectory.maxMergeSizeMB");
-        double maxSizeMB = indexState.getDoubleSetting("nrtCachingDirectory.maxSizeMB");
-        if (maxMergeSizeMB > 0 && maxSizeMB > 0) {
-          indexDir = new NRTCachingDirectory(origIndexDir, maxMergeSizeMB, maxSizeMB);
-        } else {
-          indexDir = origIndexDir;
-        }
+      double maxMergeSizeMB = indexState.getDoubleSetting("nrtCachingDirectory.maxMergeSizeMB");
+      double maxSizeMB = indexState.getDoubleSetting("nrtCachingDirectory.maxSizeMB");
+      if (maxMergeSizeMB > 0 && maxSizeMB > 0) {
+        indexDir = new NRTCachingDirectory(origIndexDir, maxMergeSizeMB, maxSizeMB);
       } else {
         indexDir = origIndexDir;
       }
@@ -660,14 +650,10 @@ public class ShardState implements Closeable {
       }
       origIndexDir = indexState.df.open(indexDirFile);
 
-      if (!(origIndexDir instanceof RAMDirectory)) {
-        double maxMergeSizeMB = indexState.getDoubleSetting("nrtCachingDirectory.maxMergeSizeMB");
-        double maxSizeMB = indexState.getDoubleSetting("nrtCachingDirectory.maxSizeMB");
-        if (maxMergeSizeMB > 0 && maxSizeMB > 0) {
-          indexDir = new NRTCachingDirectory(origIndexDir, maxMergeSizeMB, maxSizeMB);
-        } else {
-          indexDir = origIndexDir;
-        }
+      double maxMergeSizeMB = indexState.getDoubleSetting("nrtCachingDirectory.maxMergeSizeMB");
+      double maxSizeMB = indexState.getDoubleSetting("nrtCachingDirectory.maxSizeMB");
+      if (maxMergeSizeMB > 0 && maxSizeMB > 0) {
+        indexDir = new NRTCachingDirectory(origIndexDir, maxMergeSizeMB, maxSizeMB);
       } else {
         indexDir = origIndexDir;
       }
@@ -942,9 +928,9 @@ public class ShardState implements Closeable {
     }
   }
 
-  private IndexReader.ReaderClosedListener removeSSDVStates = new IndexReader.ReaderClosedListener() {
+  private IndexReader.ClosedListener removeSSDVStates = new IndexReader.ClosedListener() {
       @Override
-      public void onClose(IndexReader r) {
+      public void onClose(IndexReader.CacheKey r) {
         synchronized(ssdvStates) {
           ssdvStates.remove(r);
         }
@@ -958,8 +944,9 @@ public class ShardState implements Closeable {
       Map<String,SortedSetDocValuesReaderState> readerSSDVStates = ssdvStates.get(reader);
       if (readerSSDVStates == null) {
         readerSSDVStates = new HashMap<>();
-        ssdvStates.put(reader, readerSSDVStates);
-        reader.addReaderClosedListener(removeSSDVStates);
+        IndexReader.CacheHelper helper = reader.getReaderCacheHelper();
+        ssdvStates.put(helper.getKey(), readerSSDVStates);
+        helper.addClosedListener(removeSSDVStates);
       }
 
       SortedSetDocValuesReaderState ssdvState = readerSSDVStates.get(dimConfig.indexFieldName);
@@ -1064,7 +1051,7 @@ public class ShardState implements Closeable {
   public int maxDoc() throws IOException {
     synchronized (this) {
       if (finishWriting == 0) {
-        return writer.maxDoc();
+        return writer.getDocStats().maxDoc;
       }
     }
 

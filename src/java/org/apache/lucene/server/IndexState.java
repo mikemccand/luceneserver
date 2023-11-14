@@ -53,7 +53,7 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.AnalyzerWrapper;
 import org.apache.lucene.analysis.core.KeywordAnalyzer;
 import org.apache.lucene.analysis.util.FilesystemResourceLoader;
-import org.apache.lucene.analysis.util.ResourceLoader;
+import org.apache.lucene.util.ResourceLoader;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.expressions.Bindings;
 import org.apache.lucene.facet.FacetsConfig;
@@ -64,6 +64,7 @@ import org.apache.lucene.facet.taxonomy.SearcherTaxonomyManager.SearcherAndTaxon
 import org.apache.lucene.facet.taxonomy.SearcherTaxonomyManager;
 import org.apache.lucene.facet.taxonomy.directory.DirectoryTaxonomyWriter;
 import org.apache.lucene.index.ConcurrentMergeScheduler;
+import org.apache.lucene.index.MergeScheduler;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexCommit;
 import org.apache.lucene.index.IndexFileNames;
@@ -108,7 +109,6 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.store.NRTCachingDirectory;
-import org.apache.lucene.store.RAMDirectory;
 import org.apache.lucene.util.IOUtils;
 import org.apache.lucene.util.PrintStreamInfoStream;
 import org.apache.lucene.util.Version;
@@ -322,7 +322,7 @@ public class IndexState implements Closeable {
 
   /** Per-field wrapper that provides the similarity
    *  configured in the FieldDef */
-  final Similarity sim = new PerFieldSimilarityWrapper(new BM25Similarity()) {
+  final Similarity sim = new PerFieldSimilarityWrapper() {
       final Similarity defaultSim = new BM25Similarity();
 
       @Override
@@ -370,7 +370,7 @@ public class IndexState implements Closeable {
       if (Files.exists(rootDir) == false) {
         Files.createDirectories(rootDir);
       }
-      this.resourceLoader = new FilesystemResourceLoader(rootDir);
+      this.resourceLoader = new FilesystemResourceLoader(rootDir, IndexState.class.getClassLoader());
     } else {
       // nocommit can/should we make a DirectoryResourceLoader?
       this.resourceLoader = null;
@@ -458,8 +458,8 @@ public class IndexState implements Closeable {
     
     ConcurrentMergeScheduler cms = new ConcurrentMergeScheduler() {
         @Override
-        public synchronized MergeThread getMergeThread(IndexWriter writer, MergePolicy.OneMerge merge) throws IOException {
-          MergeThread thread = super.getMergeThread(writer, merge);
+        public synchronized MergeThread getMergeThread(MergeScheduler.MergeSource mergeSource, MergePolicy.OneMerge merge) throws IOException {
+          MergeThread thread = super.getMergeThread(mergeSource, merge);
           thread.setName(thread.getName() + " [" + name + ":" + shardOrd + "]");
           return thread;
         }
@@ -1037,7 +1037,7 @@ public class IndexState implements Closeable {
     synchronized (this) {
 
       // nocommit make this tunable:
-      if (writableShard.writer.maxDoc() > 50000000) {
+      if (writableShard.writer.getDocStats().maxDoc > 50000000) {
         System.out.println("NEW SHARD ORD " + (writableShard.shardOrd+1));
         ShardState nextShard = addShard(writableShard.shardOrd+1, true);
 

@@ -20,8 +20,8 @@ package org.apache.lucene.server;
 import java.text.BreakIterator;
 import java.util.Locale;
 
-import org.apache.lucene.search.postingshighlight.Passage;
-import org.apache.lucene.search.postingshighlight.PassageFormatter;
+import org.apache.lucene.search.uhighlight.Passage;
+import org.apache.lucene.search.uhighlight.PassageFormatter;
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 

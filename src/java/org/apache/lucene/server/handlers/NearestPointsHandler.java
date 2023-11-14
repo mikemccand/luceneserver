@@ -27,6 +27,8 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.LatLonPoint;
 import org.apache.lucene.facet.taxonomy.SearcherTaxonomyManager.SearcherAndTaxonomy;
 import org.apache.lucene.index.IndexableField;
+import org.apache.lucene.sandbox.document.NearestHit;
+import org.apache.lucene.sandbox.search.LatLonPointPrototypeQueries;
 import org.apache.lucene.search.FieldDoc;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopFieldDocs;
@@ -102,7 +104,7 @@ public class NearestPointsHandler extends Handler {
     // Pull the searcher we will use
     final SearcherAndTaxonomy s = SearchHandler.getSearcherAndTaxonomy(r, shardState, diagnostics);
     try {
-      TopFieldDocs hits = LatLonPoint.nearest(s.searcher, fieldName, lat, lon, count);
+      TopFieldDocs hits = LatLonPointPrototypeQueries.nearest(s.searcher, fieldName, lat, lon, count);
 
       JSONObject result = new JSONObject();
       result.put("diagnostics", diagnostics);

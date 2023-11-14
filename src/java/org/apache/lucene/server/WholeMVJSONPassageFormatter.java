@@ -17,8 +17,8 @@ package org.apache.lucene.server;
  * limitations under the License.
  */
 
-import org.apache.lucene.search.postingshighlight.Passage;
-import org.apache.lucene.search.postingshighlight.PassageFormatter;
+import org.apache.lucene.search.uhighlight.Passage;
+import org.apache.lucene.search.uhighlight.PassageFormatter;
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 

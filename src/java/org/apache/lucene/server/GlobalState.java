@@ -58,6 +58,7 @@ import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TimeLimitingCollector;
 import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.search.TotalHits;
 import org.apache.lucene.server.handlers.DocHandler;
 import org.apache.lucene.server.handlers.Handler;
 import org.apache.lucene.server.handlers.NodeToNodeHandler;
@@ -191,7 +192,8 @@ public class GlobalState implements Closeable {
             synchronized(node.c) {
               node.c.out.writeByte(NodeToNodeHandler.CMD_RECEIVE_HITS);
               node.c.out.writeBytes(query.id.id, 0, query.id.id.length);
-              node.c.out.writeInt(hits.totalHits);
+              // nocommit must also serialize relation; and allow long not just int:
+              node.c.out.writeInt(Math.toIntExact(hits.totalHits.value));
               node.c.out.writeInt(hits.scoreDocs.length);
               for(ScoreDoc hit : hits.scoreDocs) {
                 node.c.out.writeInt(hit.doc);

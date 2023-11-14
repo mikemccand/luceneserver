@@ -24,7 +24,7 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.lucene.analysis.util.ResourceLoader;
+import org.apache.lucene.util.ResourceLoader;
 
 /** Holds "files" in RAM, and falls back to delegate if the
  *  resource isn't in RAM.  This is used for analysis

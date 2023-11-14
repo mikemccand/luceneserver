@@ -14,7 +14,7 @@ import os
 import urllib.request
 
 # version of lucene we build against
-LUCENE_VERSION = '6.4.2'
+LUCENE_VERSION = '9.8.0'
 
 deps = [
   #('org.codehaus.jackson', 'jackson-core-asl', '1.9.13'),
@@ -24,8 +24,8 @@ deps = [
   ('commons-codec', 'commons-codec', '1.10'),
   ('net.minidev', 'json-smart', '1.2'),
   ('org.apache.lucene', 'lucene-core', LUCENE_VERSION),
-  ('org.apache.lucene', 'lucene-analyzers-common', LUCENE_VERSION),
-  ('org.apache.lucene', 'lucene-analyzers-icu', LUCENE_VERSION),
+  ('org.apache.lucene', 'lucene-analysis-common', LUCENE_VERSION),
+  ('org.apache.lucene', 'lucene-analysis-icu', LUCENE_VERSION),
     ('com.ibm.icu', 'icu4j', '56.1'),
   ('org.apache.lucene', 'lucene-facet', LUCENE_VERSION),
   ('org.apache.lucene', 'lucene-codecs', LUCENE_VERSION),
