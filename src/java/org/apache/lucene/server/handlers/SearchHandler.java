@@ -118,12 +118,15 @@ import org.apache.lucene.search.TopDocsCollector;
 import org.apache.lucene.search.TopFieldCollector;
 import org.apache.lucene.search.TopScoreDocCollector;
 import org.apache.lucene.search.WildcardQuery;
+import org.apache.lucene.search.grouping.AllGroupsCollector;
+import org.apache.lucene.search.grouping.FirstPassGroupingCollector;
 import org.apache.lucene.search.grouping.GroupDocs;
+import org.apache.lucene.search.grouping.GroupSelector;
 import org.apache.lucene.search.grouping.SearchGroup;
+import org.apache.lucene.search.grouping.SecondPassGroupingCollector;
+import org.apache.lucene.search.grouping.TermGroupSelector;
 import org.apache.lucene.search.grouping.TopGroups;
-import org.apache.lucene.search.grouping.term.TermAllGroupsCollector;
-import org.apache.lucene.search.grouping.term.TermFirstPassGroupingCollector;
-import org.apache.lucene.search.grouping.term.TermSecondPassGroupingCollector;
+import org.apache.lucene.search.grouping.TopGroupsCollector;
 import org.apache.lucene.search.join.BitSetProducer;
 import org.apache.lucene.search.join.QueryBitSetProducer;
 import org.apache.lucene.search.join.ScoreMode;
@@ -390,7 +393,7 @@ public class SearchHandler extends Handler {
                                  new Param("groupsPerPage", "How many groups to include on each page.", new IntType(), 3),
                                  new Param("hitsPerGroup", "How many top hits to include in each group.", new IntType(), 4),
                                  new Param("doMaxScore", "Whether to compute maxScore for each group.", new BooleanType(), false),
-                                 new Param("doDocScores", "Whether to compute scores for each hit in each group.", new BooleanType(), true),
+                                 //new Param("doDocScores", "Whether to compute scores for each hit in each group.", new BooleanType(), true),
                                  new Param("sort", "How to sort groups (default is by relevance).", SORT_TYPE),
                                  new Param("doTotalGroupCount", "If true, return the total number of groups (at possibly highish added CPU cost)",
                                            new BooleanType(), false))),
@@ -2374,8 +2377,8 @@ public class SearchHandler extends Handler {
       diagnostics.put("drillDownQuery", q.toString());
 
       Collector c;
-      TermFirstPassGroupingCollector groupCollector = null;
-      TermAllGroupsCollector allGroupsCollector = null;
+      FirstPassGroupingCollector<BytesRef> groupCollector = null;
+      AllGroupsCollector<BytesRef> allGroupsCollector = null;
 
       FieldDef groupField = null;
       Request grouping = null;
@@ -2394,6 +2397,8 @@ public class SearchHandler extends Handler {
       }
 
       int topHits = r.getInt("topHits");
+
+      GroupSelector groupSelector = null;
 
       if (r.hasParam("grouping")) {
         if (r.hasParam("searchAfter")) {
@@ -2416,9 +2421,11 @@ public class SearchHandler extends Handler {
           groupSort = Sort.RELEVANCE;
         }
 
-        groupCollector = new TermFirstPassGroupingCollector(groupField.name, groupSort, grouping.getInt("groupsPerPage"));
+        groupSelector = new TermGroupSelector(groupField.name);
+
+        groupCollector = new FirstPassGroupingCollector(groupSelector, groupSort, grouping.getInt("groupsPerPage"));
         if (grouping.getBoolean("doTotalGroupCount")) {
-          allGroupsCollector = new TermAllGroupsCollector(groupField.name);
+          allGroupsCollector = new AllGroupsCollector<>(groupSelector);
           c = MultiCollector.wrap(groupCollector, allGroupsCollector);
         } else {
           c = groupCollector;
@@ -2553,16 +2560,17 @@ public class SearchHandler extends Handler {
         if (sort == null) {
           sort = Sort.RELEVANCE;
         }
-        Collection<SearchGroup<BytesRef>> topGroups = groupCollector.getTopGroups(grouping.getInt("groupStart"), true);
+        // nocommit what did that ", true" mean?  hopefully it becamse Lucene's hardwired default, like it was here!
+        // Collection<SearchGroup<BytesRef>> topGroups = groupCollector.getTopGroups(grouping.getInt("groupStart"), true);
+        Collection<SearchGroup<BytesRef>> topGroups = groupCollector.getTopGroups(grouping.getInt("groupStart"));
         if (topGroups != null) {
-          TermSecondPassGroupingCollector c3 = new TermSecondPassGroupingCollector(groupField.name,
-                                                                                   topGroups,
-                                                                                   groupSort,
-                                                                                   sort,
-                                                                                   grouping.getInt("hitsPerGroup"),
-                                                                                   grouping.getBoolean("doDocScores"),
-                                                                                   grouping.getBoolean("doMaxScore"),
-                                                                                   true);
+          TopGroupsCollector<BytesRef> c3 = new TopGroupsCollector<>(groupSelector,
+                                                                     topGroups,
+                                                                     groupSort,
+                                                                     sort,
+                                                                     grouping.getInt("hitsPerGroup"),
+                                                                     grouping.getBoolean("doMaxScore"));
+                                                                                       
           long t0 = System.nanoTime();
 
           c = c3;

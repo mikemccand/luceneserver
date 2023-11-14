@@ -38,6 +38,7 @@ import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.search.TotalHits;
 import org.apache.lucene.server.FieldDef;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
@@ -137,7 +138,8 @@ public class NodeToNodeHandler extends Handler {
             hits[i] = new ScoreDoc(docID, score);
           }
 
-          searchHandler.deliverHits(new QueryID(queryID), new TopDocs(totalHits, hits));
+          // nocommit deseriealize relation instead of lying that it's really EQUAL_TO!
+          searchHandler.deliverHits(new QueryID(queryID), new TopDocs(new TotalHits(totalHits, TotalHits.Relation.EQUAL_TO), hits));
         }
         break;
         
