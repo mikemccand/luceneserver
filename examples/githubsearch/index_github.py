@@ -17,7 +17,7 @@ import localconstants
 import util
 import gitHistory
 from direct_load_all_github_issues import load_full_issue
-from update_from_github import refresh_latest_issues
+from update_from_github import refresh_latest_issues, refresh_specific_issues
 
 from util import get_or_none
 
@@ -33,6 +33,12 @@ when you run this.
 """
 
 # TODO
+#   - fix username situation
+#      - allow search by login name and display name
+#      - render hits with display name if available
+#   - we could maybe preserve MD through highlighting and then conver to equivalent HTML for simple markup?
+#   - hrmm do i need to get the commits and cross join myself?  commit does not show updated agains the issues it mentions
+#   - does the "get an issue" API return everything the search results does?
 #   - launch as beta publicly, get feedback
 #   - hmm is periodic "git pull" not working in nrt mode?  only seemed to work on restart?
 #   - move this to examples/githubsearch; restore jirasearch to work w/ Jira
@@ -101,10 +107,7 @@ GITHUB_API_TOKEN = localconstants.GITHUB_API_TOKEN
 
 MY_EPOCH = datetime.datetime(year=2014, month=1, day=1, tzinfo=timezone.utc)
 
-if True:
-  issueToCommitPaths = gitHistory.parseLog()
-else:
-  issueToCommitPaths = {}
+issueToCommitPaths = gitHistory.parseLog()[1]
 
 def prettyPrintJSON(obj):
   print(json.dumps(obj,
@@ -546,6 +549,9 @@ def nrt_index_forever(svr):
     issue_numbers_refreshed = refresh_latest_issues(db)
     print(f'  {len(issue_numbers_refreshed)} issues to reindex: {issue_numbers_refreshed}')
 
+    # nocommit
+    issue_numbers_refreshed.append(12804)
+
     index_start_time_sec = time.time()
     index_docs(svr, specific_issues(issue_numbers_refreshed), printIssue=True, updateSuggest=True)
     print(f'  {(time.time() - index_start_time_sec):.1f} sec to index')
@@ -554,14 +560,23 @@ def nrt_index_forever(svr):
 
     print(f'  loaded and indexed {len(issue_numbers_refreshed)} issues; {total_issue_count} issues in DB')
 
-    # Check for git commits every 30 minutes:
-    if time.time() - lastGITBuild > 30*60 and any_updates_since_git:
+    # Check for git commits every  minute:
+    if time.time() - lastGITBuild > 60 and any_updates_since_git:
       lastGITBuild = time.time()
-      newIssueToCommitPaths, committedIssues = gitHistory.refresh()
+      all_mentioned_issues, newIssueToCommitPaths, committedIssues = gitHistory.refresh()
+      if len(all_mentioned_issues) > 0:
+        print(f'  now force reload of mentioned issues {all_mentioned_issues}')
+        refresh_specific_issues(all_mentioned_issues)
+
+      # nocommit wtf is difference between committedIssues & all_mentioned_issues
+      issues_to_index = set()
+      issues_to_index.update(all_mentioned_issues)
+      issues_to_index.update(committedIssues)
+        
       # merge new git history into our in-memory version:
       mergeIssueCommits(issueToCommitPaths, newIssueToCommitPaths)
       print('  update from git commits...')
-      index_docs(svr, specific_issues(committedIssues), printIssue=True)
+      index_docs(svr, specific_issues(issues_to_index), printIssue=True)
       print('  done update from git commits...')
       any_updates_since_git = False
 
@@ -590,68 +605,67 @@ def mergeIssueCommits(issueToCommitPaths, newIssueToCommitPaths):
       if len(s) == 1:
         s = list(s)[0]
       old[0] = s
+      # merge paths
       old.extend(ent[1:])
 
 def build_full_suggest(svr):
   print('Build suggest...')
   t0 = time.time()
-  suggestFile = open('%s/suggest.txt' % localconstants.ROOT_STATE_PATH, 'wb')
-  all_users = {}
+  with open('%s/suggest.txt' % localconstants.ROOT_STATE_PATH, 'wb') as suggest_file:
+    all_users = {}
 
-  for (issue, comments, events, reactions, timeline), full_pr, pr_comments, pr_reviews in all_issues():
-    key = issue['number']
-    project = extract_project(issue)
-    reporter = extract_reporter(issue)
-    add_user(all_users, reporter, project, key)
+    for (issue, comments, events, reactions, timeline), full_pr, pr_comments, pr_reviews in all_issues():
+      key = issue['number']
+      project = extract_project(issue)
+      reporter = extract_reporter(issue)
+      add_user(all_users, reporter, project, key, source='top')
 
-    if issue['assignees'] is not None and len(issue['assignees']) > 0:
-      for x in issue['assignees']:
-        add_user(all_users, x, project, key)
-    
-    updated = parse_date_time(issue['created_at'])
-    for comment in comments:
-      if comment['body'] != 'Closed after release.':
-        updated = max(updated, parse_date_time(comment['created_at']))
-      # nocommit -- must handle "migrated from Jira" too
-      add_user(all_users, comment['user'], project, key)
+      if issue['assignees'] is not None and len(issue['assignees']) > 0:
+        for x in issue['assignees']:
+          add_user(all_users, x, project, key, source='assignees')
 
-    for change in timeline:
-      print(f'tl: {change["event"]}')
+      updated = parse_date_time(issue['created_at'])
+      for comment in comments:
+        if comment['body'] != 'Closed after release.':
+          updated = max(updated, parse_date_time(comment['created_at']))
+        # nocommit -- must handle "migrated from Jira" too
+        add_user(all_users, comment['user'], project, key, source='comment')
 
-    for change in events:
-      print(f'ev: {change["event"]}')
-    
-    for change in events:
-      didAttach = False
-      if False:
-        for item in change['items']:
-          if 'field' in item and item['field'] == 'Attachment':
-            didAttach = True
+      for change in timeline:
+        print(f'tl: {change["event"]}')
 
-        if didAttach:
-          #prettyPrintJSON(change)
-          if 'author' in change:
-            add_user(all_users, change['author'], project, key)
+      for change in events:
+        print(f'ev: {change["event"]}')
 
-    weight = (updated-MY_EPOCH).total_seconds()
+      for change in events:
+        didAttach = False
+        if False:
+          for item in change['items']:
+            if 'field' in item and item['field'] == 'Attachment':
+              didAttach = True
 
-    # Index project as a context, so we can suggest within project:
-    suggestFile.write(('%d\x1f%s: %s\x1f%s\x1f%s\n' % (weight, str(key), clean_github_markdown(issue['number'], issue['title']), key, project)).encode('utf-8'))
+          if didAttach:
+            #prettyPrintJSON(change)
+            if 'author' in change:
+              add_user(all_users, change['author'], project, key, source='attach')
 
-  for userDisplayName, (count, projects) in sorted(all_users.items(), key = lambda x: (-x[1][0], x[0])):
-    userDisplayName = re.sub(r'\s+', ' ', userDisplayName)
-    suggestFile.write(('%d\x1f%s\x1fuser %s\x1f%s\n' % \
-                       (count, userDisplayName, userDisplayName, '\x1f'.join(projects))).encode('utf-8'))
+      weight = (updated-MY_EPOCH).total_seconds()
 
-  for project in all_projects:
-    suggestFile.write(('1000000000\x1f%s\x1fproject %s\x1f%s\n' % (project, project, '\x1f'.join(all_projects))).encode('utf-8'))
-  
-  suggestFile.close()
+      # Index project as a context, so we can suggest within project:
+      suggest_file.write(('%d\x1f#%s: %s\x1f%s\x1f%s\n' % (weight, str(key), clean_github_markdown(issue['number'], issue['title']), key, project)).encode('utf-8'))
+
+    for userDisplayName, (count, projects) in sorted(all_users.items(), key = lambda x: (-x[1][0], x[0])):
+      userDisplayName = re.sub(r'\s+', ' ', userDisplayName)
+      suggest_file.write(('%d\x1f%s\x1fuser %s\x1f%s\n' % \
+                         (count, userDisplayName, userDisplayName, '\x1f'.join(projects))).encode('utf-8'))
+
+    for project in all_projects:
+      suggest_file.write(('1000000000\x1f%s\x1fproject %s\x1f%s\n' % (project, project, '\x1f'.join(all_projects))).encode('utf-8'))
 
   # Use ICU so we split on '.', e.g. Directory.fileExists
   # Don't do WDF preserveOriginal at query time else no suggestions for fileExists
 
-  fullSuggestPath = os.path.abspath(suggestFile.name)
+  fullSuggestPath = os.path.abspath(suggest_file.name)
 
   # Build infix title suggest
   res = svr.send('buildSuggest',
@@ -732,28 +746,21 @@ def is_commit_user(user):
       return True
   return False
 
-def add_user(all_users, user, project, key=None):
-  # print(f'add_user: {json.dumps(user, indent=2)}')
+def add_user(all_users, user, project, key=None, source=None):
+  # print(f'add_user: {json.dumps(user, indent=2)} {source=}')
 
   if 'login' in user:
     login = user['login']
+    if login not in ('GitHub',):
+      if login not in all_users:
+        all_users[login] = [0, set()]
+      l = all_users[login]
+      l[0] += 1
+      l[1].add(project)
   else:
-    login = '???'
-    
-  if login not in all_users:
-    all_users[login] = [0, set()]
-  l = all_users[login]
-  l[0] += 1
-  l[1].add(project)
-
-class User:
-  name = None
-  login = None
-
-  def __init__(self, name, login):
-    self.name = name
-    self.login = login
-
+    # Oh why oh why GH can't you be consistent and always include login?
+    name = user['name']
+      
 def extract_project(issue):
   m = re_github_issue_url.match(issue['url'])
   assert m is not None
@@ -807,7 +814,7 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
   bulk.add('{"indexName": "jira", "documents": [')
 
   if updateSuggest:
-    suggestFile = open('%s/suggest.txt' % localconstants.ROOT_STATE_PATH, 'wb')
+    suggest_file = open('%s/suggest.txt' % localconstants.ROOT_STATE_PATH, 'wb')
 
   now = datetime.datetime.now()
 
@@ -884,39 +891,45 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
           reaction_names.add(k)
       doc['reactions'] = list(reaction_names)
 
-    events = set()
+    # curiously, mentions of an issue/PR will not refresh the updated_at for that issue/PR, so we do it manually here:
+    updated = parse_date_time(issue['updated_at'])
+    
+    for event in events:
+      updated = max(updated, parse_date_time(event['created_at']))
+
+    change_events = set()
 
     for change in events:
       #if event['event'] != 'closed':
         #print(f'event: {json.dumps(event, indent=2)}')
       #print(f'event: {event.actor.login} {event.event} {event.created_at} {event.label} {event.assignee} {event.assigner} {event.review_requester} {event.requested_reviewer} {event.dismissed_review} {getattr(event, "team", None)} {event.milestone} {event.rename} {event.lock_reason}')
-      add_user(all_users, event['actor'], project)
-      events.add(change['event'])
+      add_user(all_users, event['actor'], project, source='events')
+      change_events.add(change['event'])
 
     # TODO: what really is the difference between events and timeline?
 
     commit_messages = []
     for change in timeline:
       if 'actor' in change:
-        add_user(all_users, change['actor'], project)
+        add_user(all_users, change['actor'], project, source='timeline1')
       elif 'user' in change:
-        add_user(all_users, change['user'], project)
+        add_user(all_users, change['user'], project, source='timeline2')
       elif 'committer' in change:
-        add_user(all_users, change['committer'], project)
+        add_user(all_users, change['committer'], project, source='timeline3')
       elif change['event'] == 'committed':
-        commit_messages.append(change['message'])
+        commit_messages.append(change['message'], source='timeline4')
       else:
         # curiously, there is no user login when a commit timeline event happens:
         raise RuntimeError(f'unhandled timeline change:\n{json.dumps(change, indent=2)}')
-      events.add(change['event'])
+      change_events.add(change['event'])
 
-    doc['events'] = list(events)
+    doc['events'] = list(change_events)
 
     # who opened the issue/PR
     if issue['user'] is not None:
       #print(f'user: {issue["user"]}')
       doc['reporter'] = issue['user']['login']
-      add_user(all_users, issue['user'], project)
+      add_user(all_users, issue['user'], project, source='top user')
 
     # TODO: what is body vs body_text?  markup removed?  sometiems it is here, sometiems not!?
 
@@ -970,11 +983,11 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
         
       for x in issue['assignees']:
         assignees.append(x['login'])
-        add_user(all_users, x, project)
+        add_user(all_users, x, project, source='assignees')
         doc['assignee'] = x['login']
     elif issue['assignee'] is not None:
       doc['assignee'] = issue['assignee']['login']
-      add_user(all_users, issue['assignee'], project)
+      add_user(all_users, issue['assignee'], project, source='assignee')
     else:
       doc['assignee'] = 'Unassigned'
 
@@ -1071,7 +1084,7 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
         if didAttach:
           #prettyPrintJSON(change)
           if 'author' in change:
-            add_user(all_users, change['author'], project)
+            add_user(all_users, change['author'], project, source='attachment')
       if len(attachments) == 0:
         attachments.add('None')
       doc['attachments'] = list(attachments)
@@ -1089,11 +1102,6 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
       doc['created'] = to_utc_epoch_seconds(parse_date_time(issue['created_at']))
     if issue['closed_at'] is not None:
       doc['closed'] = to_utc_epoch_seconds(parse_date_time(issue['closed_at']))
-    updated = parse_date_time(issue['updated_at'])
-
-    # this is already UTC?  all timestampes from GH API are Zulu
-    doc['updated'] = to_utc_epoch_seconds(updated)
-    print(f'  set updated number={number} updated={updated} result={doc["updated"]} vs new updated={int(updated.strftime("%s"))}')
 
     # TODO: is there a closed_by user?
 
@@ -1155,11 +1163,16 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
       total_comment_count += len(comment_list)
 
       for comment in comment_list:
+        body = comment['body']
+        if len(body.strip()) == 0:
+          # hmm why does this happen?  e.g. #12769
+          continue
+        
         # print(f'comment: {comment}')
         #if 'JIRA' in comment['body']:
         #  print(f'jira comment: {json.dumps(comment, indent=2)}')
         # nocommit must map / extra jira / github id too?
-        add_user(all_users, comment['user'], project)
+        add_user(all_users, comment['user'], project, source=f'index_comments: {comment_cat}')
 
         author_associations.add(comment['author_association'])
 
@@ -1181,7 +1194,6 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
 
         # TODO: fixme to detect migrated Jira comment, and new GitHub style commit comment
         isCommit = is_commit_user(comment['user'])
-        body = comment['body']
         # print(f'  comment body {body}')
         if isCommit:
           subDoc['author'] = 'commitbot'
@@ -1250,18 +1262,16 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
 
     subDocs.sort(key=lambda x: x['fields']['created'])
 
-    if number == 12748:
-      print(f'XXX\n{number} {is_pr}\n  {index_comments=}\n  {pr_comments=}\n  {pr_reviews=}\n  {comments=}\n  {subDocs=}')
+    if number == 12180:
+      print(f'XXX\n{number} {is_pr}\n  issue: {issue}\n  events: {events}\n  comments: {comments}\n  index_comments: {index_comments=}\n  {pr_comments=}\n  {pr_reviews=}\n  {comments=}\n  {subDocs=}')
 
     # count both normal comments and PR code comments:
     doc['comment_count'] = total_comment_count
 
     doc['author_association'] = list(author_associations)
-    
-    # Compute our own updated instead of using Jira's, to be max(createTime, comments):
-    # nocommit: is github's updated_at more trustworthy?
-    # doc['updated'] = int(updated.timestamp())
-    print(f'updated: {doc["updated"]} vs recomputed {int(updated.timestamp())}')
+
+    # we compute our own updated since GitHub's fails to notice (touch updated) when an issue/PR is referenced/mentioned
+    doc['updated'] = to_utc_epoch_seconds(updated)
 
     # TODO: maybe lucene server needs a copy field:
     # nocommit: hmm why is this a separate field?  looks identical to "updated"?
@@ -1272,7 +1282,7 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
 
     if updateSuggest:
       weight = (updated-MY_EPOCH).total_seconds()
-      suggestFile.write(('%d\x1f%s: %s\x1f%s\x1f%s\n' % (weight, key.upper(), doc['title'], key, project)).encode('utf-8'))
+      suggest_file.write(('%d\x1f%s: %s\x1f%s\x1f%s\n' % (weight, key.upper(), doc['title'], key, project)).encode('utf-8'))
 
     l = [(y[0], x) for x, y in list(all_users.items())]
     l.sort(reverse=True)
@@ -1320,12 +1330,12 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
   bulk.finish()
 
   if updateSuggest:
-    suggestFile.close()
+    suggest_file.close()
     if not first:
       res = svr.send('updateSuggest',
                       {'indexName': 'jira',
                        'suggestName': 'titles_infix',
-                       'source': {'localFile': os.path.abspath(suggestFile.name)}})
+                       'source': {'localFile': os.path.abspath(suggest_file.name)}})
       print('updateSuggest: %s' % res)
 
 def map_user_name(user):

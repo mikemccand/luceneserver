@@ -35,6 +35,7 @@ reIssue = re.compile('(lucene|solr)-\d+', re.IGNORECASE)
 rePath = re.compile('^(lucene|solr)/([^/]*?)/src/(java|test|test-files|resources)/org/apache/(lucene|solr)/')
 rePath2 = re.compile('^(lucene|solr)/([^/]*?)/([^/]*?)/src/(java|test|test-files)/org/apache/(lucene|solr)/')
 rePath3 = re.compile('^solr/contrib/([^/]*?)/src/(java|test|test-files|resources)/org/apache/(lucene|solr)/')
+re_github_issue_number = re.compile(r'#(\d+)[^\d]')
 
 def fixPath(path):
 
@@ -138,6 +139,7 @@ def parseLog(f=None):
   issues = []
   issueToPaths = {}
   author = None
+  all_mentioned_issues = set()
   while True:
     line = f.readline()
     #line = line.decode('utf-8')
@@ -159,9 +161,9 @@ def parseLog(f=None):
       pass
     elif line.startswith('    '):
       # commit comment
-      m = reIssue.search(line)
-      if m is not None:
-        issue = m.group(0).upper()
+      mentioned_issues = re_github_issue_number.findall(line)
+      for issue in mentioned_issues:
+        all_mentioned_issues.add(issue)
         issues.append(issue)
         if changedIssues is not None:
           changedIssues.add(issue)
@@ -195,12 +197,9 @@ def parseLog(f=None):
         for issue in issues:
           issueToPaths[issue].append(s)
 
-  print('gitHistory: after parseLog maxRev=%s' % maxRev)
+  print(f'gitHistory: after parseLog {maxRev=}; mentioned_issues={all_mentioned_issues}')
 
-  if changedIssues is not None:
-    return issueToPaths, changedIssues
-  else:
-    return issueToPaths
+  return all_mentioned_issues, issueToPaths, changedIssues
 
 def refresh():
   print('refresh: maxRev=%s' % maxRev)
@@ -209,6 +208,7 @@ def refresh():
     os.chdir(localconstants.LUCENE_TRUNK_GIT_CLONE)
     if os.system('git pull origin main') == 0:
       s = os.popen('git log --reverse --name-status %s..HEAD' % maxRev).read()
+      maybe_updated_issues = [int(x) for x in re_github_issue_number.findall(s)]
       open(GIT_HISTORY_FILE, 'ab').write(s.encode('utf-8'))
       f = io.StringIO(s)
       return parseLog(f)

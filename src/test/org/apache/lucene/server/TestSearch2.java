@@ -93,6 +93,8 @@ public class TestSearch2 extends ServerBaseTestCase {
         } else {
           server = server2;
         }
+        // TODO: hmm how is this supposed to work?  Is each node expected to find the other indices on the other nodes?  Right now we fail
+        // on this line because index2 is unknown to server1:
         JSONObject result = server.send("search2", "{queryText: test, indexNames: [index1, index2]}");
       }
 

@@ -32,7 +32,6 @@ def get_login_to_name():
         #print(f'{1000*(t1-t0):.1f} msec to compute _login_to_name; {len(_login_to_name)} unique users')
         # For some insane reason, Doug has no display name ;)
         _login_to_name['cutting'] = 'Doug Cutting'
-
         
     return _login_to_name
 

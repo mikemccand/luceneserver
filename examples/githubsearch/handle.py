@@ -27,6 +27,7 @@ import string
 import copy
 import threading
 import localconstants
+import local_db
 import util
 import random
 import datetime
@@ -433,7 +434,7 @@ def addCommas(x):
     x = x[:-3]
   return s
 
-def sortByUser(s, userDrillDowns):
+def sort_by_user(s, userDrillDowns):
   if type(s) is list:
     l = []
     for s0 in s:
@@ -801,7 +802,8 @@ def handleSuggest(path, isMike, environ):
         d['label'] = 'project: %s' % d['label']
       else:
         # An issue
-        d['volLink'] = 'http://issues.apache.org/jira/browse/%s' % payload.upper()
+        #d['volLink'] = 'http://issues.apache.org/jira/browse/%s' % payload.upper()
+        d['volLink'] = 'https://github.com/apache/lucene/issues/%s' % payload
     #l.append(hit['key'])
     #l.append('<img src=%s/> %s' % (tup[1], tup[0]))
     l.append(d)
@@ -893,7 +895,7 @@ def renderNavSummary(w, facets, drillDowns):
       
   w('<br>')
   
-def renderJiraHits(w, text, groups, userDrillDowns):
+def render_hits(w, text, groups, userDrillDowns):
 
   now_utc = int(time.time() + getUTCOffset())
 
@@ -931,7 +933,7 @@ def renderJiraHits(w, text, groups, userDrillDowns):
       f'{fields["comment_count"]} comments&nbsp;&nbsp;' +
       f'{fields.get("vote_count", 0)} votes&nbsp;&nbsp;' +
       f'{fields.get("watch_count", 0)} watches&nbsp;&nbsp;' +
-      f'{fix_hilite(sortByUser(fields.get("all_users", []), userDrillDowns), "all_users")}</em></font></td></tr>')
+      f'{fix_hilite(sort_by_user(fields.get("all_users", []), userDrillDowns), "all_users")}</em></font></td></tr>')
     w('<tr><td>')
     s = fix_hilite(fields.get('body', ''))
 
@@ -2019,10 +2021,10 @@ def handleQuery(path, isMike, environ):
     if groupBy is not None:
       for group in result['groups']:
         renderGroupHeader(w, group, groupDDField, hitsPerGroup)
-        renderJiraHits(w, text, group['hits'], userDrillDowns)
+        render_hits(w, text, group['hits'], userDrillDowns)
     else:
       renderNavSummary(w, facets, drillDowns)
-      renderJiraHits(w, text, result['groups'], userDrillDowns)
+      render_hits(w, text, result['groups'], userDrillDowns)
 
     #w('</div>')
     w('</table>')

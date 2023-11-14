@@ -171,6 +171,30 @@ def load_pr_reviews(db, c, number):
   db.commit()
   print(f'    got: {all_pr_reviews}')
   return all_pr_reviews
+
+def load_and_store_full_issue(issue, db, c):
+
+  number = issue['number']
+
+  now = datetime.datetime.now()
+  comments, events, reactions, timeline = load_full_issue(issue)
+
+  local_db.maybe_load_user(c, issue['user']['login'])
+  for comment in comments:
+      local_db.maybe_load_user(c, comment['user']['login'])
+  # nocommit what about events/timeline users?
+
+  c.execute('REPLACE INTO issues (key, pickle) VALUES (?, ?)',
+            (str(number), pickle.dumps((issue, comments, events, reactions, timeline))))
+
+  #print(f'ISSUE={json.dumps(issue, indent=2)}')
+  #print(f'COMMENTS={json.dumps(comments, indent=2)}')
+
+  if 'pull_request' in issue:
+    # nocommit move the other table inserts here too, instead of "down low"
+    load_one_full_pr(db, c, number)
+    load_pr_comments(db, c, number)
+    load_pr_reviews(db, c, number)
         
 def refresh_latest_issues(db):
   now = datetime.datetime.utcnow()
@@ -220,41 +244,11 @@ def refresh_latest_issues(db):
       break
 
     for issue in batch:
-
-      print(f'  load {issue["number"]}')
-
       number = issue['number']
-
-      if False and number != 12781:
-        print(f'NOCOMMIT: skipping updating {number}')
-        continue
-
-      now = datetime.datetime.now()
-      comments, events, reactions, timeline = load_full_issue(issue)
-
-      local_db.maybe_load_user(c, issue['user']['login'])
-      for comment in comments:
-          local_db.maybe_load_user(c, comment['user']['login'])
-      # nocommit what about events/timeline users?
-
-      c.execute('REPLACE INTO issues (key, pickle) VALUES (?, ?)',
-                (str(number), pickle.dumps((issue, comments, events, reactions, timeline))))
+      print(f'  load {number}')
+      load_and_store_full_issue(issue, db, c)
       issue_numbers_refreshed.append(number)
-
-      #print(f'ISSUE={json.dumps(issue, indent=2)}')
-      #print(f'COMMENTS={json.dumps(comments, indent=2)}')
-
-      if 'pull_request' in issue:
-        load_one_full_pr(db, c, number)
-        load_pr_comments(db, c, number)
-        load_pr_reviews(db, c, number)
         
-    if False:
-        if not batch['incomplete_results']:
-          page += 1
-        else:
-          # retry same page -- GitHub timed out and gave us subset of results
-          pass
     page += 1
 
   if False and len(issue_numbers_refreshed) != total_count:
@@ -265,6 +259,14 @@ def refresh_latest_issues(db):
   db.commit()
 
   return issue_numbers_refreshed
+
+def refresh_specific_issues(issue_numbers):
+  db = local_db.get()
+  c = db.cursor()
+  for number in issue_numbers:
+    print(f'  refresh {number}')
+    issue = http_load_as_json(f'https://api.github.com/repos/apache/lucene/issues/{number}')
+    load_and_store_full_issue(issue, db, c)
 
 if __name__ == '__main__':
   main()

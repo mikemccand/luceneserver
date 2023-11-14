@@ -16,6 +16,7 @@ def load_full_issue(issue):
     comments = local_db.http_load_as_json(issue['comments_url'])
     # TODO: responses to each comment?
     events = local_db.http_load_as_json(issue['events_url'])
+    print(f'load events for {issue["number"]}:\n  {json.dumps(events, indent=2)}')
     reactions = local_db.http_load_as_json(issue['reactions']['url'])
     timeline = local_db.http_load_as_json(issue['timeline_url'])
     return comments, events, reactions, timeline
