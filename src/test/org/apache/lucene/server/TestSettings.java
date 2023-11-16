@@ -53,6 +53,6 @@ public class TestSettings extends ServerBaseTestCase {
     assertEquals(2, o.size());
     send("startIndex");
     long gen = getLong(send("addDocument", "{fields: {body: 'here is a test'}}"), "indexGen");
-    assertEquals(1, getInt(send("search", "{queryText: test, searcher: {indexGen: " + gen + "}}"), "totalHits"));
+    assertEquals(1, getInt(send("search", "{queryText: test, searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
   }
 }

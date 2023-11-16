@@ -26,11 +26,11 @@ import org.apache.lucene.search.Weight;
 // credibility!!
 final class CannedScorer extends Scorer {
 
-  float score;
-  int doc;
+  final float score;
+  final int doc;
 
-  public CannedScorer(int doc, float score) {
-    super((Weight) null);
+  public CannedScorer(Weight weight, int doc, float score) {
+    super(weight);
     this.doc = doc;
     this.score = score;
   }

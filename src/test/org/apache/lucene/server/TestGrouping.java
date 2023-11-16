@@ -81,7 +81,7 @@ public class TestGrouping extends ServerBaseTestCase {
     long gen = addDocument(0, "Bob", "this is a test.", 10.99f, "2012/10/17");
 
     JSONObject o2 = search("test", gen, null, false, false, "author", null);
-    assertEquals(4, ((Number) o2.get("totalHits")).intValue());
+    assertEquals(4, ((Number) o2.get("totalHits.value")).intValue());
     assertEquals(4, ((Number) o2.get("totalGroupedHits")).intValue());
     JSONArray a = (JSONArray) o2.get("groups");
     assertEquals(3, a.size());

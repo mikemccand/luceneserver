@@ -156,7 +156,7 @@ public class TestFacets extends ServerBaseTestCase {
     addDocument(1, "Lisa", "this is a another test", 11.99f, "2012/10/1");
     addDocument(2, "Frank", "this is a third test", 12.99f, "2010/10/1");
     search("test", -1, "price", false, true, null, null);
-    assertEquals(3, getInt("totalHits"));
+    assertEquals(3, getInt("totalHits.value"));
     assertEquals(3, getInt("hits.length"));
 
     assertEquals(0, getInt("hits[0].fields.id"));
@@ -179,7 +179,7 @@ public class TestFacets extends ServerBaseTestCase {
 
     addDocument(2, "Frank", "this is a third test", 12.99f, "2010/10/1");
     search("test", -1, "price", false, true, null, null);
-    assertEquals(3, getInt("totalHits"));
+    assertEquals(3, getInt("totalHits.value"));
     assertEquals(3, getInt("hits.length"));
 
     assertEquals(0, getInt("hits[0].fields.id"));
@@ -205,17 +205,17 @@ public class TestFacets extends ServerBaseTestCase {
 
     // Initial query:
     send("search", "{query: MatchAllDocsQuery, facets: [{dim: author, topN: 10}]}");
-    assertEquals(6, getInt("totalHits"));
+    assertEquals(6, getInt("totalHits.value"));
     assertEquals("top: 6, Tom: 3, Lisa: 2, Bob: 1", formatFacetCounts(getObject("facets[0]")));
 
     // Now, single drill down:
     send("search", "{drillDowns: [{field: author, value: Bob}], query: MatchAllDocsQuery, facets: [{dim: author, topN: 10}]}");
-    assertEquals(1, getInt("totalHits"));
+    assertEquals(1, getInt("totalHits.value"));
     assertEquals("top: 6, Tom: 3, Lisa: 2, Bob: 1", formatFacetCounts(getObject("facets[0]")));
 
     // Multi (OR'd) drill down:
     send("search", "{drillDowns: [{field: author, value: Bob}, {field: author, value: Lisa}], query: MatchAllDocsQuery, facets: [{dim: author, topN: 10}]}");
-    assertEquals(3, getInt("totalHits"));
+    assertEquals(3, getInt("totalHits.value"));
     assertEquals("top: 6, Tom: 3, Lisa: 2, Bob: 1", formatFacetCounts(getObject("facets[0]")));
   }
 
@@ -242,7 +242,7 @@ public class TestFacets extends ServerBaseTestCase {
 
     send("search", "{drillDowns: [{field: longField, numericRange: {label: Half, min: 0, max: 49, minInclusive: true, maxInclusive: true}}], facets: [{dim: longField, numericRanges: [{label: All, min: 0, max: 99, minInclusive: true, maxInclusive: true}, {label: Half, min: 0, max: 49, minInclusive: true, maxInclusive: true}]}]}");
     assertEquals("top: 100, All: 100, Half: 50", formatFacetCounts(getObject("facets[0]")));
-    assertEquals(50, getInt("totalHits"));
+    assertEquals(50, getInt("totalHits.value"));
   }
 
   public void testDoubleRangeFacets() throws Exception {
@@ -255,7 +255,7 @@ public class TestFacets extends ServerBaseTestCase {
 
     send("search", "{drillDowns: [{field: doubleField, numericRange: {label: Half, min: 0, max: 49, minInclusive: true, maxInclusive: true}}], facets: [{dim: doubleField, numericRanges: [{label: All, min: 0, max: 99, minInclusive: true, maxInclusive: true}, {label: Half, min: 0, max: 49, minInclusive: true, maxInclusive: true}]}]}");
     assertEquals("top: 100, All: 100, Half: 50", formatFacetCounts(getObject("facets[0]")));
-    assertEquals(50, getInt("totalHits"));
+    assertEquals(50, getInt("totalHits.value"));
   }
 
   // nocommit fails ... we need to add FloatRangeFacetCounts
@@ -294,7 +294,7 @@ public class TestFacets extends ServerBaseTestCase {
 
     // Verify error message:
     send("search", "{query: MatchAllDocsQuery, facets: [{dim: ssdv}]}");
-    assertEquals(0, getInt("totalHits"));
+    assertEquals(0, getInt("totalHits.value"));
 
     send("addDocument", "{fields: {ssdv: one}}");
     send("addDocument", "{fields: {ssdv: two}}");
@@ -310,7 +310,7 @@ public class TestFacets extends ServerBaseTestCase {
       // message is bad: it says "each element in the array
       // my have these params:..." when it shouldn't
       send("search", "{query: MatchAllDocsQuery, facets: [{dim: ssdv}]}");
-      assertEquals(6, getInt("totalHits"));
+      assertEquals(6, getInt("totalHits.value"));
       assertEquals("top: 6, one: 3, two: 2, three: 1", formatFacetCounts(getObject("facets[0]")));
 
       // Make sure suggest survives server restart:    

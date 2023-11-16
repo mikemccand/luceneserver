@@ -120,7 +120,7 @@ public class TestAnalysis extends ServerBaseTestCase {
 
   public void testPositionIncrementGap() throws Exception {
     createIndex("posinc");
-    send("settings", "{directory: RAMDirectory}");
+    //send("settings", "{directory: RAMDirectory}");
     send("registerFields", "{fields: {author1: {type: text, analyzer: {tokenizer: Whitespace}, multiValued: true}, author2: {type: text, analyzer: {tokenizer: Whitespace, positionIncrementGap: 1}, multiValued: true}}}");
     send("startIndex");
     send("addDocument", "{fields: {author1: [bob, smith], author2: [bob, smith]}}");

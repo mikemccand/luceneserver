@@ -59,23 +59,23 @@ public class TestSearch extends ServerBaseTestCase {
     deleteAllDocs();
     long gen = getLong(send("addDocument", "{fields: {body: 'the wizard of oz'}}"), "indexGen");
     JSONObject result = send("search", "{query: {class: PhraseQuery, field: body, terms: [wizard, of, oz]}, searcher: {indexGen: " + gen + "}}");
-    assertEquals(1, getInt(result, "totalHits"));
+    assertEquals(1, getInt(result, "totalHits.value"));
 
     result = send("search", "{query: {class: PhraseQuery, field: body, terms: [wizard, oz]}, searcher: {indexGen: " + gen + "}}");
-    assertEquals(0, getInt(result, "totalHits"));
+    assertEquals(0, getInt(result, "totalHits.value"));
 
     result = send("search", "{query: {class: PhraseQuery, field: body, terms: [wizard, oz], slop: 1}, searcher: {indexGen: " + gen + "}}");
-    assertEquals(1, getInt(result, "totalHits"));
+    assertEquals(1, getInt(result, "totalHits.value"));
   }
 
   public void testConstantScoreQuery() throws Exception {
     deleteAllDocs();
     long gen = getLong(send("addDocument", "{fields: {body: 'the wizard of oz'}}"), "indexGen");
     JSONObject result = send("search", "{query: {class: TermQuery, field: body, term: wizard}, searcher: {indexGen: " + gen + "}}");
-    assertEquals(1, getInt(result, "totalHits"));
+    assertEquals(1, getInt(result, "totalHits.value"));
 
     result = send("search", "{query: {class: ConstantScoreQuery, boost: 10.0, query: {class: TermQuery, field: body, term: wizard}}, searcher: {indexGen: " + gen + "}}");
-    assertEquals(1, getInt(result, "totalHits"));
+    assertEquals(1, getInt(result, "totalHits.value"));
     assertEquals(10.0, getFloat(result, "hits[0].score"), .000001f);
   }
 
@@ -83,9 +83,9 @@ public class TestSearch extends ServerBaseTestCase {
     deleteAllDocs();
     long gen = getLong(send("addDocument", "{fields: {body: 'testing'}}"), "indexGen");
     JSONObject r = send("search", "{query: {class: RegexpQuery, field: body, regexp: '.*est.*'}, searcher: {indexGen: " + gen + "}}");
-    assertEquals(1, getInt(r, "totalHits"));
+    assertEquals(1, getInt(r, "totalHits.value"));
     r = send("search", "{query: {class: RegexpQuery, field: body, regexp: '.*zest.*'}, searcher: {indexGen: " + gen + "}}");
-    assertEquals(0, getInt(r, "totalHits"));
+    assertEquals(0, getInt(r, "totalHits.value"));
   }
 
   public void testTermRangeQuery() throws Exception {
@@ -95,9 +95,9 @@ public class TestSearch extends ServerBaseTestCase {
     long gen = getLong(send("addDocument", "{fields: {body: 'termc'}}"), "indexGen");
 
     JSONObject result = send("search", "{query: {class: TermRangeQuery, field: body, lowerTerm: terma, upperTerm: termc, includeLower: true, includeUpper: true}, searcher: {indexGen: " + gen + "}}");
-    assertEquals(3, getInt(result, "totalHits"));
+    assertEquals(3, getInt(result, "totalHits.value"));
     result = send("search", "{query: {class: TermRangeQuery, field: body, lowerTerm: terma, upperTerm: termc, includeLower: false, includeUpper: false}, searcher: {indexGen: " + gen + "}}");
-    assertEquals(1, getInt(result, "totalHits"));
+    assertEquals(1, getInt(result, "totalHits.value"));
   }
 
   public void testMatchAllDocsQuery() throws Exception {
@@ -132,7 +132,7 @@ public class TestSearch extends ServerBaseTestCase {
     send("addDocument", "{fields: {body: 'fantastic four'}}");
     long gen = getLong(send("addDocument", "{fields: {body: 'fantastic five'}}"), "indexGen");
 
-    assertEquals(1, getInt(send("search", "{query: {class: CommonTermsQuery, highFreqOccur: must, lowFreqOccur: must, maxTermFrequency: 0.5, field: body, terms: [fantastic, four]}, searcher: {indexGen: " + gen + "}}"), "totalHits"));
+    assertEquals(1, getInt(send("search", "{query: {class: CommonTermsQuery, highFreqOccur: must, lowFreqOccur: must, maxTermFrequency: 0.5, field: body, terms: [fantastic, four]}, searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
   }
 
   public void testMultiPhraseQuery() throws Exception {
@@ -140,38 +140,38 @@ public class TestSearch extends ServerBaseTestCase {
     send("addDocument", "{fields: {body: 'fantastic five is furious'}}");
     long gen = getLong(send("addDocument", "{fields: {body: 'fantastic four is furious'}}"), "indexGen");
 
-    assertEquals(1, getInt(send("search", "{query: {class: MultiPhraseQuery, field: body, terms: [fantastic, five, is, furious]}, searcher: {indexGen: " + gen + "}}"), "totalHits"));
-    assertEquals(2, getInt(send("search", "{query: {class: MultiPhraseQuery, field: body, terms: [fantastic, {term: furious, position: 3}]}, searcher: {indexGen: " + gen + "}}"), "totalHits"));
-    assertEquals(2, getInt(send("search", "{query: {class: MultiPhraseQuery, field: body, terms: [fantastic, [five, four], {term: furious, position: 3}]}, searcher: {indexGen: " + gen + "}}"), "totalHits"));
+    assertEquals(1, getInt(send("search", "{query: {class: MultiPhraseQuery, field: body, terms: [fantastic, five, is, furious]}, searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
+    assertEquals(2, getInt(send("search", "{query: {class: MultiPhraseQuery, field: body, terms: [fantastic, {term: furious, position: 3}]}, searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
+    assertEquals(2, getInt(send("search", "{query: {class: MultiPhraseQuery, field: body, terms: [fantastic, [five, four], {term: furious, position: 3}]}, searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
   }
 
   public void testClassicQPDefaultOperator() throws Exception {
     deleteAllDocs();
     long gen = getLong(send("addDocument", "{fields: {body: 'fantastic four is furious'}}"), "indexGen");
     
-    assertEquals(1, getInt(send("search", "{queryParser: {class: classic, defaultOperator: or, defaultField: body}, queryText: 'furious five', searcher: {indexGen: " + gen + "}}"), "totalHits"));
-    assertEquals(0, getInt(send("search", "{queryParser: {class: classic, defaultOperator: and, defaultField: body}, queryText: 'furious five', searcher: {indexGen: " + gen + "}}"), "totalHits"));
+    assertEquals(1, getInt(send("search", "{queryParser: {class: classic, defaultOperator: or, defaultField: body}, queryText: 'furious five', searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
+    assertEquals(0, getInt(send("search", "{queryParser: {class: classic, defaultOperator: and, defaultField: body}, queryText: 'furious five', searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
   }
 
   public void testMultiFieldQueryParser() throws Exception {
     deleteAllDocs();
     long gen = getLong(send("addDocument", "{fields: {body: 'fantastic four is furious', title: 'here is the title'}}"), "indexGen");
     
-    assertEquals(1, getInt(send("search", "{queryParser: {class: MultiFieldQueryParser, defaultOperator: or, fields: [body, {field: title, boost: 2.0}]}, queryText: 'title furious', searcher: {indexGen: " + gen + "}}"), "totalHits"));
-    assertEquals(1, getInt(send("search", "{queryParser: {class: MultiFieldQueryParser, defaultOperator: and, fields: [body, {field: title, boost: 2.0}]}, queryText: 'title furious', searcher: {indexGen: " + gen + "}}"), "totalHits"));
+    assertEquals(1, getInt(send("search", "{queryParser: {class: MultiFieldQueryParser, defaultOperator: or, fields: [body, {field: title, boost: 2.0}]}, queryText: 'title furious', searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
+    assertEquals(1, getInt(send("search", "{queryParser: {class: MultiFieldQueryParser, defaultOperator: and, fields: [body, {field: title, boost: 2.0}]}, queryText: 'title furious', searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
   }
 
   public void testSimpleQueryParser() throws Exception {
     deleteAllDocs();
     long gen = getLong(send("addDocument", "{fields: {body: 'fantastic four is furious', title: 'here is the title'}}"), "indexGen");
     
-    assertEquals(1, getInt(send("search", "{queryParser: {class: SimpleQueryParser, defaultOperator: or, fields: [body, title], operators: [WHITESPACE]}, queryText: 'title furious', searcher: {indexGen: " + gen + "}}"), "totalHits"));
-    assertEquals(1, getInt(send("search", "{queryParser: {class: SimpleQueryParser, defaultOperator: and, fields: [body, title], operators: [WHITESPACE]}, queryText: 'title furious', searcher: {indexGen: " + gen + "}}"), "totalHits"));
-    assertEquals(0, getInt(send("search", "{queryParser: {class: SimpleQueryParser, defaultOperator: or, fields: [body, title], operators: [WHITESPACE]}, queryText: 't* f*', searcher: {indexGen: " + gen + "}}"), "totalHits"));
-    assertEquals(1, getInt(send("search", "{queryParser: {class: SimpleQueryParser, defaultOperator: or, fields: [body, title], operators: [WHITESPACE, PREFIX]}, queryText: 't* f*', searcher: {indexGen: " + gen + "}}"), "totalHits"));
-    assertEquals(0, getInt(send("search", "{queryParser: {class: SimpleQueryParser, defaultOperator: or, fields: [body, title], operators: [WHITESPACE]}, queryText: '\"furious title\"', searcher: {indexGen: " + gen + "}}"), "totalHits"));
-    assertEquals(0, getInt(send("search", "{queryParser: {class: SimpleQueryParser, defaultOperator: or, fields: [body, title], operators: [WHITESPACE, PHRASE]}, queryText: '\"furious title\"', searcher: {indexGen: " + gen + "}}"), "totalHits"));
-    assertEquals(1, getInt(send("search", "{queryParser: {class: SimpleQueryParser, defaultOperator: or, fields: [body, title], operators: [WHITESPACE, PHRASE]}, queryText: '\"fantastic four\"', searcher: {indexGen: " + gen + "}}"), "totalHits"));
+    assertEquals(1, getInt(send("search", "{queryParser: {class: SimpleQueryParser, defaultOperator: or, fields: [body, title], operators: [WHITESPACE]}, queryText: 'title furious', searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
+    assertEquals(1, getInt(send("search", "{queryParser: {class: SimpleQueryParser, defaultOperator: and, fields: [body, title], operators: [WHITESPACE]}, queryText: 'title furious', searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
+    assertEquals(0, getInt(send("search", "{queryParser: {class: SimpleQueryParser, defaultOperator: or, fields: [body, title], operators: [WHITESPACE]}, queryText: 't* f*', searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
+    assertEquals(1, getInt(send("search", "{queryParser: {class: SimpleQueryParser, defaultOperator: or, fields: [body, title], operators: [WHITESPACE, PREFIX]}, queryText: 't* f*', searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
+    assertEquals(0, getInt(send("search", "{queryParser: {class: SimpleQueryParser, defaultOperator: or, fields: [body, title], operators: [WHITESPACE]}, queryText: '\"furious title\"', searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
+    assertEquals(0, getInt(send("search", "{queryParser: {class: SimpleQueryParser, defaultOperator: or, fields: [body, title], operators: [WHITESPACE, PHRASE]}, queryText: '\"furious title\"', searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
+    assertEquals(1, getInt(send("search", "{queryParser: {class: SimpleQueryParser, defaultOperator: or, fields: [body, title], operators: [WHITESPACE, PHRASE]}, queryText: '\"fantastic four\"', searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
   }
 
   // nocommit switch to points, add half float coverage
@@ -186,15 +186,15 @@ public class TestSearch extends ServerBaseTestCase {
 
       // Include both min & max:
       assertEquals(3, getInt(send("search", "{query: {class: NumericRangeQuery, field: nf, min: 5, max: 17}}"),
-                             "totalHits"));
+                             "totalHits.value"));
 
       // Leave min out:
       assertEquals(3, getInt(send("search", "{query: {class: NumericRangeQuery, field: nf, max: 17}}"),
-                             "totalHits"));
+                             "totalHits.value"));
 
       // Leave max out:
       assertEquals(3, getInt(send("search", "{query: {class: NumericRangeQuery, field: nf, min: 5}}"),
-                             "totalHits"));
+                             "totalHits.value"));
 
       send("stopIndex");
       send("deleteIndex");
@@ -225,7 +225,7 @@ public class TestSearch extends ServerBaseTestCase {
       //System.out.println("i=" + i + ": " + lastPage);
 
       // 20 total hits
-      assertEquals(20, getInt(lastPage, "totalHits"));
+      assertEquals(20, getInt(lastPage, "totalHits.value"));
       assertEquals(5, getInt(lastPage, "hits.length"));
       for(int j=0;j<5;j++) {
         seenIDs.add(getInt(lastPage, "hits[" + j + "].fields.id"));
@@ -294,7 +294,7 @@ public class TestSearch extends ServerBaseTestCase {
       lastPage = send("search", o);
 
       // 20 total hits
-      assertEquals(20, getInt(lastPage, "totalHits"));
+      assertEquals(20, getInt(lastPage, "totalHits.value"));
       assertEquals(5, getInt(lastPage, "hits.length"));
       for(int j=0;j<5;j++) {
         seenIDs.add(getInt(lastPage, "hits[" + j + "].fields.id"));
@@ -319,7 +319,7 @@ public class TestSearch extends ServerBaseTestCase {
       // Unboosted:
       String request = "{queryText: text, searcher: {indexGen: " + gen + "}}";
       JSONObject result = send("search", request);
-      assertEquals(2, getInt(result, "totalHits"));
+      assertEquals(2, getInt(result, "totalHits.value"));
       assertEquals(0, getInt(result, "hits[0].doc"));
       assertEquals(1, getInt(result, "hits[1].doc"));
 
@@ -333,7 +333,7 @@ public class TestSearch extends ServerBaseTestCase {
                     "{name: boost, expression: '(age >= 30) ? 1.0 : (2.0 * (30. - age) / 30)'}, " +
                     "{name: blend, expression: 'boost * _score'}], " + 
                     " sort: {fields: [{field: blend, reverse: true}]}, retrieveFields: [age, boost], searcher: {indexGen: " + gen + "}}");
-      assertEquals(2, getInt(result, "totalHits"));
+      assertEquals(2, getInt(result, "totalHits.value"));
       assertEquals(1, getInt(result, "hits[0].doc"));
       assertEquals(0, getInt(result, "hits[1].doc"));
       assertTrue(getFloat(result, "hits[0].fields.boost") > 1.0f);

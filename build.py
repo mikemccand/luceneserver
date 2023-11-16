@@ -26,7 +26,7 @@ deps = [
   ('org.apache.lucene', 'lucene-core', LUCENE_VERSION),
   ('org.apache.lucene', 'lucene-analysis-common', LUCENE_VERSION),
   ('org.apache.lucene', 'lucene-analysis-icu', LUCENE_VERSION),
-    ('com.ibm.icu', 'icu4j', '56.1'),
+    ('com.ibm.icu', 'icu4j', '70.1'),
   ('org.apache.lucene', 'lucene-facet', LUCENE_VERSION),
   ('org.apache.lucene', 'lucene-codecs', LUCENE_VERSION),
   ('org.apache.lucene', 'lucene-grouping', LUCENE_VERSION),

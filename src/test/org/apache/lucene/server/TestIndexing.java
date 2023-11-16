@@ -66,7 +66,7 @@ public class TestIndexing extends ServerBaseTestCase {
     send("addDocument", "{fields: {body: 'here is a test', id: '0'}}");
     long gen = getLong(send("updateDocument", "{term: {field: id, term: '0'}, fields: {body: 'here is another test', id: '0'}}"), "indexGen");
     JSONObject o = send("search", "{queryText: 'body:test', searcher: {indexGen: " + gen + "}, retrieveFields: [body]}");
-    assertEquals(1, getInt(o, "totalHits"));
+    assertEquals(1, getInt(o, "totalHits.value"));
     assertEquals("here is another test", getString(o, "hits[0].fields.body"));
   }
 
@@ -86,7 +86,7 @@ public class TestIndexing extends ServerBaseTestCase {
     JSONObject result = send("bulkAddDocument", Collections.singletonMap("indexName", Collections.singletonList("index")), new StringReader(s));
     assertEquals(100, result.get("indexedDocumentCount"));
     long indexGen = ((Number) result.get("indexGen")).longValue();
-    assertEquals(1, getInt(send("search", "{queryText: 'body:99', searcher: {indexGen: " + indexGen + "}}"), "totalHits"));
+    assertEquals(1, getInt(send("search", "{queryText: 'body:99', searcher: {indexGen: " + indexGen + "}}"), "totalHits.value"));
 
     // Now, update:
     sb = new StringBuilder();
@@ -110,9 +110,9 @@ public class TestIndexing extends ServerBaseTestCase {
     result = send("bulkUpdateDocument", new HashMap<>(), new StringReader(s));
     assertEquals(100, result.get("indexedDocumentCount"));
     indexGen = ((Number) result.get("indexGen")).longValue();
-    assertEquals(1, getInt(send("search", "{queryText: 'body:99', searcher: {indexGen: " + indexGen + "}}"), "totalHits"));
+    assertEquals(1, getInt(send("search", "{queryText: 'body:99', searcher: {indexGen: " + indexGen + "}}"), "totalHits.value"));
 
-    assertEquals(100, getInt(send("search", "{query: MatchAllDocsQuery, searcher: {indexGen: " + indexGen + "}}"), "totalHits"));
+    assertEquals(100, getInt(send("search", "{query: MatchAllDocsQuery, searcher: {indexGen: " + indexGen + "}}"), "totalHits.value"));
   }
 
   public void testBulkAddException() throws Exception {
@@ -204,7 +204,7 @@ public class TestIndexing extends ServerBaseTestCase {
     assertEquals(100, result.get("indexedDocumentCount"));
     long indexGen = getLong(result, "indexGen");
     JSONObject r = search("99", indexGen, null, false, true, null, null);
-    assertEquals(1, ((Integer) r.get("totalHits")).intValue());
+    assertEquals(1, ((Integer) r.get("totalHits.value")).intValue());
   }
 
   public void testBulkAddDocument2() throws Exception {
@@ -230,7 +230,7 @@ public class TestIndexing extends ServerBaseTestCase {
     assertEquals(100, result.get("indexedDocumentCount"));
     long indexGen = getLong(result, "indexGen");
     JSONObject r = send("search", "{indexName: bulk2, searcher: {indexGen: " + indexGen + "}, queryText: \"99\", facets: [{dim: dateFacet, topN: 10}], retrieveFields: [id, date, price, {field: body, highlight: snippets}]}");
-    assertEquals(1, ((Integer) r.get("totalHits")).intValue());
+    assertEquals(1, ((Integer) r.get("totalHits.value")).intValue());
     send("deleteIndex");
   }
 
@@ -250,7 +250,6 @@ public class TestIndexing extends ServerBaseTestCase {
 
   public void testBoost() throws Exception {
     createIndex("boost");
-    send("settings", "{directory: RAMDirectory}");
     // Just to test merge rate limiting:
     send("settings", "{mergeMaxMBPerSec: 10.0}");
     // Just to test index.ramBufferSizeMB:
@@ -301,7 +300,7 @@ public class TestIndexing extends ServerBaseTestCase {
       System.out.println("\nTEST: createIndex");
     }
     createIndex("normsFormat");
-    send("settings", "{directory: RAMDirectory, normsFormat: Lucene53}");
+    send("settings", "{normsFormat: Lucene53}");
     send("registerFields",
          "{fields: {id: {type: atom, store: true}, body: {type: text, analyzer: StandardAnalyzer}}}");
     if (VERBOSE) {
@@ -391,7 +390,7 @@ public class TestIndexing extends ServerBaseTestCase {
     JSONObject result = parseJSONObject(new String(bytes, StandardCharsets.UTF_8));
     assertEquals(1, getInt(result, "indexedDocumentCount"));
     refresh();
-    assertEquals(1, getInt(send("search", "{queryText: document}"), "totalHits"));
+    assertEquals(1, getInt(send("search", "{queryText: document}"), "totalHits.value"));
     send("stopIndex");
     send("deleteIndex");
   }
@@ -406,7 +405,7 @@ public class TestIndexing extends ServerBaseTestCase {
     assertEquals(1, getInt(result, "indexedDocumentCount"));
     refresh();
     send("search", "{query: {class: LatLonDistanceQuery, field: point, latitude: 41.0, longitude: 71.0, radiusMeters: 1000000.0}}");
-    assertEquals(1, getInt("totalHits"));
+    assertEquals(1, getInt("totalHits.value"));
     send("stopIndex");
     send("deleteIndex");
   }
@@ -561,7 +560,7 @@ public class TestIndexing extends ServerBaseTestCase {
     JSONObject result = server.send("bulkCSVAddDocument2", params, new StringReader("id,id2,body\n0,1," + body + "\n"));
     assertEquals(1, getInt(result, "indexedDocumentCount"));
     refresh();
-    assertEquals(1, getInt(send("search", "{queryText: document}"), "totalHits"));
+    assertEquals(1, getInt(send("search", "{queryText: document}"), "totalHits.value"));
     send("stopIndex");
     send("deleteIndex");
   }
@@ -576,7 +575,7 @@ public class TestIndexing extends ServerBaseTestCase {
     assertEquals(1, getInt(result, "indexedDocumentCount"));
     refresh();
     send("search", "{query: {class: LatLonDistanceQuery, field: point, latitude: 41.0, longitude: 71.0, radiusMeters: 1000000.0}}");
-    assertEquals(1, getInt("totalHits"));
+    assertEquals(1, getInt("totalHits.value"));
     send("stopIndex");
     send("deleteIndex");
   }
@@ -691,18 +690,16 @@ public class TestIndexing extends ServerBaseTestCase {
     if (VERBOSE) {
       System.out.println("TEST: testOnlySettings start");
     }
+    
     for(int i=0;i<2;i++) {
       server.curIndexName = "settings";
       if (VERBOSE) {
         System.out.println("\nTEST: create");
       }
-      if (i == 0) {
-        send("createIndex");
-      } else {
-        Path dir = createTempDir("recency").resolve("root");
-        send("createIndex", "{rootDir: " + dir.toAbsolutePath() + "}");
-      }
-      String dirImpl = i == 0 ? "RAMDirectory" : "FSDirectory";
+      Path dir = createTempDir("settings").resolve("root");
+      send("createIndex", "{rootDir: " + dir.toAbsolutePath() + "}");
+
+      String dirImpl = i == 0 ? "MMapDirectory" : "FSDirectory";
 
       if (VERBOSE) {
         System.out.println("\nTEST: settings1");

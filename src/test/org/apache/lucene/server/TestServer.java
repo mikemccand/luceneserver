@@ -130,7 +130,7 @@ public class TestServer extends ServerBaseTestCase {
     deleteAllDocs();
     long gen = addDocument(0, "Bob", "this is a test", 10f, "2012/10/17");
     JSONObject o = search("test", gen, null, false, true, null, null);
-    assertEquals(1, getInt(o, "totalHits"));
+    assertEquals(1, getInt(o, "totalHits.value"));
   }
 
   public void testUnusedParamsAreCaught() throws Exception {
@@ -150,7 +150,7 @@ public class TestServer extends ServerBaseTestCase {
     addDocument(0, "Lisa", "this is a test", 10.99f, "2012/10/1");
     long gen = addDocument(1, "Tom", "this is also a test", 14.99f, "2012/11/3");
     JSONObject o = search("test", gen, "price", false, true, null, null);
-    assertEquals(2, ((Number) o.get("totalHits")).intValue());
+    assertEquals(2, ((Number) o.get("totalHits.value")).intValue());
     JSONArray hits = (JSONArray) o.get("hits");
     assertEquals(2, hits.size());
 
@@ -166,7 +166,7 @@ public class TestServer extends ServerBaseTestCase {
     addDocument(0, "Frank", "this is a test", 10.99f, "2012/10/1");
     long gen = addDocument(1, "Lisa", "this is also a test", 14.99f, "2012/11/3");
     JSONObject o = search("test", gen, "price", true, true, null, null);
-    assertEquals(2, ((Number) o.get("totalHits")).intValue());
+    assertEquals(2, ((Number) o.get("totalHits.value")).intValue());
 
     JSONArray hits = (JSONArray) o.get("hits");
     assertEquals(2, hits.size());
@@ -183,13 +183,13 @@ public class TestServer extends ServerBaseTestCase {
     long gen = addDocument(0, "Tom", "this is a test.  here is a random sentence.  here is another sentence with test in it.", 10.99f, "2012/10/17");
 
     JSONObject o = search("test", gen, null, false, false, null, null);
-    assertEquals(1, ((Number) o.get("totalHits")).intValue());
+    assertEquals(1, ((Number) o.get("totalHits.value")).intValue());
 
     // Add another document
     gen = addDocument(0, "Melanie", "this is a test.  here is a random sentence.  here is another sentence with test in it.", 10.99f, "2012/10/17");
 
     JSONObject o2 = search("test", gen, null, false, false, null, null);
-    assertEquals(2, ((Number) o2.get("totalHits")).intValue());
+    assertEquals(2, ((Number) o2.get("totalHits.value")).intValue());
 
     // Now the first search does a follow-on search, so we
     // should only see 1 document since it should be using
@@ -201,7 +201,7 @@ public class TestServer extends ServerBaseTestCase {
     //System.out.println("send: " + o3);
     JSONObject o4 = send("search", o3);
 
-    assertEquals(1, ((Number) o4.get("totalHits")).intValue());
+    assertEquals(1, ((Number) o4.get("totalHits.value")).intValue());
   }
 
   public void testInvalidFields() throws Exception {
@@ -260,7 +260,7 @@ public class TestServer extends ServerBaseTestCase {
 
     result = send("search", "{searcher: {indexGen: " + indexGen + "}, queryText: 'authors:bob', retrieveFields: [authors]}");
 
-    assertEquals(1, getInt(result, "totalHits"));
+    assertEquals(1, getInt(result, "totalHits.value"));
     assertEquals("[\"Bob\",\"Lisa\"]", getArray(result, "hits[0].fields.authors").toString());
   }
 
@@ -275,7 +275,7 @@ public class TestServer extends ServerBaseTestCase {
 
     result = send("search", "{searcher: {indexGen: " + indexGen + "}, queryText: 'body:test', retrieveFields: [ratings]}");
 
-    assertEquals(1, getInt(result, "totalHits"));
+    assertEquals(1, getInt(result, "totalHits.value"));
     assertEquals("[17,22]", getArray(result, "hits[0].fields.ratings").toString());
   }
 
@@ -292,7 +292,7 @@ public class TestServer extends ServerBaseTestCase {
 
     // search on a stop word should yield no results:
     result = send("search", String.format(Locale.ROOT, "{searcher: {indexGen: %d}, queryText: 'aTextField:a'}", indexGen));
-    assertEquals(0, getInt(result, "totalHits"));
+    assertEquals(0, getInt(result, "totalHits.value"));
   }
 
   public void testStandardAnalyzerNoStopWords() throws Exception {
@@ -308,7 +308,7 @@ public class TestServer extends ServerBaseTestCase {
 
     // search on a stop word should now yield one hit:
     result = send("search", "{queryText: 'aTextField2:a', searcher: {indexGen: " + indexGen + "}}");
-    assertEquals(1, getInt(result, "totalHits"));
+    assertEquals(1, getInt(result, "totalHits.value"));
   }
 
   public void testEnglishAnalyzerNoStopWords() throws Exception {
@@ -323,7 +323,7 @@ public class TestServer extends ServerBaseTestCase {
 
     // cats should stem to cat and get a match:
     result = send("search", "{queryText: 'aTextField3:cat', searcher: {indexGen: " + indexGen + "}}");
-    assertEquals(1, getInt(result, "totalHits"));
+    assertEquals(1, getInt(result, "totalHits.value"));
   }
 
   public void testInvalidFieldName() throws Exception {
@@ -362,7 +362,7 @@ public class TestServer extends ServerBaseTestCase {
     bounceServer();
     send("startIndex");
     JSONObject o = search("test", 0, null, false, true, null, null);
-    assertEquals(1, ((Number) o.get("totalHits")).intValue());
+    assertEquals(1, ((Number) o.get("totalHits.value")).intValue());
   }
 
   public void testStatsHandler() throws Exception {

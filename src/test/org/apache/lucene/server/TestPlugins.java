@@ -81,7 +81,7 @@ public class TestPlugins extends ServerBaseTestCase {
     long gen = getLong(send("addDocument", "{fields: {id: 0, mockFoobar: 7}}"), "indexGen");
 
     JSONObject result = send("search", "{searcher: {indexGen: " + gen + "}, query: MatchAllDocsQuery, retrieveFields: [id, intfield]}");
-    assertEquals(1, getInt(result, "totalHits"));
+    assertEquals(1, getInt(result, "totalHits.value"));
     assertEquals(14, getInt(result, "hits[0].fields.intfield"));
     //System.out.println("got: " + prettyPrint(result));
   }

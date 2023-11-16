@@ -53,7 +53,7 @@ public class TestNumericFields extends ServerBaseTestCase {
     deleteAllDocs();
     long gen = getLong(send("addDocument", "{fields: {intNoSort: 17, intSort: 22, floatNoSort: 17.0, floatSort: 22.0}}"), "indexGen");
     JSONObject result = send("search", "{retrieveFields: [intNoSort, intSort, floatNoSort, floatSort], query: MatchAllDocsQuery, searcher: {indexGen: " + gen + "}}");
-    assertEquals(1, getInt(result, "totalHits"));
+    assertEquals(1, getInt(result, "totalHits.value"));
     assertEquals(17, getInt(result, "hits[0].fields.intNoSort"));
     assertEquals(22, getInt(result, "hits[0].fields.intSort"));
     assertEquals(17.0f, getFloat(result, "hits[0].fields.floatNoSort"), 1e-7);

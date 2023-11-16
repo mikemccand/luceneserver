@@ -57,7 +57,7 @@ public class TestVirtualFields extends ServerBaseTestCase {
     send("addDocument", "{fields: {id: 0, boost: 1.0}}");
     send("addDocument", "{fields: {id: 1, boost: 2.0}}");
     send("search", "{query: MatchAllDocsQuery, sort: {fields: [{field: logboost}]}, retrieveFields: [id]}");
-    assertEquals(2, getInt("totalHits"));
+    assertEquals(2, getInt("totalHits.value"));
     assertEquals(0, getInt("hits[0].fields.id"));
     assertEquals(1, getInt("hits[1].fields.id"));
 
@@ -71,7 +71,7 @@ public class TestVirtualFields extends ServerBaseTestCase {
     send("addDocument", "{fields: {id: 0, boost: 1.0}}");
     send("addDocument", "{fields: {id: 1, boost: 2.0}}");
     send("search", "{query: MatchAllDocsQuery, sort: {fields: [{field: logboost, reverse: true}]}, retrieveFields: [id]}");
-    assertEquals(2, getInt("totalHits"));
+    assertEquals(2, getInt("totalHits.value"));
     assertEquals(1, getInt("hits[0].fields.id"));
     assertEquals(0, getInt("hits[1].fields.id"));
 
@@ -85,7 +85,7 @@ public class TestVirtualFields extends ServerBaseTestCase {
     send("addDocument", "{fields: {id: 0, boost: 1.0}}");
     send("addDocument", "{fields: {id: 1, boost: 2.0}}");
     send("search", "{query: MatchAllDocsQuery, sort: {fields: [{field: logboost}]}, retrieveFields: [id, logboost]}");
-    assertEquals(2, getInt("totalHits"));
+    assertEquals(2, getInt("totalHits.value"));
     assertEquals(0, getInt("hits[0].fields.id"));
     assertEquals(1, getInt("hits[1].fields.id"));
 
@@ -99,7 +99,7 @@ public class TestVirtualFields extends ServerBaseTestCase {
     send("addDocument", "{fields: {id: 0, boost: 1.0}}");
     send("addDocument", "{fields: {id: 1, boost: 2.0}}");
     send("search", "{query: MatchAllDocsQuery, sort: {fields: [{field: id, reverse: true}]}, retrieveFields: [id, logboost]}");
-    assertEquals(2, getInt("totalHits"));
+    assertEquals(2, getInt("totalHits.value"));
     assertEquals(1, getInt("hits[0].fields.id"));
     assertEquals(0, getInt("hits[1].fields.id"));
 
@@ -109,21 +109,24 @@ public class TestVirtualFields extends ServerBaseTestCase {
 
   public void testFieldUsingAnother() throws Exception {
     deleteAllDocs();
+    System.out.println("NOW REGISTER");
     send("registerFields", "{fields: {scoreboost2: {type: virtual, expression: '2*scoreboost'}}}");
+    System.out.println("DONE REGISTER");
 
     send("addDocument", "{fields: {text: 'the wind is howling like this swirling storm inside', id: 0, boost: 1.0}}");
     send("addDocument", "{fields: {text: 'I am one with the wind and sky', id: 1, boost: 2.0}}");
+    System.out.println("NOW SEARCH");
     send("search", "{queryText: wind, sort: {fields: [{field: scoreboost2, reverse: true}]}, retrieveFields: [id, scoreboost2]}");
-    assertEquals(2, getInt("totalHits"));
+    assertEquals(2, getInt("totalHits.value"));
     assertEquals(1, getInt("hits[0].fields.id"));
     assertEquals(0, getInt("hits[1].fields.id"));
 
     // nocommit don't hardwire scores here
-    assertEquals(1.72276068f, getFloat("hits[0].fields.scoreboost2"), .0001f);
-    assertEquals(0.3364663f, getFloat("hits[1].fields.scoreboost2"), .0001f);
+    assertEquals(1.556128F, getFloat("hits[0].fields.scoreboost2"), .0001f);
+    assertEquals(0.161852F, getFloat("hits[1].fields.scoreboost2"), .0001f);
 
-    assertEquals(1.72276068f, getFloat("hits[0].fields.sortFields.scoreboost2"), .0001f);
-    assertEquals(0.3364663f, getFloat("hits[1].fields.sortFields.scoreboost2"), .0001f);
+    assertEquals(1.556128F, getFloat("hits[0].fields.sortFields.scoreboost2"), .0001f);
+    assertEquals(0.161852F, getFloat("hits[1].fields.sortFields.scoreboost2"), .0001f);
   }
 
   public void testWithScore1() throws Exception {
@@ -131,7 +134,7 @@ public class TestVirtualFields extends ServerBaseTestCase {
     send("addDocument", "{fields: {text: 'the wind is howling like this swirling storm inside', id: 0, boost: 1.0}}");
     send("addDocument", "{fields: {text: 'I am one with the wind and sky', id: 1, boost: 2.0}}");
     send("search", "{queryText: wind, sort: {fields: [{field: scoreboost, reverse: true}]}, retrieveFields: [id, logboost]}");
-    assertEquals(2, getInt("totalHits"));
+    assertEquals(2, getInt("totalHits.value"));
     assertEquals(1, getInt("hits[0].fields.id"));
     assertEquals(0, getInt("hits[1].fields.id"));
 
@@ -145,7 +148,7 @@ public class TestVirtualFields extends ServerBaseTestCase {
     send("addDocument", "{fields: {text: 'the wind is howling like this swirling storm inside', id: 0, boost: 1.0}}");
     send("addDocument", "{fields: {text: 'I am one with the wind and sky', id: 1, boost: 2.0}}");
     send("search", "{queryText: wind, sort: {fields: [{field: scoreboost, reverse: true}]}, retrieveFields: [id, scoreboost, logboost]}");
-    assertEquals(2, getInt("totalHits"));
+    assertEquals(2, getInt("totalHits.value"));
     assertEquals(1, getInt("hits[0].fields.id"));
     assertEquals(0, getInt("hits[1].fields.id"));
 
@@ -164,7 +167,7 @@ public class TestVirtualFields extends ServerBaseTestCase {
     send("addDocument", "{fields: {text: 'the wind is howling like this swirling storm inside', id: 0, boost: 1.0}}");
     send("addDocument", "{fields: {text: 'I am one with the wind and sky', id: 1, boost: 2.0}}");
     send("search", "{queryText: wind, sort: {fields: [{field: id, reverse: true}]}, retrieveFields: [id, scoreboost, logboost]}");
-    assertEquals(2, getInt("totalHits"));
+    assertEquals(2, getInt("totalHits.value"));
     assertEquals(1, getInt("hits[0].fields.id"));
     assertEquals(0, getInt("hits[1].fields.id"));
 
@@ -244,7 +247,7 @@ public class TestVirtualFields extends ServerBaseTestCase {
     send("addDocument", "{fields: {text: 'I am one with the wind and sky', id: 1, boost: 2.0}}");
     send("search",
          "{queryText: wind, virtualFields: [{name: scoreboost3, expression: 3*scoreboost}], sort: {fields: [{field: id, reverse: true}]}, retrieveFields: [id, scoreboost3]}");
-    assertEquals(2, getInt("totalHits"));
+    assertEquals(2, getInt("totalHits.value"));
     assertEquals(1, getInt("hits[0].fields.id"));
     assertEquals(0, getInt("hits[1].fields.id"));
 
@@ -258,7 +261,7 @@ public class TestVirtualFields extends ServerBaseTestCase {
     send("addDocument", "{fields: {text: 'I am one with the wind and sky', id: 1, boost: 2.0}}");
     send("search",
          "{queryText: wind, virtualFields: [{name: scoreboost3, expression: 3*scoreboost}], sort: {fields: [{field: scoreboost3}]}, retrieveFields: [id]}");
-    assertEquals(2, getInt("totalHits"));
+    assertEquals(2, getInt("totalHits.value"));
     assertEquals(0, getInt("hits[0].fields.id"));
     assertEquals(1, getInt("hits[1].fields.id"));
 

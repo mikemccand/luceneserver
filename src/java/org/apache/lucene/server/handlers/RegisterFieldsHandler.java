@@ -363,6 +363,8 @@ public class RegisterFieldsHandler extends Handler {
     String exprString = r.getString("expression");
     Expression expr;
 
+    System.out.println("PARSE: " + exprString + " name=" + name);
+
     try {
       expr = JavascriptCompiler.compile(exprString);
     } catch (ParseException pe) {

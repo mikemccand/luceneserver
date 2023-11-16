@@ -926,7 +926,7 @@ public class SearchHandler extends Handler {
   @SuppressWarnings("unchecked")
   /** Fills in the returned fields (some hilited) for one hit: */
   private void fillFields(IndexState state, HighlighterConfig highlighter, IndexSearcher s,
-                          JSONObject result, ScoreDoc hit, Set<String> fields,
+                          Query q, JSONObject result, ScoreDoc hit, Set<String> fields,
                           Map<String,Object[]> highlights,
                           int hiliteHitIndex, Sort sort,
                           List<String> sortFieldNames,
@@ -946,6 +946,7 @@ public class SearchHandler extends Handler {
         // We detect invalid field above:
         assert fd != null;
 
+        // nocommit be more efficient about this, pulling hits in segment/docid order so we don't need to make a new iterator for every hit!
         // nocommit also allow pulling from doc values?
         if (fd.valueSource != null) {
           List<LeafReaderContext> leaves = s.getIndexReader().leaves();
@@ -953,10 +954,16 @@ public class SearchHandler extends Handler {
 
           int docID = hit.doc - leaf.docBase;
 
+          System.out.println("hit.score=" + hit.score + " needsScores=" + fd.valueSource.needsScores());
+
+          // nocommit: hmm assert is not valid?  a virtual field can need the score and if we sort by it, Lucene will not fill in relevance
+          // score?  huh, nevermind, just had to use the helper static method to populate the scores after-the-fact, but TODO: let's stop
+          // doing that unless caller explicitly requests it?
           assert Float.isNaN(hit.score) == false || fd.valueSource.needsScores() == false;
+          
           final DoubleValues scoreValues;
           if (fd.valueSource.needsScores()) {
-            scoreValues = DoubleValuesSource.fromScorer(new CannedScorer(docID, hit.score));
+            scoreValues = DoubleValuesSource.fromScorer(new CannedScorer(q.createWeight(s, org.apache.lucene.search.ScoreMode.COMPLETE, 1f), docID, hit.score));
           } else {
             scoreValues = null;
           }
@@ -2601,6 +2608,8 @@ public class SearchHandler extends Handler {
           totalGroupCount = 0;
         }
       } else {
+
+        // no grouping
         groups = null;
         joinGroups = null;
         hits = ((TopDocsCollector) c).topDocs();
@@ -2614,6 +2623,10 @@ public class SearchHandler extends Handler {
           }
           hits = new TopDocs(hits.totalHits,
                              newScoreDocs);
+        }
+
+        if (c instanceof TopFieldCollector) {
+          TopFieldCollector.populateScores(hits.scoreDocs, s.searcher, q);
         }
 
         // if there is a ToParentBlockJoin query, convert TopDocs -> TopGroups (fill in all matching children for each parent hit):
@@ -2825,7 +2838,7 @@ public class SearchHandler extends Handler {
               if (fields != null || highlightFields != null) {
                 JSONObject o7 = new JSONObject();
                 o6.put("fields", o7);
-                fillFields(indexState, highlighter, s.searcher, o7, hit, fields, highlights, hitIndex, sort, sortFieldNames, dynamicFields);
+                fillFields(indexState, highlighter, s.searcher, q, o7, hit, fields, highlights, hitIndex, sort, sortFieldNames, dynamicFields);
               }
 
               hitIndex++;
@@ -2869,7 +2882,7 @@ public class SearchHandler extends Handler {
               JSONObject o4 = new JSONObject();
               o3.put("fields", o4);
               ScoreDoc sd = new ScoreDoc(group.groupValue.intValue(), group.score);
-              fillFields(indexState, highlighter, s.searcher, o4, sd, fields, highlights, hitIndex, sort, sortFieldNames, dynamicFields);
+              fillFields(indexState, highlighter, s.searcher, q, o4, sd, fields, highlights, hitIndex, sort, sortFieldNames, dynamicFields);
             }
             hitIndex++;
 
@@ -2905,7 +2918,7 @@ public class SearchHandler extends Handler {
               if (fields != null || highlightFields != null) {
                 JSONObject o7 = new JSONObject();
                 o6.put("fields", o7);
-                fillFields(indexState, highlighter, s.searcher, o7, hit, fields, highlights, hitIndex, child.sort, child.sortFieldNames, dynamicFields);
+                fillFields(indexState, highlighter, s.searcher, q, o7, hit, fields, highlights, hitIndex, child.sort, child.sortFieldNames, dynamicFields);
               }
 
               hitIndex++;
@@ -2914,6 +2927,7 @@ public class SearchHandler extends Handler {
         }
 
       } else {
+        // no block join
         result.put("totalHits", makeTotalHits(hits.totalHits));
         JSONArray o2 = new JSONArray();
         result.put("hits", o2);
@@ -2931,7 +2945,7 @@ public class SearchHandler extends Handler {
           if (fields != null || highlightFields != null) {
             JSONObject o4 = new JSONObject();
             o3.put("fields", o4);
-            fillFields(indexState, highlighter, s.searcher, o4, hit, fields, highlights, hitIndex, sort, sortFieldNames, dynamicFields);
+            fillFields(indexState, highlighter, s.searcher, q, o4, hit, fields, highlights, hitIndex, sort, sortFieldNames, dynamicFields);
           }
         }
       }
