@@ -62,7 +62,7 @@ public class TestSimpleSpatial extends ServerBaseTestCase {
 
     // Search, matching all documents and counting distance
     // facets from the home origin:
-    assertEquals(3, getInt("totalHits"));
+    assertEquals(3, getInt("totalHits.value"));
     assertEquals("top: 3, < 1 km: 1, < 2 km: 2, < 5 km: 2, < 10 km: 3",
                  TestFacets.formatFacetCounts(getObject("facets[0]")));
 
@@ -78,7 +78,7 @@ public class TestSimpleSpatial extends ServerBaseTestCase {
          "{label: '< 10 km', min: 0.0, minInclusive: true, max: 10.0, maxInclusive: false}," +
          "]}]}");
 
-    assertEquals(2, getInt("totalHits"));
+    assertEquals(2, getInt("totalHits.value"));
 
     // Drill-sideways counts are unchanged after a single drill-down:
     assertEquals("top: 3, < 1 km: 1, < 2 km: 2, < 5 km: 2, < 10 km: 3",

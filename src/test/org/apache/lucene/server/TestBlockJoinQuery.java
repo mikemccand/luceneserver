@@ -76,14 +76,16 @@ public class TestBlockJoinQuery extends ServerBaseTestCase {
     // search on parent:
     send("search", "{query: {class: ToParentBlockJoinQuery, childQuery: {class: text, field: skill, text: python}, parentsFilter: {class: TermQuery, field: docType, term: resume}}}");
     //System.out.println("GOT: " + result);
-    assertEquals(1, getInt("totalHits"));
+    assertEquals(1, getInt("totalHits.value"));
 
     // Returns child docs grouped up to parent doc:
     send("search", "{retrieveFields: [skill, year, name, country], query: {class: ToParentBlockJoinQuery, childHits: {}, childQuery: {class: text, field: skill, text: python}, parentsFilter: {class: TermQuery, field: docType, term: resume}}}");
 
     assertEquals(1, getInt("totalGroupCount"));
     // Grouping from a BJQ does not set totalHits:
-    assertEquals(0, getInt("totalHits"));
+    assertEquals(0, getInt("totalHits.value"));
+
+    System.out.println("GOT RESPONSE:\n" + server.lastResult);
 
     assertEquals(1, getInt("groups.length"));
     assertEquals(1, getInt("groups[0].hits.length"));

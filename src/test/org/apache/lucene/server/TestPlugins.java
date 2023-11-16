@@ -77,7 +77,7 @@ public class TestPlugins extends ServerBaseTestCase {
     // nocommit send addDocument & verify change "took"
 
     createAndStartIndex("index");
-    send("registerFields", "{fields: {id: {type: int, store: true, postingsFormat: Memory}, intfield: {type: int, store: true}}}");
+    send("registerFields", "{fields: {id: {type: int, store: true}, intfield: {type: int, store: true}}}");
     long gen = getLong(send("addDocument", "{fields: {id: 0, mockFoobar: 7}}"), "indexGen");
 
     JSONObject result = send("search", "{searcher: {indexGen: " + gen + "}, query: MatchAllDocsQuery, retrieveFields: [id, intfield]}");

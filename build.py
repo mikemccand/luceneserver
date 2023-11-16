@@ -37,7 +37,7 @@ deps = [
   ('org.apache.lucene', 'lucene-queryparser', LUCENE_VERSION),
   ('org.apache.lucene', 'lucene-suggest', LUCENE_VERSION),
   ('org.apache.lucene', 'lucene-expressions', LUCENE_VERSION),
-    ('org.antlr', 'antlr4-runtime', '4.5.1-1'),
+    ('org.antlr', 'antlr4-runtime', '4.11.1'),
     ('org.ow2.asm', 'asm', '5.1'),
     ('org.ow2.asm', 'asm-commons', '5.1'),
   ('org.apache.lucene', 'lucene-replicator', LUCENE_VERSION),

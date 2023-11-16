@@ -118,6 +118,7 @@ import org.apache.lucene.search.TopDocsCollector;
 import org.apache.lucene.search.TopFieldCollector;
 import org.apache.lucene.search.TopFieldDocs;
 import org.apache.lucene.search.TopScoreDocCollector;
+import org.apache.lucene.search.TotalHits;
 import org.apache.lucene.search.WildcardQuery;
 import org.apache.lucene.search.grouping.AllGroupsCollector;
 import org.apache.lucene.search.grouping.FirstPassGroupingCollector;
@@ -2041,7 +2042,7 @@ public class SearchHandler extends Handler {
                                                 c,
                                                 ranges);
           }
-          facetResult = facets.getTopChildren(0, fd.name);
+          facetResult = facets.getTopChildren(Integer.MAX_VALUE, fd.name);
         } else {
           // nocommit float/double too
           throw r2.bad("numericRanges", "field type must be numeric; got: " + fd.valueType);
@@ -2625,20 +2626,33 @@ public class SearchHandler extends Handler {
           GroupDocs<Integer>[] groupDocs = new GroupDocs[hits.scoreDocs.length];
           // for each matched top parent hit we run a ParentChildrenBlockJoinQuery to find all matching children:
           for (ScoreDoc parentHit : hits.scoreDocs) {
-            TopFieldDocs childHits = s.searcher.search(new ParentChildrenBlockJoinQuery(child.parentsFilter, child.childQuery, parentHit.doc),
-                                                       child.maxChildren,
-                                                       child.sort,
-                                                       child.trackScores);
+            TopDocs childHits;
+            if (child.sort == null) {
+              // Default sort (RELEVANCE descending):
+              childHits = s.searcher.search(new ParentChildrenBlockJoinQuery(child.parentsFilter, child.childQuery, parentHit.doc),
+                                            child.maxChildren);
+           } else {
+              childHits = s.searcher.search(new ParentChildrenBlockJoinQuery(child.parentsFilter, child.childQuery, parentHit.doc),
+                                            child.maxChildren,
+                                            child.sort,
+                                            child.trackScores);
+            }
 
+            // TODO: is there a cleaner way?  Should we leave this as null when sorting by "score"/Relevance?
+            Object[] groupSortValues;
+            if (parentHit instanceof FieldDoc) {
+              groupSortValues = ((FieldDoc) parentHit).fields;
+            } else {
+              groupSortValues = new Object[] {Float.valueOf(parentHit.score)};
+            }
 
             // nocommit is parentHit.score the agg'd (from children -> parent) group score?
-            // nocommit how to get the groupSortValues?  retrieve from DVs, but need to know groupSort fields? for now <-- null!
             groupDocs[groupCount++] = new GroupDocs<>(parentHit.score,
                                                       Float.NaN,
                                                       childHits.totalHits,
                                                       childHits.scoreDocs,
-                                                      0, // nocommit what Integer should this be!
-                                                      null);
+                                                      Integer.valueOf(parentHit.doc),
+                                                      groupSortValues);
           
 
             // nocommit is this supposed to be += totalHits.count instead?
@@ -2647,10 +2661,14 @@ public class SearchHandler extends Handler {
 
           // nocommit what about startHit?  paging within a group?  we ignore it now.
           joinGroups = new TopGroups<Integer>((sort == null ? Sort.RELEVANCE : sort).getSort(),
-                                              child.sort.getSort(), totalGroupedHitCount,
+                                              (child.sort == null ? Sort.RELEVANCE : child.sort).getSort(),
+                                              0,
                                               totalGroupedHitCount, groupDocs,
                                               Float.NaN);
-                                                        
+
+          // totalGroupCount is the total parent hits?
+          joinGroups = new TopGroups<Integer>(joinGroups,
+                                              Math.toIntExact(hits.totalHits.value));
           groups = null;
           hits = null;
         }
@@ -2677,7 +2695,7 @@ public class SearchHandler extends Handler {
             }
           }
         }
-      } else if (!useBlockJoinCollector.isEmpty()) {
+      } else if (useBlockJoinCollector.isEmpty() == false) {
         if (joinGroups != null) {
 
           int count = 0;
@@ -2735,10 +2753,10 @@ public class SearchHandler extends Handler {
         
       if (groupField != null) {
         if (groups == null) {
-          result.put("totalHits", 0);
+          result.put("totalHits", makeTotalHits(0));
           result.put("totalGroupCount", 0);
         } else {
-          result.put("totalHits", groups.totalHitCount);
+          result.put("totalHits", makeTotalHits(groups.totalHitCount));
           result.put("totalGroupedHits", groups.totalGroupedHitCount);
           if (groups.totalGroupCount != null) {
             result.put("totalGroupCount", groups.totalGroupCount);
@@ -2767,13 +2785,15 @@ public class SearchHandler extends Handler {
             } else {
               o3.put("groupValue", v);
             }
+
+            // still just an int
             o3.put("totalHits", group.totalHits);
 
-            if (!Float.isNaN(group.maxScore)) {
+            if (Float.isNaN(group.maxScore) == false) {
               o3.put("maxScore", group.maxScore);
             }
 
-            if (!Float.isNaN(group.score)) {
+            if (Float.isNaN(group.score) == false) {
               o3.put("score", group.score);
             }
 
@@ -2809,10 +2829,10 @@ public class SearchHandler extends Handler {
             }
           }
         }
-      } else if (!useBlockJoinCollector.isEmpty()) {
+      } else if (useBlockJoinCollector.isEmpty() == false) {
         // ToParentBlockJoin
         if (joinGroups == null) {
-          result.put("totalHits", 0);
+          result.put("totalHits", makeTotalHits(0));
           result.put("totalGroupCount", 0);
         } else {
 
@@ -2821,7 +2841,7 @@ public class SearchHandler extends Handler {
           Map.Entry<ToParentBlockJoinQuery,BlockJoinQueryChild> ent = it.next();
           BlockJoinQueryChild child = ent.getValue();
 
-          result.put("totalHits", joinGroups.totalHitCount);
+          result.put("totalHits", makeTotalHits(joinGroups.totalHitCount));
           result.put("totalGroupedHits", joinGroups.totalGroupedHitCount);
           if (joinGroups.totalGroupCount != null) {
             result.put("totalGroupCount", joinGroups.totalGroupCount);
@@ -2850,9 +2870,10 @@ public class SearchHandler extends Handler {
             }
             hitIndex++;
 
+            // still just an int
             o3.put("totalHits", group.totalHits);
 
-            if (!Float.isNaN(group.maxScore)) {
+            if (Float.isNaN(group.maxScore) == false) {
               o3.put("maxScore", group.maxScore);
             }
 
@@ -2874,7 +2895,7 @@ public class SearchHandler extends Handler {
               JSONObject o6 = new JSONObject();
               o5.add(o6);
               o6.put("doc", hit.doc);
-              if (!Float.isNaN(hit.score)) {
+              if (Float.isNaN(hit.score) == false) {
                 o6.put("score", hit.score);
               }
 
@@ -2890,7 +2911,7 @@ public class SearchHandler extends Handler {
         }
 
       } else {
-        result.put("totalHits", hits.totalHits);
+        result.put("totalHits", makeTotalHits(hits.totalHits));
         JSONArray o2 = new JSONArray();
         result.put("hits", o2);
 
@@ -2959,6 +2980,21 @@ public class SearchHandler extends Handler {
         return resultString;
       }
     };
+  }
+
+  private JSONObject makeTotalHits(int hitCount) {
+    return makeTotalHits(hitCount, TotalHits.Relation.EQUAL_TO);
+  }
+
+  private JSONObject makeTotalHits(TotalHits hits) {
+    return makeTotalHits(hits.value, hits.relation);
+  }
+
+  private JSONObject makeTotalHits(long hitCount, TotalHits.Relation relation) {
+    JSONObject o = new JSONObject();
+    o.put("value", hitCount);
+    o.put("relation", relation.toString());
+    return o;
   }
 
   /** Parses the {@link Request} into a {@link Locale}. */

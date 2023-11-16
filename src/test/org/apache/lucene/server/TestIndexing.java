@@ -51,7 +51,7 @@ public class TestIndexing extends ServerBaseTestCase {
   private static void registerFields() throws Exception {
     JSONObject o = new JSONObject();
     put(o, "body", "{type: text, highlight: true, store: true, analyzer: {class: StandardAnalyzer}, similarity: {class: BM25Similarity, b: 0.15}}");
-    put(o, "id", "{type: atom, store: true, postingsFormat: Memory}");
+    put(o, "id", "{type: atom, store: true}");
     put(o, "price", "{type: float, sort: true, search: true, store: true}");
     put(o, "date", "{type: atom, search: false, store: true}");
     put(o, "dateFacet", "{type: atom, search: false, store: false, facet: hierarchy}");

@@ -42,7 +42,7 @@ public class TestBooleanFieldType extends ServerBaseTestCase {
 
   private static void registerFields() throws Exception {
     JSONObject o = new JSONObject();
-    put(o, "id", "{type: int, store: true, postingsFormat: Memory}");
+    put(o, "id", "{type: int, store: true}");
     put(o, "other", "{type: text, store: true}");
     put(o, "flagStored", "{type: boolean, store: true, search: false}");
     put(o, "flagIndexed", "{type: boolean, store: false, search: true}");

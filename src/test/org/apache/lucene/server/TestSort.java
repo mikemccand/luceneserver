@@ -164,7 +164,7 @@ public class TestSort extends ServerBaseTestCase {
     // default
     send("search",
          "{query: MatchAllDocsQuery, topHits: 3, retrieveFields: [id], searcher: {indexGen: " + gen + "}, sort: {fields: [{field: " + field + sortSpec + "}]}}");
-    assertEquals(3, getInt("totalHits"));
+    assertEquals(3, getInt("totalHits.value"));
     for(int i=0;i<3;i++) {
       assertEquals(expected[i], getInt("hits[" + i + "].fields.id"));
     }
@@ -178,7 +178,7 @@ public class TestSort extends ServerBaseTestCase {
     
     send("search",
          "{query: MatchAllDocsQuery, topHits: 3, retrieveFields: [id], searcher: {indexGen: " + gen + "}, sort: {fields: [{field: " + field + sortSpec + ", reverse: true}]}}");
-    assertEquals(3, getInt("totalHits"));
+    assertEquals(3, getInt("totalHits.value"));
     for(int i=0;i<3;i++) {
       assertEquals(expected[i], getInt("hits[" + i + "].fields.id"));
     }
@@ -187,7 +187,7 @@ public class TestSort extends ServerBaseTestCase {
     expected = new int[] {0, 1, 2};
     send("search",
          "{query: MatchAllDocsQuery, topHits: 3, retrieveFields: [id], searcher: {indexGen: " + gen + "}, sort: {fields: [{field: " + field + sortSpec + ", missingLast: true}]}}");
-    assertEquals(3, getInt("totalHits"));
+    assertEquals(3, getInt("totalHits.value"));
     for(int i=0;i<3;i++) {
       assertEquals(expected[i], getInt("hits[" + i + "].fields.id"));
     }
@@ -196,7 +196,7 @@ public class TestSort extends ServerBaseTestCase {
     expected = new int[] {2, 1, 0};
     send("search",
          "{query: MatchAllDocsQuery, topHits: 3, retrieveFields: [id], searcher: {indexGen: " + gen + "}, sort: {fields: [{field: " + field + sortSpec + ", reverse: true, missingLast: true}]}}");
-    assertEquals(3, getInt("totalHits"));
+    assertEquals(3, getInt("totalHits.value"));
     for(int i=0;i<3;i++) {
       assertEquals(expected[i], getInt("hits[" + i + "].fields.id"));
     }

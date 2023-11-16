@@ -54,7 +54,7 @@ public class TestFacets extends ServerBaseTestCase {
     put(o, "longField", "{type: long, search: true, facet: numericRange}");
     put(o, "doubleField", "{type: double, search: true, facet: numericRange}");
     put(o, "floatField", "{type: float, search: true, facet: numericRange}");
-    put(o, "id", "{type: int, store: true, postingsFormat: Memory}");
+    put(o, "id", "{type: int, store: true}");
     put(o, "date", "{type: atom, search: false, store: true}");
     if (random().nextBoolean()) {
       // Send facets to two different random fields:

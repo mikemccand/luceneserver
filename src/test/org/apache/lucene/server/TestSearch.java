@@ -105,7 +105,7 @@ public class TestSearch extends ServerBaseTestCase {
     send("addDocument", "{fields: {body: 'terma'}}");
     send("addDocument", "{fields: {body: 'termb'}}");
     long gen = getLong(send("addDocument", "{fields: {body: 'termc'}}"), "indexGen");
-    assertEquals(3, getInt(send("search", "{query: {class: MatchAllDocsQuery}, searcher: {indexGen: " + gen + "}}"), "totalHits"));
+    assertEquals(3, getInt(send("search", "{query: {class: MatchAllDocsQuery}, searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
   }
 
   public void testWildcardQuery() throws Exception {
@@ -113,17 +113,17 @@ public class TestSearch extends ServerBaseTestCase {
     send("addDocument", "{fields: {body: 'terma'}}");
     send("addDocument", "{fields: {body: 'termb'}}");
     long gen = getLong(send("addDocument", "{fields: {body: 'termc'}}"), "indexGen");
-    assertEquals(3, getInt(send("search", "{query: {class: WildcardQuery, field: body, term: 'term?'}, searcher: {indexGen: " + gen + "}}"), "totalHits"));
+    assertEquals(3, getInt(send("search", "{query: {class: WildcardQuery, field: body, term: 'term?'}, searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
   }
 
   public void testFuzzyQuery() throws Exception {
     deleteAllDocs();
     long gen = getLong(send("addDocument", "{fields: {body: 'fantastic'}}"), "indexGen");
-    assertEquals(1, getInt(send("search", "{query: {class: FuzzyQuery, field: body, term: 'fantasic', maxEdits: 1}, searcher: {indexGen: " + gen + "}}"), "totalHits"));
-    assertEquals(1, getInt(send("search", "{query: {class: FuzzyQuery, field: body, term: 'fantasic', maxEdits: 2}, searcher: {indexGen: " + gen + "}}"), "totalHits"));
-    assertEquals(0, getInt(send("search", "{query: {class: FuzzyQuery, field: body, term: 'fantasc', maxEdits: 1}, searcher: {indexGen: " + gen + "}}"), "totalHits"));
-    assertEquals(1, getInt(send("search", "{query: {class: FuzzyQuery, field: body, term: 'fantasc', maxEdits: 2}, searcher: {indexGen: " + gen + "}}"), "totalHits"));
-    assertEquals(1, getInt(send("search", "{query: {class: FuzzyQuery, field: body, term: 'fantasc', maxEdits: 2, prefixLength: 4}, searcher: {indexGen: " + gen + "}}"), "totalHits"));
+    assertEquals(1, getInt(send("search", "{query: {class: FuzzyQuery, field: body, term: 'fantasic', maxEdits: 1}, searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
+    assertEquals(1, getInt(send("search", "{query: {class: FuzzyQuery, field: body, term: 'fantasic', maxEdits: 2}, searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
+    assertEquals(0, getInt(send("search", "{query: {class: FuzzyQuery, field: body, term: 'fantasc', maxEdits: 1}, searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
+    assertEquals(1, getInt(send("search", "{query: {class: FuzzyQuery, field: body, term: 'fantasc', maxEdits: 2}, searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
+    assertEquals(1, getInt(send("search", "{query: {class: FuzzyQuery, field: body, term: 'fantasc', maxEdits: 2, prefixLength: 4}, searcher: {indexGen: " + gen + "}}"), "totalHits.value"));
   }
 
   public void testCommonTermsQuery() throws Exception {

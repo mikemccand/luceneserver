@@ -105,7 +105,7 @@ public abstract class ServerBaseTestCase extends LuceneTestCase {
 
   protected JSONObject parseJSONObject(String s) throws Exception {
     Object o = new JSONParser(JSONParser.MODE_STRICTEST).parse(s, ContainerFactory.FACTORY_SIMPLE);
-    if (o instanceof JSONObject == false) {
+    if (o instanceof JSONObject== false) {
       throw new IllegalArgumentException("string is not a JSON struct { .. }");
     }
     return (JSONObject) o;
