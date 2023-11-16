@@ -230,7 +230,7 @@ public class TestIndexing extends ServerBaseTestCase {
     assertEquals(100, result.get("indexedDocumentCount"));
     long indexGen = getLong(result, "indexGen");
     JSONObject r = send("search", "{indexName: bulk2, searcher: {indexGen: " + indexGen + "}, queryText: \"99\", facets: [{dim: dateFacet, topN: 10}], retrieveFields: [id, date, price, {field: body, highlight: snippets}]}");
-    assertEquals(1, ((Integer) r.get("totalHits.value")).intValue());
+    assertEquals(1, getInt(r, "totalHits.value"));
     send("deleteIndex");
   }
 

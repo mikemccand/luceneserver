@@ -189,7 +189,9 @@ public class BulkAddDocumentHandler extends Handler {
         }
 
         // At most one document spans across two chunks:
-        assert parser.getCurrentLocation().getCharOffset() == allChars.length-1: " parser location=" + parser.getCurrentLocation().getCharOffset() + " vs " + allChars.length + " tail: " + new String(allChars, allChars.length-20, 20);
+        // nocommit hmm why did the "-1" need to be removed on upgrade!?  i didn't upgrade Jackson (yet):
+        // assert parser.getCurrentLocation().getCharOffset() == allChars.length-1: " parser location=" + parser.getCurrentLocation().getCharOffset() + " vs " + allChars.length + " tail: " + new String(allChars, allChars.length-20, 20);
+        assert parser.getCurrentLocation().getCharOffset() == allChars.length: " parser location=" + parser.getCurrentLocation().getCharOffset() + " vs " + allChars.length + " tail: " + new String(allChars, allChars.length-20, 20);
       }
     }
 

@@ -102,7 +102,7 @@ public class TestAnalysis extends ServerBaseTestCase {
     assertFailsWith("analyze",
                     "{text: abc, analyzer: {charFilters: [Bad], tokenizer: Whitespace}}",
                     "analyze > analyzer > charFilters[0]",
-                    "A SPI class of type org.apache.lucene.analysis.util.CharFilterFactory with name 'Bad' does not exist");
+                    "A SPI class of type org.apache.lucene.analysis.CharFilterFactory with name 'Bad' does not exist");
   }
 
   public void testPatternReplaceCharFilter() throws Exception {
