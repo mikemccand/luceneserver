@@ -156,7 +156,7 @@ public class TestHighlight extends ServerBaseTestCase {
 
     long gen = addDocument("{fields: {authors: ['Dr. Seuss', 'Bob Smith', 'Seuss is Fun.  Some extra content.']}}");
     JSONObject result = send("search", "{queryText: 'authors:seuss', retrieveFields: [{field: authors, highlight: whole}], searcher: {indexGen: " + gen + "}}");
-    assertEquals(1, getInt(result, "totalHits"));
+    assertEquals(1, getInt(result, "totalHits.value"));
     JSONArray fields = getArray(result, "hits[0].fields.authors");
     assertEquals(3, fields.size());
     assertEquals("Dr. <b>Seuss</b>", renderSingleHighlight((JSONArray) fields.get(0)));
@@ -169,7 +169,7 @@ public class TestHighlight extends ServerBaseTestCase {
 
     long gen = addDocument("{fields: {authors: ['Dr. Seuss', 'Bob Smith', 'Seuss is Fun.  Some extra content.']}}");
     JSONObject result = send("search", "{queryText: 'authors:seuss', retrieveFields: [{field: authors, highlight: snippets, maxPassages: 1}], searcher: {indexGen: " + gen + "}}");
-    assertEquals(1, getInt(result, "totalHits"));
+    assertEquals(1, getInt(result, "totalHits.value"));
     assertEquals(1, getInt(result, "hits[0].fields.authors.length"));
     assertEquals("<b>Seuss</b> Bob Smith <b>Seuss</b> is Fun.  ", renderSingleHighlight(getArray(result, "hits[0].fields.authors[0].parts")));
   }
@@ -179,7 +179,7 @@ public class TestHighlight extends ServerBaseTestCase {
     deleteAllDocs();
     long gen = addDocument("{fields: {body: 'This sentence has test.  This one does not.  Here is test again.', authors: ['This sentence has test.  This one does not.  Here is test again.']}}");
     JSONObject result = send("search", "{queryText: 'test', retrieveFields: [{field: authors, highlight: snippets, maxPassages: 1}, {field: body, highlight: snippets, maxPassages: 2}], searcher: {indexGen: " + gen + "}}");
-    assertEquals(1, getInt(result, "totalHits"));
+    assertEquals(1, getInt(result, "totalHits.value"));
 
     // Author has just 1 passage:
     assertEquals(1, getInt(result, "hits[0].fields.authors.length"));

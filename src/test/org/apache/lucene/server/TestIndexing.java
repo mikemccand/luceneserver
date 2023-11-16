@@ -204,7 +204,7 @@ public class TestIndexing extends ServerBaseTestCase {
     assertEquals(100, result.get("indexedDocumentCount"));
     long indexGen = getLong(result, "indexGen");
     JSONObject r = search("99", indexGen, null, false, true, null, null);
-    assertEquals(1, ((Integer) r.get("totalHits.value")).intValue());
+    assertEquals(1, getInt(r, "totalHits.value"));
   }
 
   public void testBulkAddDocument2() throws Exception {
@@ -248,6 +248,8 @@ public class TestIndexing extends ServerBaseTestCase {
     send("startIndex");
   }
 
+  // nocommit bye bye index time boosting!  was there a replacement?  search time only?
+  /*
   public void testBoost() throws Exception {
     createIndex("boost");
     // Just to test merge rate limiting:
@@ -276,6 +278,7 @@ public class TestIndexing extends ServerBaseTestCase {
 
     send("deleteIndex");
   }
+  */
 
   public void testInvalidNormsFormat() throws Exception {
     try {

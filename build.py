@@ -36,6 +36,7 @@ deps = [
   ('org.apache.lucene', 'lucene-queries', LUCENE_VERSION),
   ('org.apache.lucene', 'lucene-queryparser', LUCENE_VERSION),
   ('org.apache.lucene', 'lucene-suggest', LUCENE_VERSION),
+  ('org.apache.lucene', 'lucene-memory', LUCENE_VERSION),
   ('org.apache.lucene', 'lucene-expressions', LUCENE_VERSION),
     ('org.antlr', 'antlr4-runtime', '4.11.1'),
     ('org.ow2.asm', 'asm', '5.1'),

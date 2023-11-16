@@ -75,9 +75,7 @@ public class CreateIndexHandler extends Handler {
           throw r.bad("invalid indexName \"" + indexName + "\": " + iae.toString(), iae);
         }
         // Create the first shard
-        System.out.println("NOW ADD SHARD 0");
         indexState.addShard(0, true);
-        System.out.println("DONE ADD SHARD 0");
         return "{}";
       }
     };

@@ -123,7 +123,7 @@ public class TestFacets extends ServerBaseTestCase {
     if (sortField != null) {
       JSONObject sort = new JSONObject();
       o.put("sort", sort);
-      sort.put("doDocScores", true);
+      // sort.put("doDocScores", true);
 
       JSONArray sortFields = new JSONArray();
       sort.put("fields", sortFields);

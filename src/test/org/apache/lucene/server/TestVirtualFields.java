@@ -153,8 +153,8 @@ public class TestVirtualFields extends ServerBaseTestCase {
     assertEquals(0, getInt("hits[1].fields.id"));
 
     // nocommit don't test actual scores
-    assertEquals(0.861380339f, getFloat("hits[0].fields.scoreboost"), .0001f);
-    assertEquals(0.16823316f, getFloat("hits[1].fields.scoreboost"), .0001f);
+    assertEquals(0.77806407, getFloat("hits[0].fields.scoreboost"), .0001f);
+    assertEquals(0.08092601F, getFloat("hits[1].fields.scoreboost"), .0001f);
 
     assertEquals(.6931f, getFloat("hits[0].fields.logboost"), .0001f);
     assertEquals(0.0f, getFloat("hits[1].fields.logboost"), .0001f);
@@ -171,10 +171,10 @@ public class TestVirtualFields extends ServerBaseTestCase {
     assertEquals(1, getInt("hits[0].fields.id"));
     assertEquals(0, getInt("hits[1].fields.id"));
 
-    assertEquals(0.861380339f, getFloat("hits[0].fields.scoreboost"), .0001f);
-    assertEquals(0.16823316f, getFloat("hits[1].fields.scoreboost"), .0001f);
+    assertEquals(0.7780640F, getFloat("hits[0].fields.scoreboost"), .0001f);
+    assertEquals(0.0809260F, getFloat("hits[1].fields.scoreboost"), .0001f);
 
-    assertEquals(.6931f, getFloat("hits[0].fields.logboost"), .0001f);
+    assertEquals(0.6931471F, getFloat("hits[0].fields.logboost"), .0001f);
     assertEquals(0.0f, getFloat("hits[1].fields.logboost"), .0001f);
   }
 
@@ -251,8 +251,8 @@ public class TestVirtualFields extends ServerBaseTestCase {
     assertEquals(1, getInt("hits[0].fields.id"));
     assertEquals(0, getInt("hits[1].fields.id"));
 
-    assertEquals(2.584141017f, getFloat("hits[0].fields.scoreboost3"), .0001f);
-    assertEquals(0.5046995f, getFloat("hits[1].fields.scoreboost3"), .0001f);
+    assertEquals(2.334192, getFloat("hits[0].fields.scoreboost3"), .0001f);
+    assertEquals(0.24277804, getFloat("hits[1].fields.scoreboost3"), .0001f);
   }
 
   public void testSortedDynamicField() throws Exception {
@@ -265,7 +265,7 @@ public class TestVirtualFields extends ServerBaseTestCase {
     assertEquals(0, getInt("hits[0].fields.id"));
     assertEquals(1, getInt("hits[1].fields.id"));
 
-    assertEquals(0.50469947f, getFloat("hits[0].fields.sortFields.scoreboost3"), .0001f);
-    assertEquals(2.5841410f, getFloat("hits[1].fields.sortFields.scoreboost3"), .0001f);
+    assertEquals(0.24277800F, getFloat("hits[0].fields.sortFields.scoreboost3"), .0001f);
+    assertEquals(2.3341922F, getFloat("hits[1].fields.sortFields.scoreboost3"), .0001f);
   }
 }

@@ -99,7 +99,7 @@ public class TestServer extends ServerBaseTestCase {
     if (sortField != null) {
       JSONObject sort = new JSONObject();
       o.put("sort", sort);
-      sort.put("doDocScores", true);
+      // sort.put("doDocScores", true);
 
       JSONArray sortFields = new JSONArray();
       sort.put("fields", sortFields);
@@ -150,7 +150,7 @@ public class TestServer extends ServerBaseTestCase {
     addDocument(0, "Lisa", "this is a test", 10.99f, "2012/10/1");
     long gen = addDocument(1, "Tom", "this is also a test", 14.99f, "2012/11/3");
     JSONObject o = search("test", gen, "price", false, true, null, null);
-    assertEquals(2, ((Number) o.get("totalHits.value")).intValue());
+    assertEquals(2, getInt(o, "totalHits.value"));
     JSONArray hits = (JSONArray) o.get("hits");
     assertEquals(2, hits.size());
 
@@ -166,7 +166,7 @@ public class TestServer extends ServerBaseTestCase {
     addDocument(0, "Frank", "this is a test", 10.99f, "2012/10/1");
     long gen = addDocument(1, "Lisa", "this is also a test", 14.99f, "2012/11/3");
     JSONObject o = search("test", gen, "price", true, true, null, null);
-    assertEquals(2, ((Number) o.get("totalHits.value")).intValue());
+    assertEquals(2, getInt(o, "totalHits.value"));
 
     JSONArray hits = (JSONArray) o.get("hits");
     assertEquals(2, hits.size());
@@ -183,13 +183,13 @@ public class TestServer extends ServerBaseTestCase {
     long gen = addDocument(0, "Tom", "this is a test.  here is a random sentence.  here is another sentence with test in it.", 10.99f, "2012/10/17");
 
     JSONObject o = search("test", gen, null, false, false, null, null);
-    assertEquals(1, ((Number) o.get("totalHits.value")).intValue());
+    assertEquals(1, getInt(o, "totalHits.value"));
 
     // Add another document
     gen = addDocument(0, "Melanie", "this is a test.  here is a random sentence.  here is another sentence with test in it.", 10.99f, "2012/10/17");
 
     JSONObject o2 = search("test", gen, null, false, false, null, null);
-    assertEquals(2, ((Number) o2.get("totalHits.value")).intValue());
+    assertEquals(2, getInt(o2, "totalHits.value"));
 
     // Now the first search does a follow-on search, so we
     // should only see 1 document since it should be using
@@ -201,7 +201,7 @@ public class TestServer extends ServerBaseTestCase {
     //System.out.println("send: " + o3);
     JSONObject o4 = send("search", o3);
 
-    assertEquals(1, ((Number) o4.get("totalHits.value")).intValue());
+    assertEquals(1, getInt(o4, "totalHits.value"));
   }
 
   public void testInvalidFields() throws Exception {
@@ -362,7 +362,7 @@ public class TestServer extends ServerBaseTestCase {
     bounceServer();
     send("startIndex");
     JSONObject o = search("test", 0, null, false, true, null, null);
-    assertEquals(1, ((Number) o.get("totalHits.value")).intValue());
+    assertEquals(1, getInt(o, "totalHits.value"));
   }
 
   public void testStatsHandler() throws Exception {

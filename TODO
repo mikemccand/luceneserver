@@ -1,5 +1,9 @@
 get unused import detection, tidy, checkstyle running
 
+fix test runner
+  - rewrite the "Reproduce with" to build.py
+  - remove all the useless stack frames from a test failure -- don't need to see that boilerplate, just the relevant frames (my sources)
+
 expose HNSW/KNN!
 
 finish getting distributed queue approach online

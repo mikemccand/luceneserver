@@ -80,11 +80,11 @@ public class TestAddDocuments extends ServerBaseTestCase {
 
     // search on parent:
     result = send("search", String.format(Locale.ROOT, "{queryText: 'name:Lisa', searcher: {indexGen: %d}}", indexGen));
-    assertEquals(1, result.get("totalHits.value"));
+    assertEquals(1, getInt(result, "totalHits.value"));
 
     // search on child:
     result = send("search", String.format(Locale.ROOT, "{queryText: 'skill:python', searcher: {indexGen: %d}}", indexGen));
-    assertEquals(1, result.get("totalHits.value"));
+    assertEquals(1, getInt(result, "totalHits.value"));
   }
 
   public void testBulkAddDocuments() throws Exception {
@@ -113,11 +113,11 @@ public class TestAddDocuments extends ServerBaseTestCase {
 
     // search on parent:
     result = send("search", String.format(Locale.ROOT, "{queryText: 'name:Lisa', searcher: {indexGen: %d}}", indexGen));
-    assertEquals(100, result.get("totalHits.value"));
+    assertEquals(100, getInt(result, "totalHits.value"));
 
     // search on child:
     result = send("search", String.format(Locale.ROOT, "{queryText: 'skill:python', searcher: {indexGen: %d}}", indexGen));
-    assertEquals(100, result.get("totalHits.value"));
+    assertEquals(100, getInt(result, "totalHits.value"));
   }
 
   // TODO: test block join/grouping once they are impl'd!

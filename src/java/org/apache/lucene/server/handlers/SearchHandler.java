@@ -595,6 +595,9 @@ public class SearchHandler extends Handler {
     @Override
     protected List<CharSequence[]> loadFieldValues(String[] fields, DocIdSetIterator docIDs, int maxLength) throws IOException {
 
+      // nocommit why was this needed?  did 3rd parameter here change meaning?
+      maxLength = getMaxLength();
+      
       List<CharSequence[]> allValues = new ArrayList<>();
       while (true) {
         int docID = docIDs.nextDoc();
@@ -2020,7 +2023,7 @@ public class SearchHandler extends Handler {
           Facets facets = new LongRangeFacetCounts(fd.name,
                                                    c,
                                                    ranges);
-          facetResult = facets.getTopChildren(0, fd.name);
+          facetResult = facets.getTopChildren(Integer.MAX_VALUE, fd.name);
         } else if (fd.valueType == FieldDef.FieldValueType.FLOAT || fd.valueType == FieldDef.FieldValueType.DOUBLE || fd.valueType == FieldDef.FieldValueType.VIRTUAL) {
           List<Object> rangeList = r2.getList("numericRanges");
           DoubleRange[] ranges = new DoubleRange[rangeList.size()];
@@ -2288,7 +2291,7 @@ public class SearchHandler extends Handler {
           field = f.getString("field");
           if (f.hasParam("highlight")) {
             highlight = f.getEnum("highlight");
-            if (!highlight.equals("no")) {
+            if (highlight.equals("no") == false) {
               perField = new FieldHighlightConfig();
               highlightFields.put(field, perField);
               perField.mode = highlight;
@@ -2803,7 +2806,7 @@ public class SearchHandler extends Handler {
             }
 
             // still just an int
-            o3.put("totalHits", group.totalHits);
+            o3.put("totalHits", group.totalHits.value);
 
             if (Float.isNaN(group.maxScore) == false) {
               o3.put("maxScore", group.maxScore);
