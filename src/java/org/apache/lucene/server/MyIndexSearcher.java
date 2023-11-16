@@ -44,10 +44,12 @@ public class MyIndexSearcher extends IndexSearcher {
 
   @Override
   protected void search(List<LeafReaderContext> leaves, Weight weight, Collector collector) throws IOException {
+
+    // nocommit -- removeme?  do we still rely on this Scorer not BulkScorer / getChildren?
     for (LeafReaderContext ctx : leaves) { // search each subreader
       // we force the use of Scorer (not BulkScorer) to make sure
       // that the scorer passed to LeafCollector.setScorer supports
-      // Scorer.getChildren
+      // Scorer.getChildren -- messy messy!  maybe broken now?
       final LeafCollector leafCollector = collector.getLeafCollector(ctx);
       if (weight.getQuery().toString().contains("DrillSidewaysQuery")) {
         BulkScorer scorer = weight.bulkScorer(ctx);
@@ -72,6 +74,10 @@ public class MyIndexSearcher extends IndexSearcher {
           }
         }
       }
+
+      // Note: this is called if collection ran successfully, including the above special cases of
+      // CollectionTerminatedException and TimeExceededException, but no other exception.
+      leafCollector.finish();
     }
   }
 }

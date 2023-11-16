@@ -56,6 +56,7 @@ import org.apache.lucene.facet.DrillDownQuery;
 import org.apache.lucene.facet.DrillSideways;
 import org.apache.lucene.facet.FacetResult;
 import org.apache.lucene.facet.Facets;
+import org.apache.lucene.facet.FacetsCollector.MatchingDocs;
 import org.apache.lucene.facet.FacetsCollector;
 import org.apache.lucene.facet.FacetsConfig;
 import org.apache.lucene.facet.LabelAndValue;
@@ -167,7 +168,6 @@ import org.apache.lucene.server.params.WrapType;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.QueryBuilder;
 import org.apache.lucene.util.automaton.LevenshteinAutomata;
-
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 
@@ -2487,6 +2487,7 @@ public class SearchHandler extends Handler {
         if (timeoutMS <= 0) {
           r.fail("timeoutSec", "must be > 0 msec");
         }
+        // nocommit cutover to Lucene's buildin timeouts now
         c2 = new TimeLimitingCollector(c, TimeLimitingCollector.getGlobalCounter(), timeoutMS);
       } else {
         c2 = c;
@@ -2509,9 +2510,10 @@ public class SearchHandler extends Handler {
 
         // Always use drill sideways; it downgrades to a
         // "normal" query if there were no drilldowns:
-        //System.out.println("SEARCHER: " + s.searcher.getClass());
         DrillSideways ds = new DrillSideways(s.searcher, indexState.facetsConfig, s.taxonomyReader) {
 
+            // nocommit: hmm this is dead, yet seemingly important, code:
+            /*
             private FacetsCollector getCollector(String dim, Map<String,FacetsCollector> dsMap, FacetsCollector drillDowns) {
               FacetsCollector c = dsMap.get(dim);
               if (c == null) {
@@ -2520,6 +2522,7 @@ public class SearchHandler extends Handler {
 
               return c;
             }
+            */
 
             @Override
             protected Facets buildFacetsResult(FacetsCollector drillDowns, FacetsCollector[] drillSideways, String[] drillSidewaysDims) throws IOException {
@@ -2532,7 +2535,7 @@ public class SearchHandler extends Handler {
               // If we are using
               // ToParentBlockJoinCollector then all
               // sub-docs must be scored at once:
-              return !useBlockJoinCollector.isEmpty();
+              return useBlockJoinCollector.isEmpty() == false;
             }
           };
 
