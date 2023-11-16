@@ -23,7 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 
 import org.apache.lucene.document.Document;
-import org.apache.lucene.util.LineFileDocs;
+import org.apache.lucene.tests.util.LineFileDocs;
 
 import net.minidev.json.JSONObject;
 

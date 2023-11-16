@@ -227,7 +227,6 @@ public class GlobalState implements Closeable {
 
   /** Sole constructor. */
   public GlobalState(String nodeName, Path stateDir) throws IOException {
-    System.out.println("MAX INDEXING THREADS " + MAX_INDEXING_THREADS);
     this.nodeName = nodeName;
     this.stateDir = stateDir;
     if (Files.exists(stateDir) == false) {
@@ -290,9 +289,6 @@ public class GlobalState implements Closeable {
   public IndexState getIndex(String name) throws IOException {
     synchronized(indices) {
       IndexState state = indices.get(name);
-      System.out.println("\n\n");
-      new Throwable().printStackTrace(System.out);
-      System.out.println("lookup name=" + name + " state=" + state + " indices=" + indices);
       if (state == null) {
         String rootPath = (String) indexNames.get(name);
         System.out.println("  rootPath=" + rootPath);

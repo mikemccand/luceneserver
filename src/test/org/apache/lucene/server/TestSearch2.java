@@ -25,8 +25,8 @@ import java.nio.file.Paths;
 import java.util.Locale;
 
 import org.apache.lucene.document.Document;
-import org.apache.lucene.util.LineFileDocs;
-import org.apache.lucene.util.TestUtil;
+import org.apache.lucene.tests.util.LineFileDocs;
+import org.apache.lucene.tests.util.TestUtil;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 

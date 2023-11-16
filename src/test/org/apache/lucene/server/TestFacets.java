@@ -19,7 +19,7 @@ package org.apache.lucene.server;
 
 import java.io.IOException;
 
-import org.apache.lucene.util.TestUtil;
+import org.apache.lucene.tests.util.TestUtil;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 

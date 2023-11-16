@@ -27,7 +27,6 @@ import org.apache.lucene.index.IndexCommit;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.SegmentInfos;
 import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.join.ToParentBlockJoinIndexSearcher;
 import org.apache.lucene.server.FinishRequest;
 import org.apache.lucene.server.GlobalState;
 import org.apache.lucene.server.IndexState;
@@ -107,7 +106,7 @@ public class CreateSnapshotHandler extends Handler {
             // search is done:
             long t0 = System.nanoTime();
             IndexReader r = DirectoryReader.openIfChanged((DirectoryReader) s2.searcher.getIndexReader(), c);
-            IndexSearcher s = new ToParentBlockJoinIndexSearcher(r);
+            IndexSearcher s = new IndexSearcher(r);
             try {
               shardState.slm.record(s);
             } finally {

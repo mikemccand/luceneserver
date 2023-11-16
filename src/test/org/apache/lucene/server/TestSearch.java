@@ -23,7 +23,7 @@ import java.util.Locale;
 import java.util.Set;
 
 import org.apache.lucene.document.Document;
-import org.apache.lucene.util.LineFileDocs;
+import org.apache.lucene.tests.util.LineFileDocs;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 

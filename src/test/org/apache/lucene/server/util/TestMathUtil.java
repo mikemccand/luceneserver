@@ -24,8 +24,8 @@ import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 
 import org.apache.lucene.util.BytesRef;
-import org.apache.lucene.util.LuceneTestCase;
-import org.apache.lucene.util.TestUtil;
+import org.apache.lucene.tests.util.LuceneTestCase;
+import org.apache.lucene.tests.util.TestUtil;
 import org.junit.Ignore;
 
 public class TestMathUtil extends LuceneTestCase {

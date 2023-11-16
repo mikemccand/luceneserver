@@ -35,7 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-import org.apache.lucene.util.LuceneTestCase;
+import org.apache.lucene.tests.util.LuceneTestCase;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
@@ -330,7 +330,7 @@ public abstract class ServerBaseTestCase extends LuceneTestCase {
     String name = path.substring(tokStart, upto);
     if (name.length() > 0) {
       if (o instanceof JSONArray && name.equals("length")) {
-        o = new Integer(((JSONArray) o).size());
+        o = Integer.valueOf(((JSONArray) o).size());
       } else {
         o = ((JSONObject) o).get(name);
         if (o == null) {

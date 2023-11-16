@@ -116,6 +116,7 @@ import org.apache.lucene.search.TimeLimitingCollector;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TopDocsCollector;
 import org.apache.lucene.search.TopFieldCollector;
+import org.apache.lucene.search.TopFieldDocs;
 import org.apache.lucene.search.TopScoreDocCollector;
 import org.apache.lucene.search.WildcardQuery;
 import org.apache.lucene.search.grouping.AllGroupsCollector;
@@ -128,9 +129,9 @@ import org.apache.lucene.search.grouping.TermGroupSelector;
 import org.apache.lucene.search.grouping.TopGroups;
 import org.apache.lucene.search.grouping.TopGroupsCollector;
 import org.apache.lucene.search.join.BitSetProducer;
+import org.apache.lucene.search.join.ParentChildrenBlockJoinQuery;
 import org.apache.lucene.search.join.QueryBitSetProducer;
 import org.apache.lucene.search.join.ScoreMode;
-import org.apache.lucene.search.join.ToParentBlockJoinCollector;
 import org.apache.lucene.search.join.ToParentBlockJoinQuery;
 import org.apache.lucene.search.uhighlight.PassageFormatter;
 import org.apache.lucene.search.uhighlight.PassageScorer;
@@ -272,8 +273,9 @@ public class SearchHandler extends Handler {
                                                                  new StructType(
                                                                      new Param("sort", "How to sort child hits", SORT_TYPE),
                                                                      new Param("maxChildren", "Maximum number of children to retrieve per parent", new IntType(), Integer.MAX_VALUE),
-                                                                     new Param("trackScores", "Whether to compute scores", new BooleanType(), true),
-                                                                     new Param("trackMaxScore", "Whether to compute max score", new BooleanType(), true)))),
+                                                                     new Param("trackScores", "Whether to compute scores", new BooleanType(), true)
+                                                                     //new Param("trackMaxScore", "Whether to compute max score", new BooleanType(), true)))),
+                                                                                ))),
                                          new PolyEntry("text", "Parse text into query using default QueryParser.",
                                                        new Param("text", "Query text to parse", new StringType()),
                                                        new Param("defaultField", "Default field for QueryParser", new StringType())),
@@ -1048,7 +1050,8 @@ public class SearchHandler extends Handler {
     public List<String> sortFieldNames;
     public int maxChildren;
     public boolean trackScores;
-    public boolean trackMaxScore;
+    public BitSetProducer parentsFilter;
+    public Query childQuery;
   }
 
   @SuppressWarnings("unchecked")
@@ -1337,7 +1340,7 @@ public class SearchHandler extends Handler {
         if (useBlockJoinCollector == null) {
           pr.r.fail("returnChildHits", "cannot return child hits when inside a filter");
         }
-        if (!useBlockJoinCollector.isEmpty()) {
+        if (useBlockJoinCollector.isEmpty() == false) {
           pr.r.fail("returnChildHits", "can only support a single ToParentBlockJoinQuery for now");
         }
         Request childHits = pr.r.getStruct("childHits");
@@ -1346,9 +1349,10 @@ public class SearchHandler extends Handler {
           child.sortFieldNames = new ArrayList<String>();
           child.sort = parseSort(timestampSec, state, childHits.getList("sort"), child.sortFieldNames, dynamicFields);
         }
+        child.parentsFilter = parentsFilter;
+        child.childQuery = childQuery;
         child.maxChildren = childHits.getInt("maxChildren");
         child.trackScores = childHits.getBoolean("trackScores");
-        child.trackMaxScore = childHits.getBoolean("trackMaxScore");
         useBlockJoinCollector.put((ToParentBlockJoinQuery) q, child);
       }
     } else if (pr.name.equals("DisjunctionMaxQuery")) {
@@ -2251,6 +2255,10 @@ public class SearchHandler extends Handler {
 
     Query q = extractQuery(indexState, r, timestampSec, useBlockJoinCollector, dynamicFields);
 
+    if (useBlockJoinCollector.isEmpty() == false && r.hasParam("searchAfter")) {
+      r.fail("searchAfter", "cannot use searchAfter with ToParentBlockJoinQuery with returnChildHits=true");
+    }
+
     final Set<String> fields;
     final Map<String,FieldHighlightConfig> highlightFields;
 
@@ -2404,7 +2412,7 @@ public class SearchHandler extends Handler {
         if (r.hasParam("searchAfter")) {
           r.fail("searchAfter", "cannot use searchAfter with grouping");
         }
-        if (!useBlockJoinCollector.isEmpty()) {
+        if (useBlockJoinCollector.isEmpty() == false) {
           r.fail("grouping", "cannot do both grouping and ToParentBlockJoinQuery with returnChildHits=true");
         }
         grouping = r.getStruct("grouping");
@@ -2430,15 +2438,6 @@ public class SearchHandler extends Handler {
         } else {
           c = groupCollector;
         }
-      } else if (useBlockJoinCollector.isEmpty() == false) {
-        if (r.hasParam("searchAfter")) {
-          r.fail("searchAfter", "cannot use searchAfter with ToParentBlockJoinQuery with returnChildHits=true");
-        }
-        Iterator<Map.Entry<ToParentBlockJoinQuery,BlockJoinQueryChild>> it = useBlockJoinCollector.entrySet().iterator();
-        Map.Entry<ToParentBlockJoinQuery,BlockJoinQueryChild> ent = it.next();
-        BlockJoinQueryChild child = ent.getValue();
-        c = new ToParentBlockJoinCollector(sort == null ? Sort.RELEVANCE : sort,
-                                           topHits, child.trackScores, child.trackMaxScore);
       } else if (sort == null) {
         ScoreDoc searchAfter;
         if (r.hasParam("searchAfter")) {
@@ -2597,17 +2596,6 @@ public class SearchHandler extends Handler {
           joinGroups = null;
           totalGroupCount = 0;
         }
-      } else if (!useBlockJoinCollector.isEmpty()) {
-        assert useBlockJoinCollector.size() == 1;
-        Iterator<Map.Entry<ToParentBlockJoinQuery,BlockJoinQueryChild>> it = useBlockJoinCollector.entrySet().iterator();
-        Map.Entry<ToParentBlockJoinQuery,BlockJoinQueryChild> ent = it.next();
-        BlockJoinQueryChild child = ent.getValue();
-
-        joinGroups = ((ToParentBlockJoinCollector) c).getTopGroups(ent.getKey(),
-                                                                   child.sort, startHit,
-                                                                   child.maxChildren, 0, true);
-        groups = null;
-        hits = null;
       } else {
         groups = null;
         joinGroups = null;
@@ -2622,6 +2610,49 @@ public class SearchHandler extends Handler {
           }
           hits = new TopDocs(hits.totalHits,
                              newScoreDocs);
+        }
+
+        // if there is a ToParentBlockJoin query, convert TopDocs -> TopGroups (fill in all matching children for each parent hit):
+        if (useBlockJoinCollector.isEmpty() == false) {
+          assert useBlockJoinCollector.size() == 1;
+          Iterator<Map.Entry<ToParentBlockJoinQuery,BlockJoinQueryChild>> it = useBlockJoinCollector.entrySet().iterator();
+          Map.Entry<ToParentBlockJoinQuery,BlockJoinQueryChild> ent = it.next();
+          BlockJoinQueryChild child = ent.getValue();
+
+          // now construct child group for each of the top returned parent hits
+          int totalGroupedHitCount = 0;
+          int groupCount = 0;
+          GroupDocs<Integer>[] groupDocs = new GroupDocs[hits.scoreDocs.length];
+          // for each matched top parent hit we run a ParentChildrenBlockJoinQuery to find all matching children:
+          for (ScoreDoc parentHit : hits.scoreDocs) {
+            TopFieldDocs childHits = s.searcher.search(new ParentChildrenBlockJoinQuery(child.parentsFilter, child.childQuery, parentHit.doc),
+                                                       child.maxChildren,
+                                                       child.sort,
+                                                       child.trackScores);
+
+
+            // nocommit is parentHit.score the agg'd (from children -> parent) group score?
+            // nocommit how to get the groupSortValues?  retrieve from DVs, but need to know groupSort fields? for now <-- null!
+            groupDocs[groupCount++] = new GroupDocs<>(parentHit.score,
+                                                      Float.NaN,
+                                                      childHits.totalHits,
+                                                      childHits.scoreDocs,
+                                                      0, // nocommit what Integer should this be!
+                                                      null);
+          
+
+            // nocommit is this supposed to be += totalHits.count instead?
+            totalGroupedHitCount += childHits.scoreDocs.length;
+          }
+
+          // nocommit what about startHit?  paging within a group?  we ignore it now.
+          joinGroups = new TopGroups<Integer>((sort == null ? Sort.RELEVANCE : sort).getSort(),
+                                              child.sort.getSort(), totalGroupedHitCount,
+                                              totalGroupedHitCount, groupDocs,
+                                              Float.NaN);
+                                                        
+          groups = null;
+          hits = null;
         }
       }
 
