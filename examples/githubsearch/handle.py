@@ -266,7 +266,7 @@ jiraSpec.retrieveFields = (
   )
 
 jiraSpec.highlighter = {
-  'class': 'PostingsHighlighter',
+  'class': 'UnifiedHighlighter',
   'passageScorer.b': 0.75,
   'maxPassages': 3,
   'maxLength': 1000000}
@@ -1571,7 +1571,7 @@ def handleQuery(path, isMike, environ):
 
     if spec.highlighter is None:
       h = {'passageScorer.proxScoring': False,
-           'class': 'PostingsHighlighter'}
+           'class': 'UnifiedHighlighter'}
     else:
       h = copy.deepcopy(spec.highlighter)
       h['passageScorer.proxScoring'] = False

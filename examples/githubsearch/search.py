@@ -16,8 +16,8 @@
 import io
 import gzip
 import traceback
-#import sys
-#sys.path.insert(0, '/home/ec2-user/src/ui')
+import sys
+sys.path.insert(0, '/home/ec2-user/src/github-ui')
 import util
 import handle
 

@@ -29,7 +29,8 @@ when you run this.
 # fields to add
 #   - has votes / vote count facet
 
-allProjects = ('Infrastructure', 'Tika', 'Solr', 'Lucene')
+# allProjects = ('Infrastructure', 'Tika', 'Solr', 'Lucene')
+allProjects = ('Infrastructure', 'Tika', 'Solr')
 
 reCommitURL = re.compile(r'\[(.*?)\]')
 reSVNCommitURL = re.compile('(http://svn\.apache\.org/viewvc.*?)$', re.MULTILINE)
@@ -435,7 +436,8 @@ def main():
       age = '-%dm' % (int(1+minutes))
 
       args = {
-        'jql': '(project="Solr" OR project="Lucene - Core" OR project="Tika") AND updated > %s ORDER BY key ASC' % age,
+        'jql': '(project="Solr" OR project="Tika") AND updated > %s ORDER BY key ASC' % age,
+        #'jql': '(project="Solr" OR project="Lucene - Core" OR project="Tika") AND updated > %s ORDER BY key ASC' % age,
         #'jql': '(project="Solr" OR project="Lucene - Core") AND updated > %s ORDER BY key ASC' % age,
         'expand': 'changelog',
         'maxResults': '1000',
@@ -451,12 +453,14 @@ def main():
       while True:
         args['startAt'] = str(startAt)
         url = 'https://issues.apache.org/jira/rest/api/2/search?%s' % urllib.parse.urlencode(args)
+        print(f'load URL {url}')
         t0 = time.time()
         try:
           s = urllib.request.urlopen(url, timeout=60).read().decode('utf-8')
         except:
           print('WARNING: exception loading JSON from Jira')
           traceback.print_exc()
+          print(f'  details: {sys.exc_info()[0].fp.read()}')
           break
 
         t1 = time.time()

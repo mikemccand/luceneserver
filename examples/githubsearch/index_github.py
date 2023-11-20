@@ -33,6 +33,10 @@ when you run this.
 """
 
 # TODO
+#   - prod
+#     - get prod tools working again
+#     - get letsencrypt cert
+#   - upgrade AL -- just build a new lightsail instance
 #   - fix username situation
 #      - allow search by login name and display name
 #      - render hits with display name if available
@@ -127,16 +131,16 @@ ICU_TOKENIZER_KEEP_ISSUES = {
 
 def create_schema(svr):
 
-  path = '%s/jira' % localconstants.ROOT_INDICES_PATH
+  path = '%s/github' % localconstants.ROOT_INDICES_PATH
 
   if os.path.exists(path):
     shutil.rmtree(path)
 
-  svr.send('createIndex', {'indexName': 'jira', 'rootDir': path})
-  #svr.send('settings', {'indexName': 'jira', 'index.verbose': True})
-  svr.send('settings', {'indexName': 'jira', 'directory': 'MMapDirectory', 'nrtCachingDirectory.maxMergeSizeMB': 0.0})
-  #svr.send('settings', {'indexName': 'jira', 'directory': 'NIOFSDirectory', 'nrtCachingDirectory.maxMergeSizeMB': 0.0})
-  svr.send('startIndex', {'indexName': 'jira'})
+  svr.send('createIndex', {'indexName': 'github', 'rootDir': path})
+  #svr.send('settings', {'indexName': 'github', 'index.verbose': True})
+  svr.send('settings', {'indexName': 'github', 'directory': 'MMapDirectory', 'nrtCachingDirectory.maxMergeSizeMB': 0.0})
+  #svr.send('settings', {'indexName': 'github', 'directory': 'NIOFSDirectory', 'nrtCachingDirectory.maxMergeSizeMB': 0.0})
+  svr.send('startIndex', {'indexName': 'github'})
 
   analyzer = {
     'charFilters': [{'class': 'Mapping',
@@ -179,7 +183,7 @@ def create_schema(svr):
                      'EnglishMinimalStem']}
 
   #print('TOKENS')
-  #prettyPrintJSON(svr.send('analyze', {'analyzer': analyzer, 'indexName': 'jira', 'text': 'foo LUCENE-444 lucene-1123 AnalyzingInfixSuggester'}))
+  #prettyPrintJSON(svr.send('analyze', {'analyzer': analyzer, 'indexName': 'github', 'text': 'foo LUCENE-444 lucene-1123 AnalyzingInfixSuggester'}))
 
   fields = {'key': {'type': 'atom',
                     'sort': True,
@@ -358,7 +362,7 @@ def create_schema(svr):
                              'analyzer': analyzer},
             }
 
-  result = svr.send('registerFields', {'indexName': 'jira', 'fields': fields})
+  result = svr.send('registerFields', {'indexName': 'github', 'fields': fields})
   print('Done register')
 
 def removeAllGhosts():
@@ -510,8 +514,8 @@ def main():
 
   if getFlag('-reindex'):
     full_reindex(svr, getFlag('-delete'))
-  elif svr.send('indexStatus', {'indexName': 'jira'})['status'] != 'started':
-    svr.send('startIndex', {'indexName': 'jira'})
+  elif svr.send('indexStatus', {'indexName': 'github'})['status'] != 'started':
+    svr.send('startIndex', {'indexName': 'github'})
 
   if getFlag('-build_full_suggest'):
     build_full_suggest(svr)
@@ -525,7 +529,7 @@ def nrt_index_forever(svr):
 
   # First, catch up since last commit:
   print('\nNRT index: catch up since last commit')
-  commitUserData = svr.send('getCommitUserData', {'indexName': 'jira'})
+  commitUserData = svr.send('getCommitUserData', {'indexName': 'github'})
   last_commit_time = datetime.datetime.fromisoformat(commitUserData['last_commit_time'])
   print('Last commit time %s (%s ago); now catch up' %
         (last_commit_time, now - last_commit_time))
@@ -669,7 +673,7 @@ def build_full_suggest(svr):
 
   # Build infix title suggest
   res = svr.send('buildSuggest',
-                    {'indexName': 'jira',
+                    {'indexName': 'github',
                      'suggestName': 'titles_infix',
                      'source': {'localFile': fullSuggestPath},
                      'class': 'InfixSuggester',
@@ -698,7 +702,7 @@ def full_reindex(svr, doDelete):
 
   if doDelete:
     try:
-      isStarted = svr.send('indexStatus', {'indexName': 'jira'})['status'] == 'started'
+      isStarted = svr.send('indexStatus', {'indexName': 'github'})['status'] == 'started'
     except:
       traceback.print_exc()
       isStarted = False
@@ -706,24 +710,24 @@ def full_reindex(svr, doDelete):
     if isStarted:
       print('Rollback index...')
       try:
-        svr.send('rollbackIndex', {'indexName': 'jira'})
+        svr.send('rollbackIndex', {'indexName': 'github'})
       except:
         traceback.print_exc()
       print('Stop index...')
       try:
-        svr.send('stopIndex', {'indexName': 'jira'})
+        svr.send('stopIndex', {'indexName': 'github'})
       except:
         traceback.print_exc()
     print('Delete index...')
     try:
-      svr.send('deleteIndex', {'indexName': 'jira'})
+      svr.send('deleteIndex', {'indexName': 'github'})
     except:
       traceback.print_exc()
 
     print('Create schema...')
     create_schema(svr)
 
-    #svr.send('deleteAllDocuments', {'indexName': 'jira'})
+    #svr.send('deleteAllDocuments', {'indexName': 'github'})
 
   index_docs(svr, all_issues(), updateSuggest=False)
   build_full_suggest(svr)
@@ -733,9 +737,9 @@ def full_reindex(svr, doDelete):
 
 def commit(svr, timestamp):
   t0 = time.time()
-  svr.send('setCommitUserData', {'indexName': 'jira',
+  svr.send('setCommitUserData', {'indexName': 'github',
                                  'userData': {'last_commit_time': timestamp.isoformat()}})
-  svr.send('commit', {'indexName': 'jira'})
+  svr.send('commit', {'indexName': 'github'})
   print('Commit took %.1f msec' % (1000*(time.time()-t0)))
 
 def is_commit_user(user):
@@ -811,7 +815,7 @@ def to_utc_epoch_seconds(dt):
 def index_docs(svr, issues, printIssue=False, updateSuggest=False):
 
   bulk = server.ChunkedSend(svr, 'bulkUpdateDocuments', 32768)
-  bulk.add('{"indexName": "jira", "documents": [')
+  bulk.add('{"indexName": "github", "documents": [')
 
   if updateSuggest:
     suggest_file = open('%s/suggest.txt' % localconstants.ROOT_STATE_PATH, 'wb')
@@ -1333,7 +1337,7 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
     suggest_file.close()
     if not first:
       res = svr.send('updateSuggest',
-                      {'indexName': 'jira',
+                      {'indexName': 'github',
                        'suggestName': 'titles_infix',
                        'source': {'localFile': os.path.abspath(suggest_file.name)}})
       print('updateSuggest: %s' % res)
@@ -1377,7 +1381,7 @@ if __name__ == '__main__':
 Usage: python3 index_github.py <options>:
     -server host[:port]  Where Lucene Server is running
     -reindex  Fully reindex
-    -nrt  Run forever, indexing jira issues as they are changed
+    -nrt  Run forever, indexing github issues as they are changed
     -delete  If -reindex is specified, this will first delete the entire index, instead of updating it in place
     -build_full_suggest  Rebuild the infix suggester
     [-help] prints this message

@@ -25,6 +25,9 @@ import runServer
 sys.path.insert(0, '..')
 import localconstants
 
+# where to install ui files in prod, relative to ~:
+UI_DIR = 'src/github-ui'
+
 def run(cmd):
   if os.system(cmd):
     raise RuntimeError('%s failed; cwd=%s' % (cmd, os.getcwd()))
@@ -48,31 +51,33 @@ else:
     else:
       raise RuntimeError('unknown arg %s' % arg)
 
-userHost = 'changingbits@web504.webfaction.com'
+#userHost = 'changingbits@web504.webfaction.com'
+userHost = 'ec2-user@githubsearch.mikemccandless.com'
 #userHost = 'mike@10.17.4.12'
 sshIdent = ''
 #sshIdent = '-i /home/mike/.ssh/aws_changingbits.pem'
 
 print()
 print('Snapshot')
-run('ssh -t %s %s "cd src/ui/production; python3 -u snapshot.py"' % (sshIdent, userHost))
+run(f'ssh -t {sshIdent} {userHost} "cd {UI_DIR}/production; python3 -u snapshot.py"')
 
 if doServer:
   serverDistPath = '/l/luceneserver/build/luceneserver-%s.zip' % localconstants.LUCENE_SERVER_VERSION
   print()
-  print('Copy %s' % serverDistPath)
-  run('scp %s %s %s:src/ui' % (sshIdent, serverDistPath, userHost))
-  run('ssh %s %s "cd src/ui; rm -rf luceneserver; unzip luceneserver-%s.zip; mv luceneserver-%s luceneserver; rm luceneserver-%s.zip"' % (sshIdent, userHost, localconstants.LUCENE_SERVER_VERSION, localconstants.LUCENE_SERVER_VERSION, localconstants.LUCENE_SERVER_VERSION))
+  print(f'copy {serverDistPath"')
+  run(f'scp {sshIdent} {serverDistPath} {userHost}:{UI_PATH}')
+  # TODO: use symlink instead
+  run(f'ssh {sshIdent} {userHost} "cd {UI_PATH}; rm -rf luceneserver; unzip luceneserver-{localconstants.LUCENE_SERVER_VERSION}.zip; mv luceneserver-{localconstants.LUCENE_SERVER_VERSION} luceneserver; rm luceneserver-{localconstants.LUCENE_SERVER_VERSION}.zip"')
 
 if doUI:
   print('Push UI/indexing scripts')
-  run('scp %s -r ../gitHistory.py ../handle.py ../indexJira.py ../Latin-dont-break-issues.rbbi ../server.py ../moreFacets.py ../search.py ../static ../production ../suggest.py ../util.py %s:src/ui' % (sshIdent, userHost))
+  run(f'scp {sshIdent} -r ../gitHistory.py ../handle.py ../index_github.py ../Latin-dont-break-issues.rbbi ../server.py ../moreFacets.py ../search.py ../static ../production ../suggest.py ../util.py {userHost}:{UI_PATH}')
 
 if doReindex:
   extra = ' -reindex'
 else:
   extra = ''
-run('ssh -t %s %s "cd src/ui/production; python3 -u restart.py%s"' % (sshIdent, userHost, extra))
+run(f'ssh -t {sshIdent} {userHost} "cd {UI_PATH}/production; python3 -u restart.py{extra}"')
 
 print()
 print('Verify')

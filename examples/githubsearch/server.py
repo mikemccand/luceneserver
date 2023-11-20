@@ -183,7 +183,7 @@ def main():
 
   try:
     #for index in ('books', 'wiki', 'jira'):
-    for index in ('jira',):
+    for index in ('github',):
       try:
         print('%s: %s' % (index.upper(), util.ServerClient().send('startIndex', '{"indexName": "%s"}' % index)))
       except:

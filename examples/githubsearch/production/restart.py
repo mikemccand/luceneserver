@@ -94,7 +94,7 @@ run('/home/changingbits/webapps/examples/apache2/bin/restart')
 
 print()
 print('Kill current Indexer')
-for line in os.popen('ps auxww | grep python | grep indexJira.py | grep -v grep | grep -v ssh').readlines():
+for line in os.popen('ps auxww | grep python | grep index_github.py | grep -v grep | grep -v ssh').readlines():
   pid = line.strip().split()[1]
   print('  kill indexJira process pid %s [%s]' % (pid, line))
   try:
@@ -110,7 +110,7 @@ else:
 print()
 print('Start new Indexer')
 os.chdir('..')
-run('nohup python3 -u indexJira.py -server localhost:%s -nrt%s > %s/nrt.log 2>&1 &' % (PORT, extra, localconstants.logDir))
+run(f'nohup python3 -u index_github.py -server localhost:{PORT} -nrt{extra} > {localconstants.logDir}/github-nrt.log 2>&1 &')
 
 print()
 print('Wait 5 seconds')
