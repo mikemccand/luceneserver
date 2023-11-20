@@ -110,7 +110,7 @@ def load_all_full_prs(db):
                 load_one_full_pr(db, c, number)
 
 def load_one_full_pr(db, c, number):
-    print(f'  load full pr {number}')
+    #print(f'  load full pr {number}')
     full_pr = local_db.http_load_as_json(f'https://api.github.com/repos/apache/lucene/pulls/{number}')
     #print(json.dumps(full_pr))
     s = pickle.dumps(full_pr)
@@ -137,7 +137,7 @@ def load_all_pr_comments(db):
                 load_pr_comments(db, c, number)
 
 def load_pr_comments(db, c, number):
-  print(f'  load full pr comments {number}')
+  #print(f'  load full pr comments {number}')
   all_pr_comments = local_db.http_load_as_json(f'https://api.github.com/repos/apache/lucene/pulls/{number}/comments')
   s = pickle.dumps(all_pr_comments)
   #print(s)
@@ -149,27 +149,27 @@ def load_pr_comments(db, c, number):
   return all_pr_comments
         
 def load_all_pr_reviews(db):
-    # the search API only returns a subset of the fields in a PR, so we must separately individually
-    # load the full pr comments (issues seem to be complete coming from search!?):
-    c = db.cursor()
-    c.execute('SELECT key, pickle FROM issues WHERE key not in ("last_update", "page_upto")')
-    for number, v in c.fetchall():
-        issue, comments, events, reactions, timeline = pickle.loads(v)
-        if 'pull_request' in issue:
-          print(f'{number} is PR')
-          rows = list(c.execute('SELECT pickle FROM pr_reviews WHERE key=?', (str(number),)).fetchall())
-          if len(rows) == 0:
-              print(f'  pr reviews not yet fully loaded!  load now...')
-              load_pr_reviews(db, c, number)
+  # the search API only returns a subset of the fields in a PR, so we must separately individually
+  # load the full pr comments (issues seem to be complete coming from search!?):
+  c = db.cursor()
+  c.execute('SELECT key, pickle FROM issues WHERE key not in ("last_update", "page_upto")')
+  for number, v in c.fetchall():
+    issue, comments, events, reactions, timeline = pickle.loads(v)
+    if 'pull_request' in issue:
+      print(f'{number} is PR')
+      rows = list(c.execute('SELECT pickle FROM pr_reviews WHERE key=?', (str(number),)).fetchall())
+      if len(rows) == 0:
+        print(f'  pr reviews not yet fully loaded!  load now...')
+        load_pr_reviews(db, c, number)
 
 def load_pr_reviews(db, c, number):
-  print(f'  load full pr reviews {number}')
+  #print(f'  load full pr reviews {number}')
   all_pr_reviews = local_db.http_load_as_json(f'https://api.github.com/repos/apache/lucene/pulls/{number}/reviews')
   s = pickle.dumps(all_pr_reviews)
   c.execute('REPLACE INTO pr_reviews (key, pickle) VALUES (?, ?)',
             (str(number), s))
   db.commit()
-  print(f'    got: {all_pr_reviews}')
+  #print(f'    got: {all_pr_reviews}')
   return all_pr_reviews
 
 def load_and_store_full_issue(issue, db, c):

@@ -89,8 +89,7 @@ while True:
 print()
 print('Restart Apache httpd')
 
-run('/home/changingbits/webapps/examples/apache2/bin/restart')
-#run('sudo /etc/rc.d/init.d/httpd restart')
+run('sudo apachectl restart')
 
 print()
 print('Kill current Indexer')

@@ -218,7 +218,7 @@ class JIRASpec(UISpec):
 jiraSpec = JIRASpec()
 jiraSpec.doAutoComplete = True
 jiraSpec.showGridOrList = False
-jiraSpec.indexName = 'jira'
+jiraSpec.indexName = 'github'
 jiraSpec.itemLabel = 'issues'
 
 if False:
@@ -745,7 +745,7 @@ def handleSuggest(path, isMike, environ):
   else:
     args = {}
 
-  index = 'jira'
+  index = 'github'
 
   spec = jiraSpec
   
@@ -1061,7 +1061,7 @@ def handleMoreFacets(path, isMike, environ):
 
   # print('moreFacets args: %s' % args)
 
-  index = 'jira'
+  index = 'github'
 
   spec = jiraSpec
   
@@ -1212,7 +1212,7 @@ def printTokens(send):
                      'EnglishMinimalStem']}
 
   print('TOKENS')
-  prettyPrintJSON(send('analyze', {'analyzer': analyzer, 'indexName': 'jira', 'text': 'Commit ebb2127cca54e49ed5c7462d11ee8dda6125e287'}))
+  prettyPrintJSON(send('analyze', {'analyzer': analyzer, 'indexName': 'github', 'text': 'Commit ebb2127cca54e49ed5c7462d11ee8dda6125e287'}))
 
 def handleQuery(path, isMike, environ):
 
@@ -1232,7 +1232,7 @@ def handleQuery(path, isMike, environ):
   else:
     args = {}
 
-  index = 'jira'
+  index = 'github'
 
   spec = jiraSpec
 
@@ -1620,7 +1620,7 @@ def handleQuery(path, isMike, environ):
   
   if spec.doAutoComplete:
     if True:
-      w('''
+      w(r'''
       <script>
       $(document).ready(      
         function() {
