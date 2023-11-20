@@ -26,7 +26,7 @@ sys.path.insert(0, '..')
 import localconstants
 
 # where to install ui files in prod, relative to ~:
-UI_DIR = 'src/github-ui'
+UI_PATH = 'src/github-ui'
 
 def run(cmd):
   if os.system(cmd):
@@ -58,25 +58,29 @@ sshIdent = ''
 #sshIdent = '-i /home/mike/.ssh/aws_changingbits.pem'
 
 print()
-print('Snapshot')
-run(f'ssh -t {sshIdent} {userHost} "cd {UI_DIR}/production; python3 -u snapshot.py"')
+
+# nocommit put back
+if False:
+  print('Snapshot')
+  run(f'ssh -t {sshIdent} {userHost} "cd {UI_PATH}/production; python3 -u snapshot.py"')
 
 if doServer:
-  serverDistPath = '/l/luceneserver/build/luceneserver-%s.zip' % localconstants.LUCENE_SERVER_VERSION
+  serverDistPath = '/l/luceneserver/build/luceneserver-%s-SNAPSHOT.zip' % localconstants.LUCENE_SERVER_VERSION
   print()
-  print(f'copy {serverDistPath"')
+  print(f'copy {serverDistPath}"')
   run(f'scp {sshIdent} {serverDistPath} {userHost}:{UI_PATH}')
-  # TODO: use symlink instead
-  run(f'ssh {sshIdent} {userHost} "cd {UI_PATH}; rm -rf luceneserver; unzip luceneserver-{localconstants.LUCENE_SERVER_VERSION}.zip; mv luceneserver-{localconstants.LUCENE_SERVER_VERSION} luceneserver; rm luceneserver-{localconstants.LUCENE_SERVER_VERSION}.zip"')
+  run(f'ssh {sshIdent} {userHost} "cd {UI_PATH}; rm -f luceneserver; unzip luceneserver-{localconstants.LUCENE_SERVER_VERSION}-SNAPSHOT.zip; ln -s luceneserver-{localconstants.LUCENE_SERVER_VERSION}-SNAPSHOT luceneserver; rm luceneserver-{localconstants.LUCENE_SERVER_VERSION}-SNAPSHOT.zip"')
 
 if doUI:
   print('Push UI/indexing scripts')
-  run(f'scp {sshIdent} -r ../gitHistory.py ../handle.py ../index_github.py ../Latin-dont-break-issues.rbbi ../server.py ../moreFacets.py ../search.py ../static ../production ../suggest.py ../util.py {userHost}:{UI_PATH}')
+  run(f'scp {sshIdent} -r ../gitHistory.py ../handle.py ../index_github.py ../Latin-dont-break-issues.rbbi ../server.py ../moreFacets.py ../search.py ../static ../production ../suggest.py ../local_db.py ../util.py ../direct_load_all_github_issues.py ../update_from_github.py {userHost}:{UI_PATH}')
 
 if doReindex:
   extra = ' -reindex'
 else:
   extra = ''
+
+print(f'\nnow restart')
 run(f'ssh -t {sshIdent} {userHost} "cd {UI_PATH}/production; python3 -u restart.py{extra}"')
 
 print()

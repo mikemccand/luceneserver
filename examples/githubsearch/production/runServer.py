@@ -66,7 +66,7 @@ class RunServer:
     HEAP = localconstants.HEAP
 
     # -agentlib:yjpagent=sampling,disablej2ee
-    cmd = '%s -Xms%s -Xmx%s -Xss228k -cp "../luceneserver/lib/*" org.apache.lucene.server.Server -maxHTTPThreadCount 2 -ipPort localhost:%s -stateDir %s' % (localconstants.JAVA_EXE, HEAP, HEAP, port, localconstants.ROOT_INDICES_PATH)
+    cmd = '%s -Xms%s -Xmx%s -Xss228k -cp "../luceneserver/lib/*" org.apache.lucene.server.Server -maxHTTPThreadCount 2 -ipPort localhost:%s -stateDir %s' % (localconstants.JAVA_EXE, HEAP, HEAP, port, localconstants.GLOBAL_INDICES_PATH)
 
     print('SERVER CMD: %s' % cmd)
 
@@ -102,7 +102,7 @@ if __name__ == '__main__':
   while True:
     print()
     print('%s: START SERVER' % datetime.datetime.now())
-    svr = RunServer(localconstants.SERVER_PORT, localconstants.ROOT_INDICES_PATH)
+    svr = RunServer(localconstants.SERVER_PORT, localconstants.GLOBAL_INDICES_PATH)
     
     try:
       while True:

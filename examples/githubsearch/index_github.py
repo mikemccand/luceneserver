@@ -96,7 +96,7 @@ re_jira_migrated = re.compile(r'Migrated from \[(LUCENE-\d+)\].*? by (.*?)(?:, (
 re_jira_creator = re.compile(r'(.*?) \(@(.*?)\)')
 re_github_issue_url = re.compile('^https://api.github.com/repos/apache/(.*?)/issues')
 reCommitURL = re.compile(r'\[(.*?)\]')
-reSVNCommitURL = re.compile('(http://svn\.apache\.org/viewvc.*?)$', re.MULTILINE)
+reSVNCommitURL = re.compile(r'(http://svn\.apache\.org/viewvc.*?)$', re.MULTILINE)
 reInBranch = re.compile("in branch '(.*?)'")
 reInBranch2 = re.compile(r'\[(.*?) commit\]')
 reInGitBranch = re.compile("'s branch (.*?) from")
@@ -131,7 +131,7 @@ ICU_TOKENIZER_KEEP_ISSUES = {
 
 def create_schema(svr):
 
-  path = '%s/github' % localconstants.ROOT_INDICES_PATH
+  path = '%s/index' % localconstants.ROOT_STATE_PATH
 
   if os.path.exists(path):
     shutil.rmtree(path)

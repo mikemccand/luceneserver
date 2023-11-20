@@ -31,7 +31,7 @@ import localconstants
 
 GIT_HISTORY_FILE = localconstants.GIT_HISTORY_FILE
 
-reIssue = re.compile('(lucene|solr)-\d+', re.IGNORECASE)
+reIssue = re.compile(r'(lucene|solr)-\d+', re.IGNORECASE)
 rePath = re.compile('^(lucene|solr)/([^/]*?)/src/(java|test|test-files|resources)/org/apache/(lucene|solr)/')
 rePath2 = re.compile('^(lucene|solr)/([^/]*?)/([^/]*?)/src/(java|test|test-files)/org/apache/(lucene|solr)/')
 rePath3 = re.compile('^solr/contrib/([^/]*?)/src/(java|test|test-files|resources)/org/apache/(lucene|solr)/')
@@ -197,7 +197,7 @@ def parseLog(f=None):
         for issue in issues:
           issueToPaths[issue].append(s)
 
-  print(f'gitHistory: after parseLog {maxRev=}; mentioned_issues={all_mentioned_issues}')
+  # print(f'gitHistory: after parseLog {maxRev=}; mentioned_issues={all_mentioned_issues}')
 
   return all_mentioned_issues, issueToPaths, changedIssues
 

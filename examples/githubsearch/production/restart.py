@@ -77,11 +77,11 @@ if not found:
 print()
 print('Start new java server process')
 
-run('nohup python3 -u runServer.py > %s/luceneserver.log 2>&1 &' % localconstants.logDir)
+run('nohup python3 -u runServer.py > %s/luceneserver.log 2>&1 &' % localconstants.GLOBAL_LOG_DIR)
 
 # Wait until server is really ready:
 while True:
-  s = open('%s/luceneserver.log' % localconstants.logDir, 'rb').read()
+  s = open('%s/luceneserver.log' % localconstants.GLOBAL_LOG_DIR, 'rb').read()
   if s.find(('listening on').encode('utf-8')) != -1:
     break
   time.sleep(1.0)
@@ -110,7 +110,7 @@ else:
 print()
 print('Start new Indexer')
 os.chdir('..')
-run(f'nohup python3 -u index_github.py -server localhost:{PORT} -nrt{extra} > {localconstants.logDir}/github-nrt.log 2>&1 &')
+run(f'nohup python3 -u index_github.py -server localhost:{PORT} -nrt{extra} > {localconstants.logDir}/nrt.log 2>&1 &')
 
 print()
 print('Wait 5 seconds')
