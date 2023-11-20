@@ -81,7 +81,6 @@ class UISpec:
 
   def buildTextQuery(self, text):
     q = {'class': 'BooleanQuery',
-         'disableCoord': False
          }
     l0 = []
     q['subQueries'] = l0
@@ -116,14 +115,13 @@ class JIRASpec(UISpec):
   def buildTextQuery(self, text):
     l0 = []
     q = {'class': 'BooleanQuery',
-         'disableCoord': False,
          'subQueries': l0
          }
     lowerText = text.lower()
 
     l2 = []
-    for field in ('title', 'body', 'key', 'all_users', 'other_text'):
-      if field in ('title', 'key'):
+    for field in ('summary', 'description', 'key', 'allUsers', 'otherText'):
+      if field in ('summary', 'key'):
         boost = 3.0
       else:
         boost = 1.0
@@ -145,7 +143,6 @@ class JIRASpec(UISpec):
     l0.append(
       {'occur': 'should',
        'query': {'class': 'BooleanQuery',
-                 'disableCoord': True,
                  'subQueries': [{'query': {'class': 'BooleanQuery',
                                            'subQueries': l2},
                                  'occur': 'must'},
@@ -160,9 +157,9 @@ class JIRASpec(UISpec):
                  {'class': 'ToParentBlockJoinQuery',
                   'childQuery':
                   {'class': 'BooleanQuery',
-                   'subQueries': [{'occur': 'should', 'query': {'class': 'text', 'field': 'comment_body', 'text': text}},
+                   'subQueries': [{'occur': 'should', 'query': {'class': 'text', 'field': 'body', 'text': text}},
                                   {'occur': 'should', 'query': {'class': 'text', 'field': 'author', 'text': text}},
-                                  {'occur': 'should', 'query': {'class': 'text', 'field': 'child_key', 'text': lowerText, 'boost': 3.0}}]},
+                                  {'occur': 'should', 'query': {'class': 'text', 'field': 'childKey', 'text': lowerText, 'boost': 3.0}}]},                                  
                   'parentsFilter': {'class': 'BooleanFieldQuery', 'field': 'parent'},
                   'scoreMode': 'Max',
                   'childHits': {
@@ -235,9 +232,9 @@ jiraSpec.sorts = (
   ('relevanceRecency', 'relevance + recency', 'blendRecencyRelevance', True),
   ('relevance', 'pure relevance', None, False),
   ('oldest', 'oldest', 'created', False),
-  ('comment_count', 'most comments', 'comment_count', True),
-  ('vote_count', 'most votes', 'vote_count', True),
-  ('watch_count', 'most watches', 'watch_count', True),
+  ('commentCount', 'most comments', 'commentCount', True),
+  ('voteCount', 'most votes', 'voteCount', True),
+  ('watchCount', 'most watches', 'watchCount', True),
   ('newest', 'newest', 'created', True),
   ('priority', 'priority', 'priority', False),
   #('notRecentlyUpdated', 'not recently updated', 'updated', False),
@@ -247,25 +244,22 @@ jiraSpec.sorts = (
 
 jiraSpec.retrieveFields = (
   'key',
-  'project',
   'updated',
   'created',
-  {'field': 'all_users', 'highlight': 'whole'},
+  {'field': 'allUsers', 'highlight': 'whole'},
   'status',
   'author',
-  'comment_id',
-  'comment_count',
-  'vote_count',
-  'watch_count',
-  'commit_url',
-  'issue_or_pr',
-  {'field': 'title', 'highlight': 'whole'},
-  {'field': 'body', 'highlight': 'snippets'},
-  {'field': 'comment_body', 'highlight': 'snippets'},
+   'commentID',
+   'commentCount',
+   'voteCount',
+   'watchCount',
+   'commitURL',
+   {'field': 'summary', 'highlight': 'whole'},
+   {'field': 'description', 'highlight': 'snippets'},
   )
 
 jiraSpec.highlighter = {
-  'class': 'PostingsHighlighter',
+  'class': 'UnifiedHighlighter',
   'passageScorer.b': 0.75,
   'maxPassages': 3,
   'maxLength': 1000000}
@@ -278,28 +272,29 @@ jiraSpec.facetFields = (
   ('Author relation', 'author_association', False, None, False),
   ('Comment type', 'comment_type', False, None, False),
   ('Updated', 'updated', False, None, False),
-  ('Updated ago', 'updated_ago', False, None, False),
-  ('Comment count', 'comment_count', False, None, False),
-  ('User', 'all_users', False, None, True),
-  ('Committed by', 'committed_by', False, None, True),
-  ('Last comment user', 'last_contributor', False, None, True),
-  ('Fix version', 'fix_versions', True, '-int', True),
-  ('Committed paths', 'committed_paths', True, None, False),
-  ('Draft', 'is_draft', False, None, False),
-  ('Component', 'facet_modules', True, None, True),
-  ('Type', 'issue_type', False, None, True),
-  ('Priority', 'facet_priority', False, None, False),
+  ('Issue type', 'issue_or_pr', False, None, False),
+  ('Author relation', 'author_association', False, None, False),
+  ('Comment type', 'comment_type', False, None, False),
+  ('Updated ago', 'updatedAgo', False, None, False),
+  ('User', 'allUsers', False, None, True),
+  ('Committed by', 'committedBy', False, None, True),
+  ('Last comment user', 'lastContributor', False, None, True),
+  ('Fix version', 'fixVersions', True, '-int', True),
+  ('Committed paths', 'committedPaths', True, None, False),
+  ('Component', 'facetComponents', True, None, True),
+  ('Type', 'issueType', False, None, True),
+  ('Priority', 'facetPriority', False, None, False),
   ('Labels', 'labels', False, None, True),
   ('Attachment?', 'attachments', False, None, False),
-  ('Commits?', 'has_commits', False, None, False),
-  ('Has votes?', 'has_votes', True, None, False),
+  ('Commits?', 'hasCommits', False, None, False),
+  ('Has votes?', 'hasVotes', True, None, False),
   ('Reporter', 'reporter', False, None, True),
   ('Assignee', 'assignee', False, None, True),
   ('Resolution', 'resolution', False, None, False),
   #('Created', 'facetCreated', True, None, False),
   )
 
-jiraSpec.textQueryFields = ['title', 'body']
+jiraSpec.textQueryFields = ['summary', 'description']
 # nocommit can we do key descending as number...?
 jiraSpec.browseOnlyDefaultSort = 'recentlyUpdated'
 jiraSpec.finish()
@@ -459,18 +454,18 @@ def unHilite(l):
       s.append(x['text'])
   return ''.join(s)
 
-#reIssue = re.compile('([A-Z]+-\d+)')
+reIssue = re.compile('([A-Z]+-\d+)')
 
-#def issueToURL(g):
-#  s = g.group(1)
-#  return '<a href="https://issues.apache.org/jira/browse/%s">%s</a>' % (s, s)
+def issueToURL(g):
+  s = g.group(1)
+  return '<a href="https://issues.apache.org/jira/browse/%s">%s</a>' % (s, s)
 
-def fix_hilite(s, groupDDField=None, doNonBreakingSpace=False):
-  s = _fix_hilite(s, groupDDField, doNonBreakingSpace)
+def fixHilite(s, groupDDField=None, doNonBreakingSpace=False):
+  s = _fixHilite(s, groupDDField, doNonBreakingSpace)
   #s = reIssue.sub(issueToURL, s)
   return s
   
-def _fix_hilite(s, groupDDField=None, doNonBreakingSpace=False):
+def _fixHilite(s, groupDDField=None, doNonBreakingSpace=False):
   #return str(s)
   if s is None:
     return 'N/A'
@@ -633,11 +628,10 @@ class RenderFacets:
       else:
         newPath = (label,)
 
-      if ddName != 'comment_count':
-        if label == '1':
-          label = 'Yes'
-        elif label == '0':
-          label = 'No'
+      if label == '1':
+        label = 'Yes'
+      elif label == '0':
+        label = 'No'
 
       w('<tr>')
       w('<td>')
@@ -895,47 +889,44 @@ def renderNavSummary(w, facets, drillDowns):
   
 def renderJiraHits(w, text, groups, userDrillDowns):
 
-  now_utc = int(time.time() + getUTCOffset())
+  now = int(time.time() + getUTCOffset())
 
   lowerText = text.strip().lower().replace('-', ' ')
 
-  # Each group is an issue; each (child) doc is another comment on that issue
+  # Each group is a Jira issue; each (child) doc is a comment on that issue
   for group in groups:
     fields = group['fields']
-    key = fields['key']
+    key = fields['key'].upper()
     project = fields['project']
 
-    key_orig = key
-    if fields['issue_or_pr'] == 'PR':
-      key += ' PR'
+    keyOrig = key
 
     # hack alert!  really i should index a separate text+highlight field for this...
     if key.lower().replace('-', ' ') == lowerText:
-      key = '<b>#%s</b>' % key
-    else:
-      key = '#' + key
-    print(f'{key}: {fields["status"]}')
+      key = '<b>%s</b>' % key
     
-    if fields['status'] in ('Reopend', 'Open'):
+    if fields['status'] in ('Open', 'Reopened', 'In Progress', 'Patch Available', 'Waiting for user', 'Waiting for infra'):
       skey = key
     else:
       skey = '<s>%s</s>' % key
 
     issue_url = f'http://github.com/apache/{project}/issues/{key_orig}'
 
-    w(f'<tr><td><br><a href="{issue_url}"><font size=+2>{skey}: {fix_hilite(fields["title"])}</font></a></td></tr>')
+     w('<tr><td><br><a href="http://issues.apache.org/jira/browse/%s"><font size=+2>%s: %s</font></a></td></tr>' % \
+       (keyOrig, skey, fixHilite(fields['summary'])))
 
     print(f'{key=} updated={fields["updated"]} vs {now_utc=} delta={now_utc - fields["updated"]}')
 
-    w(f'<tr><td><em><font size=-1>{toAgo(now_utc - fields["updated"])} ago&nbsp;&nbsp;' +
-      f'{fields["comment_count"]} comments&nbsp;&nbsp;' +
-      f'{fields.get("vote_count", 0)} votes&nbsp;&nbsp;' +
-      f'{fields.get("watch_count", 0)} watches&nbsp;&nbsp;' +
-      f'{fix_hilite(sortByUser(fields.get("all_users", []), userDrillDowns), "all_users")}</em></font></td></tr>')
+     w('<tr><td><em><font size=-1>%s ago&nbsp;&nbsp;%d comments&nbsp;&nbsp;%d votes&nbsp;&nbsp;%d watches&nbsp;&nbsp;%s</em></font></td></tr>' % \
+       (toAgo(now-fields['updated']),
+        fields['commentCount'],
+        fields['voteCount'],
+        fields['watchCount'],
+        fixHilite(sortByUser(fields['allUsers'], userDrillDowns), 'allUsers')))
     w('<tr><td>')
     s = fix_hilite(fields.get('body', ''))
-
-    w('<a class="commentsnippet" href="%s">%s</a>' % (issue_url, s))
+    issueURL = 'http://issues.apache.org/jira/browse/%s' % key
+    w('<a class="commentsnippet" href="%s">%s</a>' % (issueURL, s))
     w('</td></tr>')
     
     # Each hit is a comment under one issue:
@@ -950,19 +941,18 @@ def renderJiraHits(w, text, groups, userDrillDowns):
       if isCommitUser(author):
         author = 'commitbot'
       if 'commitURL' in fields:
-        comment_url = fields['commitURL']
-        if 'git-wip-us' in comment_url:
-          comment_url += ';a=commitdiff'
+        commentURL = fields['commitURL']
+        if 'git-wip-us' in commentURL:
+          commentURL += ';a=commitdiff'
       else:
-        comment_url = f'https://github.com/apache/{project}/issues/{key_orig}#issuecomment-{fields["comment_id"]}'
-        #commentURL = 'http://issues.apache.org/jira/browse/%s?focusedCommentId=%s&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-%s' % \
-        #                     (key_orig, fields['comment_id'], fields['comment_id'])
+        commentURL = 'http://issues.apache.org/jira/browse/%s?focusedCommentId=%s&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-%s' % \
+                     (key, fields['commentID'], fields['commentID'])
 
-      #authorDD = '<a href="" onclick="g(fcmd(event), \'allUsers\', \'%s\');return false;"><b>%s</b></a>' % (author, nonBreakingSpace(fix_hilite(author, 'allUsers')))
-      authorDD = '<b>%s</b>' % fix_hilite(author, 'all_users', True)
+      #authorDD = '<a href="" onclick="g(fcmd(event), \'allUsers\', \'%s\');return false;"><b>%s</b></a>' % (author, nonBreakingSpace(fixHilite(author, 'allUsers')))
+      authorDD = '<b>%s</b>' % fixHilite(author, 'allUsers', True)
       w('&nbsp;&nbsp;&nbsp;&nbsp;%s&nbsp;<em>%s&nbsp;ago</em>:&nbsp;&nbsp;</td><td><a class="commentsnippet" href="%s">%s</a>' % \
         (authorDD,
-         nonBreakingSpace(toAgo(now_utc - fields['created'])), comment_url, fix_hilite(fields.get('comment_body'))))
+         nonBreakingSpace(toAgo(now - fields['created'])), commentURL, fixHilite(fields.get('body'))))
       w('</td>')
       w('</tr>')
     w('</table>')
@@ -1097,23 +1087,15 @@ def handleMoreFacets(path, isMike, environ):
                          'numericRange': d})
               break
           else:
-            raise RuntimeError(f'failed to find numericRange label {value} for dimension {field}')
-        elif field == 'updated_ago':
+            raise RuntimeError('failed to find numericRange label %s' % value)
+        elif field == 'updatedAgo':
           for d in getOldTimeFacets(now):
             if d['label'] == value[0]:
               l2.append({'field': 'updated',
                          'numericRange': d})
               break
           else:
-            raise RuntimeError(f'failed to find numericRange label {value} for dimension {field}')
-        elif field == 'comment_count':
-          for d in getCommentCountFacets():
-            if d['label'] == value[0]:
-              l2.append({'field': 'comment_count',
-                         'numericRange': d})
-              break
-          else:
-            raise RuntimeError(f'failed to find numericRange label {value} for dimension {field}')
+            raise RuntimeError('failed to find numericRange label %s' % value)
         else:
           l2.append({'field': field, 'value': value})
 
@@ -1121,7 +1103,6 @@ def handleMoreFacets(path, isMike, environ):
 
   query['facets'] = [{'dim': dim, 'topN': MAX_INT}]
   query['facets'].append({'dim': 'updated', 'numericRanges': getTimeFacets(now)})
-  query['facets'].append({'dim': 'comment_count', 'numericRanges': getCommentCountFacets()})
 
   if TRACE:
     print('MoreFacets query:')
@@ -1150,15 +1131,6 @@ def getTimeFacets(now):
     {'label': 'Past week', 'min': now-7*24*3600, 'max': now, 'minInclusive': True, 'maxInclusive': True},
     {'label': 'Past month', 'min': int(now-30.5*24*3600), 'max': now, 'minInclusive': True, 'maxInclusive': True},
     ]
-
-def getCommentCountFacets():
-  return [
-    {'label': '0', 'min': 0, 'max': 0, 'minInclusive': True, 'maxInclusive': True},
-    {'label': '1', 'min': 1, 'max': 1, 'minInclusive': True, 'maxInclusive': True},
-    {'label': '2 - 5', 'min': 2, 'max': 5, 'minInclusive': True, 'maxInclusive': True},
-    {'label': '6 - 10', 'min': 6, 'max': 10, 'minInclusive': True, 'maxInclusive': True},
-    {'label': '10 - 20', 'min': 10, 'max': 20, 'minInclusive': True, 'maxInclusive': True},
-    {'label': '> 20', 'min': 20, 'max': 100000000000, 'minInclusive': True, 'maxInclusive': True}]
 
 def getOldTimeFacets(now):
   return [
@@ -1474,11 +1446,9 @@ def handleQuery(path, isMike, environ):
       topN = 7
     if dim == 'updated':
       d = {'dim': dim, 'numericRanges': getTimeFacets(now)}
-    elif dim == 'updated_ago':
-      d = {'dim': 'updated_ago', 'numericRanges': getOldTimeFacets(now)}
-    elif dim == 'comment_count':
-      d = {'dim': 'comment_count', 'numericRanges': getCommentCountFacets()}
-    else:      
+    elif dim == 'updatedAgo':
+      d = {'dim': 'updatedAgo', 'numericRanges': getOldTimeFacets(now)}
+    else:
       d = {'dim': dim, 'topN': topN}
     l.append(d)
     if dim == groupDDField:
@@ -1486,6 +1456,7 @@ def handleQuery(path, isMike, environ):
 
   treeFacetMap = {}
 
+  # TODO: factor out this identical code w/ handleMoreFacets!!
   for field, values in drillDowns:
     if spec.facetByID[field][0]:
       for tup in values:
@@ -1521,26 +1492,18 @@ def handleQuery(path, isMike, environ):
               break
           else:
             raise RuntimeError('failed to find numericRange label %s' % value)
-        elif field == 'updated_ago':
+        elif field == 'updatedAago':
           for d in getOldTimeFacets(now):
             if d['label'] == value[0]:
-              l2.append({'field': 'updated_ago',
+              l2.append({'field': 'updatedAgo',
                          'numericRange': d})
               break
           else:
             raise RuntimeError('failed to find numericRange label %s' % value)
-        elif field == 'comment_count':
-          for d in getCommentCountFacets():
-            if d['label'] == value[0]:
-              l2.append({'field': 'comment_count',
-                         'numericRange': d})
-              break
-          else:
-            raise RuntimeError(f'failed to find numericRange label {value} for dimension {field}')
         else:
           l2.append({'field': field, 'value': value})
 
-      if field not in ('updated', 'updated_ago', 'comment_count') and not spec.facetByID[field][0]:
+      if field not in ('updated', 'updatedAgo') and not spec.facetByID[field][0]:
         ddExtraMap[field] = len(l)
         l.append({'dim': field, 'labels': values[0]})
                   
@@ -1569,7 +1532,7 @@ def handleQuery(path, isMike, environ):
 
     if spec.highlighter is None:
       h = {'passageScorer.proxScoring': False,
-           'class': 'PostingsHighlighter'}
+           'class': 'UnifiedHighlighter'}
     else:
       h = copy.deepcopy(spec.highlighter)
       h['passageScorer.proxScoring'] = False
@@ -1613,7 +1576,7 @@ def handleQuery(path, isMike, environ):
       if field == 'project':
         contexts = [x[0] for x in values]
         project = ','.join(contexts)
-      elif field == 'all_users':
+      elif field == 'allUsers':
         for x in values:
           userDrillDowns.add(x[0])
 
@@ -1667,7 +1630,7 @@ def handleQuery(path, isMike, environ):
             //$("#textid").val("");
             //event.stopPropagation();
             if (ui.item.user !== undefined) {
-              g("dds", "all_users", ui.item.user);
+              g("dds", "allUsers", ui.item.user);
             } else if (ui.item.project !== undefined) {
               g("dds", "project", ui.item.project);
             } else {

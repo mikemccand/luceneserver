@@ -82,7 +82,6 @@ class UISpec:
 
   def buildTextQuery(self, text):
     q = {'class': 'BooleanQuery',
-         'disableCoord': False
          }
     l0 = []
     q['subQueries'] = l0
@@ -117,7 +116,6 @@ class JIRASpec(UISpec):
   def buildTextQuery(self, text):
     l0 = []
     q = {'class': 'BooleanQuery',
-         'disableCoord': False,
          'subQueries': l0
          }
     lowerText = text.lower()
@@ -146,7 +144,6 @@ class JIRASpec(UISpec):
     l0.append(
       {'occur': 'should',
        'query': {'class': 'BooleanQuery',
-                 'disableCoord': True,
                  'subQueries': [{'query': {'class': 'BooleanQuery',
                                            'subQueries': l2},
                                  'occur': 'must'},

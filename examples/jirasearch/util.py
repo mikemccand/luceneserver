@@ -101,7 +101,8 @@ class ServerClient:
       port = localconstants.SERVER_PORT
     self.host = host
     self.port = port
-    
+    print('USING host=%s, port=%s' % (host, port))
+
   def send(self, command, data):
     #print '\nSEND %s, %s' % (command, data)
     #print 'SEND: %d bytes' % len(data)

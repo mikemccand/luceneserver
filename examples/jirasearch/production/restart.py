@@ -50,7 +50,7 @@ for line in os.popen('ps auxww | grep runServer.py | grep -v grep | grep -v /bin
     traceback.print_exc()
   found = True
 
-if not found:
+if False and not found:
   raise RuntimeError('could not find existing runServer.py process')
 
 print()
@@ -71,7 +71,7 @@ for line in os.popen('ps auxww | grep java | grep server.Server | grep "ipPort l
     traceback.print_exc()
   found = True
 
-if not found:
+if False and not found:
   raise RuntimeError('could not find existing java server.Server process')
 
 print()

@@ -53,6 +53,7 @@ deps = [
     ('org.eclipse.jetty', 'jetty-http', '9.3.14.v20161028'),
     ('commons-logging', 'commons-logging', '1.1.3'),
   ('org.apache.lucene', 'lucene-sandbox', LUCENE_VERSION),
+  ('com.carrotsearch', 'hppc', '0.9.1'),
   ]
 
 testDeps = [

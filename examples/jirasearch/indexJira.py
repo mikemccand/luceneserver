@@ -90,7 +90,7 @@ ICU_TOKENIZER_KEEP_ISSUES = {
 
 def createSchema(svr):
 
-  path = '%s/jira' % localconstants.ROOT_INDICES_PATH
+  path = '%s/jira' % localconstants.ROOT_STATE_PATH
 
   if os.path.exists(path):
     shutil.rmtree(path)
@@ -453,14 +453,12 @@ def main():
       while True:
         args['startAt'] = str(startAt)
         url = 'https://issues.apache.org/jira/rest/api/2/search?%s' % urllib.parse.urlencode(args)
-        print(f'load URL {url}')
         t0 = time.time()
         try:
           s = urllib.request.urlopen(url, timeout=60).read().decode('utf-8')
         except:
           print('WARNING: exception loading JSON from Jira')
           traceback.print_exc()
-          print(f'  details: {sys.exc_info()[0].fp.read()}')
           break
 
         t1 = time.time()
