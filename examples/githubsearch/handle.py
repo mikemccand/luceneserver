@@ -1620,7 +1620,7 @@ def handleQuery(path, isMike, environ):
   
   if spec.doAutoComplete:
     if True:
-      w(r'''
+      w('''
       <script>
       $(document).ready(      
         function() {
@@ -1662,7 +1662,7 @@ def handleQuery(path, isMike, environ):
           select: function(event, ui) {
             //var s = ui.item.label;
             //s = s.replace(/<b>/g, "");
-            //s = s.replace(/<\/b>/g, "");
+            //s = s.replace(/<\\/b>/g, "");
             //$("#textid").val("");
             //event.stopPropagation();
             if (ui.item.user !== undefined) {
