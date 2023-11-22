@@ -13,12 +13,12 @@ from localconstants import DB_PATH, GITHUB_API_TOKEN, ROOT_STATE_PATH
 #   - make histogram of PR age / complexity / engagement
 
 def load_full_issue(issue):
-    comments = local_db.http_load_as_json(issue['comments_url'])
+    comments = local_db.http_load_as_json(issue['comments_url'] + '?per_page=100')
     # TODO: responses to each comment?
-    events = local_db.http_load_as_json(issue['events_url'])
+    events = local_db.http_load_as_json(issue['events_url'] + '?per_page=100')
     # print(f'load events for {issue["number"]}:\n  {json.dumps(events, indent=2)}')
-    reactions = local_db.http_load_as_json(issue['reactions']['url'])
-    timeline = local_db.http_load_as_json(issue['timeline_url'])
+    reactions = local_db.http_load_as_json(issue['reactions']['url'] + '?per_page=100')
+    timeline = local_db.http_load_as_json(issue['timeline_url'] + '?per_page=100')
     return comments, events, reactions, timeline
 
 def main():

@@ -19,6 +19,10 @@ def main():
   
   c = db.cursor()
 
+  # nocommit
+  refresh_specific_issues([12624])
+  sys.exit(0)
+
   total_issue_count = c.execute('SELECT COUNT(*) FROM issues').fetchone()[0]
   print(f'{total_issue_count} issues in DB')
 
@@ -138,14 +142,14 @@ def load_all_pr_comments(db):
 
 def load_pr_comments(db, c, number):
   #print(f'  load full pr comments {number}')
-  all_pr_comments = local_db.http_load_as_json(f'https://api.github.com/repos/apache/lucene/pulls/{number}/comments')
+  all_pr_comments = local_db.http_load_as_json(f'https://api.github.com/repos/apache/lucene/pulls/{number}/comments?per_page=100')
   s = pickle.dumps(all_pr_comments)
   #print(s)
   #print(pickle.loads(s))
   c.execute('REPLACE INTO pr_comments (key, pickle) VALUES (?, ?)',
             (str(number), s))
   db.commit()
-  print(f'    got: {all_pr_comments}')
+  #print(f'    got: {all_pr_comments}')
   return all_pr_comments
         
 def load_all_pr_reviews(db):
@@ -164,7 +168,7 @@ def load_all_pr_reviews(db):
 
 def load_pr_reviews(db, c, number):
   #print(f'  load full pr reviews {number}')
-  all_pr_reviews = local_db.http_load_as_json(f'https://api.github.com/repos/apache/lucene/pulls/{number}/reviews')
+  all_pr_reviews = local_db.http_load_as_json(f'https://api.github.com/repos/apache/lucene/pulls/{number}/reviews?per_page=100')
   s = pickle.dumps(all_pr_reviews)
   c.execute('REPLACE INTO pr_reviews (key, pickle) VALUES (?, ?)',
             (str(number), s))

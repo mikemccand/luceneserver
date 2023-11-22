@@ -653,10 +653,15 @@ def build_full_suggest(svr):
             if 'author' in change:
               add_user(all_users, change['author'], project, key, source='attach')
 
-      weight = (updated-MY_EPOCH).total_seconds()
+      weight = int((updated-MY_EPOCH).total_seconds())
 
       # Index project as a context, so we can suggest within project:
-      suggest_file.write(('%d\x1f#%s: %s\x1f%s\x1f%s\n' % (weight, str(key), clean_github_markdown(issue['number'], issue['title']), key, project)).encode('utf-8'))
+      text = f'#{key}'
+      if 'pull_request' in issue:
+        text += ' PR'
+      text += ':'
+      text += clean_github_markdown(issue['number'], issue['title'])
+      suggest_file.write(f'{weight}\x1f{text}\x1f{key}\x1f{project}\n'.encode('utf-8'))
 
     for userDisplayName, (count, projects) in sorted(all_users.items(), key = lambda x: (-x[1][0], x[0])):
       userDisplayName = re.sub(r'\s+', ' ', userDisplayName)
@@ -1264,7 +1269,9 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
         subDoc['child_key'] = key
         subDocs.append({'fields': subDoc})
 
+    # sort by descending creation date (newest first):
     subDocs.sort(key=lambda x: x['fields']['created'])
+    subDocs.reverse()
 
     if number == 12180:
       print(f'XXX\n{number} {is_pr}\n  issue: {issue}\n  events: {events}\n  comments: {comments}\n  index_comments: {index_comments=}\n  {pr_comments=}\n  {pr_reviews=}\n  {comments=}\n  {subDocs=}')

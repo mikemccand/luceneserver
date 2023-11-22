@@ -86,32 +86,51 @@ def maybe_load_user(c, login):
 
 def http_load_as_json(url, do_post=False, token=GITHUB_API_TOKEN):
   global ratelimit_remaining
-    
-  headers = {
-      # 'Authorization': f'token {GITHUB_API_TOKEN}',
-      'Authorization': f'Bearer {token}',
-      'Accept': 'application/vnd.github.full+json',
-      'X-GitHub-Api-Version': '2022-11-28'}
-  if do_post:
-      response = requests.post(url, headers=headers)
-  else:
-      response = requests.get(url, headers=headers)
-  if response.status_code != 200:
-    raise RuntimeError(f'got {response.status_code} response loading {url}\n\n {response.text}')
-  if not response.headers['Content-Type'].startswith('application/json'):
-    raise RuntimeError(f'got {response.headers["Content-Type"]} but expected application/json when loading {url}')
 
-  # print(f'\n{url}\n  response headers: {response.headers}')
+  all_results = None
+
+  while True:
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/vnd.github.full+json',
+        'X-GitHub-Api-Version': '2022-11-28'}
+    if do_post:
+      response = requests.post(url, headers=headers)
+    else:
+      response = requests.get(url, headers=headers)
+
+    if response.status_code != 200:
+      raise RuntimeError(f'got {response.status_code} response loading {url}\n\n {response.text}')
+    if not response.headers['Content-Type'].startswith('application/json'):
+      raise RuntimeError(f'got {response.headers["Content-Type"]} but expected application/json when loading {url}')
+
+    # print(f'\n{url}\n  response headers: {response.headers}')
+
+    # wait due to GitHub API throttling:
+    ratelimit_remaining = int(response.headers['X-RateLimit-Remaining'])
+    if ratelimit_remaining < 10:
+      reset_at = int(response.headers['X-RateLimit-Reset'])
+      wait_seconds = reset_at - time.time() + 5
+      if wait_seconds > 0:
+        db.commit()
+        print(f'Now wait due to throttling ({ratelimit_remaining} requests remaining (reset at {reset_at}; wait for {wait_seconds} seconds)')
+        time.sleep(wait_seconds)
+
+    this_page_results = json.loads(response.text)
     
-  # wait due to GitHub API throttling:
-  ratelimit_remaining = int(response.headers['X-RateLimit-Remaining'])
-  if ratelimit_remaining < 10:
-    reset_at = int(response.headers['X-RateLimit-Reset'])
-    wait_seconds = reset_at - time.time() + 5
-    if wait_seconds > 0:
-      db.commit()
-      print(f'Now wait due to throttling ({ratelimit_remaining} requests remaining (reset at {reset_at}; wait for {wait_seconds} seconds)')
-      time.sleep(wait_seconds)
-        
-  # print(response.headers)
-  return json.loads(response.text)
+    if all_results is None:
+      # maybe only one page, or all results fit into page 1
+      all_results = this_page_results
+    else:
+      if type(all_results) != list:
+        raise RuntimeError(f'saw next page, but previous type was not a list: got {type(all_results)}')
+      else:
+        all_results.extend(this_page_results)
+
+    if 'next' in response.links:
+      # this is a paginated response, and we have not reached the end yet:
+      url = response.links['next']['url']
+    else:
+      break
+
+  return all_results

@@ -22,11 +22,14 @@ def main():
   closed_pr_count = 0
   histo_by_days = {}
 
+  print_full_pr = '-print_full_pr' in sys.argv
+  if print_full_pr:
+    sys.argv.remove('-print_full_pr')
+
   number = int(sys.argv[1])
 
-  if '-print_full_pr' in sys.argv:
-    i = sys.argv.index('-print_full_pr')
-    pr_number = sys.argv[i+1]
+  if print_full_pr:
+    pr_number = number
     blob = c.execute('SELECT pickle FROM issues WHERE key=?', (pr_number,)).fetchone()[0]
     issue, comments, events, reactions, timeline = pickle.loads(blob)
     print(f'\nISSUE:\n{json.dumps(issue, indent=2)}')
