@@ -1,7 +1,7 @@
 # Lucene Server
 
 This project provides a simple, example HTTP server on top of [Apache
-Lucene](http://lucene.apache.org) version 6.x snapshot sources,
+Lucene](http://lucene.apache.org) version 9.8 snapshot sources,
 exposing many of Lucene's core and modules functionality efficiently
 over a simple REST/JSON HTTP API.
 
