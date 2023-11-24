@@ -9,7 +9,8 @@ Note that this code is all very new and likely has exciting bugs!  But
 it's also very fast!
 
 This server is running "in production" at [Jira
-search](http://jirasearch.mikemccandless.com), a simple search
+search](http://jirasearch.mikemccandless.com) and [GitHub 
+search](http://githubsearch.mikemccandless.com), a simple search
 instance for developers to find Lucene, Solr and Tika jira issues
 updated in near-real-time.
 
@@ -82,9 +83,9 @@ But there are downsides as well:
 This has only been tested on Linux:
 
 To run the server, run `./build.py package`, which will build the
-installable bits at `build/luceneserver-0.1.0-SNAPSHOT.zip`.
+installable bits at `build/luceneserver-0.1.1-SNAPSHOT.zip`.
 
-Unzip that somewhere, `cd luceneserver-0.1.0-SNAPSHOT` and run `java
+Unzip that somewhere, `cd luceneserver-0.1.1-SNAPSHOT` and run `java
 -cp "lib/*" org.apache.lucene.server.Server`.  Make sure you put
 double quotes around that `"lib/*"` so java sees that asterisk and not
 your shell!
