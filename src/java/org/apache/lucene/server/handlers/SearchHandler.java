@@ -389,6 +389,7 @@ public class SearchHandler extends Handler {
                                                            )),
                                 "UnifiedHighlighter"))),
         new Param("query", "Full query to execute (not using QueryParser).", QUERY_TYPE),
+        new Param("highlightQuery", "Alternative query to use when highlighting (helpful for bypassing bugs with block join queries).", QUERY_TYPE),
         new Param("grouping", "Whether/how to group search results.",
                   new StructType(
                                  new Param("field", "Field to group by.", new StringType()),
@@ -658,6 +659,8 @@ public class SearchHandler extends Handler {
           } else {
             docFieldValues[j] = "";
           }
+
+          System.out.println("  loadFieldValues field=" + fields[j] + " docID=" + docID + " fieldValues=" + Arrays.toString(docFieldValues));
         }
       }
 
@@ -684,6 +687,7 @@ public class SearchHandler extends Handler {
         bi = null;
       }
     } else {
+      System.out.println("USING SENTENCE INSTANCE BI");
       bi = BreakIterator.getSentenceInstance(Locale.ROOT);
     }
     return bi;
@@ -978,7 +982,7 @@ public class SearchHandler extends Handler {
           Object v = doc.get(name);
           if (v != null) {
             // We caught same field name above:
-            assert !result.containsKey(name);
+            assert result.containsKey(name) == false;
 
             if (fd.multiValued == false) {
               result.put(name, convertType(fd, v));
@@ -2732,6 +2736,7 @@ public class SearchHandler extends Handler {
             for(GroupDocs<Integer> group : joinGroups.groups) {
               highlightDocIDs[upto++] = group.groupValue.intValue();
               for(ScoreDoc scoreDoc : group.scoreDocs) {
+                System.out.println("HIGHLIGHT: add child doc " + scoreDoc.doc);
                 highlightDocIDs[upto++] = scoreDoc.doc;
               }
             }
@@ -2760,11 +2765,35 @@ public class SearchHandler extends Handler {
           }
           upto++;
         }
+        System.out.println("highlightDocIds=" + Arrays.toString(highlightDocIDs));
 
+        // nocommit
+        /*
+        BooleanQuery.Builder newQuery = new BooleanQuery.Builder();
+        newQuery.add(new TermQuery(new Term("comment_body", "baby")), BooleanClause.Occur.SHOULD);
+        newQuery.add(new TermQuery(new Term("comment_body", "steps")), BooleanClause.Occur.SHOULD);
+        newQuery.add(new TermQuery(new Term("comment_body", "fst")), BooleanClause.Occur.SHOULD);
+        newQuery.add(new TermQuery(new Term("body", "baby")), BooleanClause.Occur.SHOULD);
+        newQuery.add(new TermQuery(new Term("body", "steps")), BooleanClause.Occur.SHOULD);
+        newQuery.add(new TermQuery(new Term("body", "fst")), BooleanClause.Occur.SHOULD);
+        */
+
+        System.out.println("queryOrig=" + queryOrig);
+
+        Query queryForHighlights;
+        if (r.hasParam("highlightQuery")) {
+          Map<ToParentBlockJoinQuery,BlockJoinQueryChild> ignored = new HashMap<>();
+          queryForHighlights = parseQuery(timestampSec, r, indexState, r.getStruct("highlightQuery"), null, ignored, dynamicFields);
+        } else {
+          queryForHighlights = queryOrig;
+        }
         highlights = highlighter.highlighter.highlightToObjects(fieldsArray,
-                                                                queryOrig,
+                                                                queryForHighlights,
                                                                 highlightDocIDs,
                                                                 maxPassages);
+        for (Map.Entry<String, Object[]> ent : highlights.entrySet()) {
+          System.out.println("GOT HIGHTLIGHTS: " + ent.getKey() + " -> " + Arrays.toString(ent.getValue()));
+        }
       }
       diagnostics.put("highlightTimeMS", (System.nanoTime() - t0)/1000000.);
 
@@ -2834,7 +2863,7 @@ public class SearchHandler extends Handler {
               JSONObject o6 = new JSONObject();
               o5.add(o6);
               o6.put("doc", hit.doc);
-              if (!Float.isNaN(hit.score)) {
+              if (Float.isNaN(hit.score) == false) {
                 o6.put("score", hit.score);
               }
 
@@ -2917,6 +2946,7 @@ public class SearchHandler extends Handler {
               if (Float.isNaN(hit.score) == false) {
                 o6.put("score", hit.score);
               }
+              System.out.println("FILL FIELDS FOR CHILD HITS highlighter=" + highlighter);
 
               if (fields != null || highlightFields != null) {
                 JSONObject o7 = new JSONObject();

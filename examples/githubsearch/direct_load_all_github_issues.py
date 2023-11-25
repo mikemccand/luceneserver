@@ -13,13 +13,41 @@ from localconstants import DB_PATH, GITHUB_API_TOKEN, ROOT_STATE_PATH
 #   - make histogram of PR age / complexity / engagement
 
 def load_full_issue(issue):
-    comments = local_db.http_load_as_json(issue['comments_url'] + '?per_page=100')
-    # TODO: responses to each comment?
-    events = local_db.http_load_as_json(issue['events_url'] + '?per_page=100')
-    # print(f'load events for {issue["number"]}:\n  {json.dumps(events, indent=2)}')
-    reactions = local_db.http_load_as_json(issue['reactions']['url'] + '?per_page=100')
-    timeline = local_db.http_load_as_json(issue['timeline_url'] + '?per_page=100')
-    return comments, events, reactions, timeline
+  comments = local_db.http_load_as_json(issue['comments_url'] + '?per_page=100')
+  # TODO: responses to each comment?
+  events = local_db.http_load_as_json(issue['events_url'] + '?per_page=100')
+  reactions = local_db.http_load_as_json(issue['reactions']['url'] + '?per_page=100')
+  timeline = local_db.http_load_as_json(issue['timeline_url'] + '?per_page=100')
+  if 'pull_request' in issue:
+    number = issue['number']
+    full_pr = local_db.http_load_as_json(f'https://api.github.com/repos/apache/lucene/pulls/{number}')
+    pr_comments = local_db.http_load_as_json(f'https://api.github.com/repos/apache/lucene/pulls/{number}/comments?per_page=100')
+    pr_reviews = local_db.http_load_as_json(f'https://api.github.com/repos/apache/lucene/pulls/{number}/reviews?per_page=100')
+  else:
+    full_pr = None
+    pr_comments = None
+    pr_reviews = None
+
+  return comments, events, reactions, timeline, full_pr, pr_comments, pr_reviews
+
+def load_all_referenced_users(c, issue, comments, events, reactions, timeline, full_pr, pr_comments, pr_reviews):
+    local_db.maybe_load_user(c, issue['user']['login'])
+    for comment in comments:
+        local_db.maybe_load_user(c, comment['user']['login'])
+    for change in events:
+        if change['actor'] is not None:
+            # TODO: why do some issues have null actor!  e.g. 12450
+            local_db.maybe_load_user(c, change['actor']['login'])
+    for change in timeline:
+        if 'actor' in change:
+            if change['actor'] is not None:
+                local_db.maybe_load_user(c, change['actor']['login'])
+        elif 'user' in change:
+            local_db.maybe_load_user(c, change['user']['login'])
+        elif change['event'] != 'committed':
+            # curiously, there is no user login when a commit timeline event happens:
+            raise RuntimeError(f'unhandled timeline change:\n{json.dumps(change, indent=2)}')
+    # nocommit also pull users out of full_pr, pr_comments, pr_reviews:
 
 def main():
     c = db.cursor()
@@ -28,51 +56,41 @@ def main():
     page = pickle.loads(row[0])
     print(f'Starting from page {page}')
 
+    # sort ascending by create date so that nomatter what changes happen to the issues/PRs, this pagination is unchanging
+    # so we get an accurate deep paging through the entire history
+    next_page_url = f'https://api.github.com/repos/apache/lucene/issues?state=all&per_page=100&direction=asc&page={page}'
+
     while True:
         count = c.execute('SELECT COUNT(*) FROM issues').fetchone()[0]
         print(f'\n\n{time.time() - start_time_sec:.1f}s: {count-2} issues in DB; page={page}')
-        batch = local_db.http_load_as_json(f'https://api.github.com/repos/apache/lucene/issues?state=all&per_page=20&direction=asc&page={page}')
+        batch, next_page_url = local_db.http_load_as_json(next_page_url, handle_pages=False)
+        print(f'  {len(batch)} issues in this page')
         for issue in batch:
             print(f'  load issue {issue["number"]}')
             # GitHub response is denormalized -- we must load a few more URLs to get all content:
-            comments, events, reactions, timeline = load_full_issue(issue)
+            comments, events, reactions, timeline, full_pr, pr_comments, pr_reviews = load_full_issue(issue)
 
-            local_db.maybe_load_user(c, issue['user']['login'])
-            for comment in comments:
-                local_db.maybe_load_user(c, comment['user']['login'])
-            for change in events:
-                local_db.maybe_load_user(c, change['actor']['login'])
-            for change in timeline:
-                if 'actor' in change:
-                    local_db.maybe_load_user(c, change['actor']['login'])
-                elif 'user' in change:
-                    local_db.maybe_load_user(c, change['user']['login'])
-                elif change['event'] != 'committed':
-                    # curiously, there is no user login when a commit timeline event happens:
-                    raise RuntimeError(f'unhandled timeline change:\n{json.dumps(change, indent=2)}')
+            load_all_referenced_users(c, issue, comments, events, reactions, timeline, full_pr, pr_comments, pr_reviews)
 
             c.execute('REPLACE INTO issues (key, pickle) VALUES (?, ?)',
-                      (str(issue['number']), pickle.dumps((issue, comments, events, reactions, timeline))))
+                      (str(issue['number']), pickle.dumps((issue, comments, events, reactions, timeline, full_pr, pr_comments, pr_reviews))))
             
         page += 1
         c.execute('INSERT OR REPLACE INTO issues (key, pickle) VALUES (?, ?)', ('page_upto', pickle.dumps(page)))
         db.commit()
 
-        # done!
-        if not batch['incomplete_results']:
+        if next_page_url is None:
+          # done!
           break
 
-    print(json.dumps(comments, indent=2))
-
 def create_db():
-    print('Now create DB!')
-    c = db.cursor()
-    c.execute('CREATE TABLE issues (key TEXT UNIQUE PRIMARY KEY, pickle BLOB)')
-    c.execute('INSERT INTO issues VALUES (?, ?)', ('last_update', pickle.dumps(datetime.datetime.utcnow())))
-    c.execute('INSERT INTO issues VALUES (?, ?)', ('page_upto', pickle.dumps(1)))
-
-    c.execute('CREATE TABLE users (login TEXT UNIQUE PRIMARY KEY, pickle BLOB)')
-    db.commit()
+  print('Now create DB!')
+  c = db.cursor()
+  c.execute('CREATE TABLE issues (key TEXT UNIQUE PRIMARY KEY, pickle BLOB)')
+  c.execute('INSERT INTO issues VALUES (?, ?)', ('last_update', pickle.dumps(datetime.datetime.utcnow())))
+  c.execute('INSERT INTO issues VALUES (?, ?)', ('page_upto', pickle.dumps(1)))
+  c.execute('CREATE TABLE users (login TEXT UNIQUE PRIMARY KEY, pickle BLOB)')
+  db.commit()
 
 if __name__ == '__main__':
     global db

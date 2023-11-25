@@ -92,7 +92,7 @@ class UISpec:
                            'text': text}})
     return q
 
-class JIRASpec(UISpec):
+class GitHubSpec(UISpec):
 
   def buildBrowseOnlyQuery(self):
     # Match all on both parent (in case it has no comments yet) and children:
@@ -113,14 +113,40 @@ class JIRASpec(UISpec):
                             'query': {'class': 'BooleanFieldQuery',
                                       'field': 'parent'}}]}
 
-  def buildTextQuery(self, text):
+  def buildHighlightTextQuery(self, text):
     l0 = []
     q = {'class': 'BooleanQuery',
          'subQueries': l0
          }
     lowerText = text.lower()
 
+    for field in ('title', 'body', 'comment_body', 'key', 'all_users', 'other_text'):
+      if field in ('title', 'key'):
+        boost = 3.0
+      else:
+        boost = 1.0
+
+      if field == 'key':
+        text0 = lowerText
+      else:
+        text0 = text
+
+      l0.append({'occur': 'should',
+                 'query': {'class': 'text',
+                           'boost': boost,
+                           'field': field,
+                           'text': text0}})
+    print(f'highlightQuery is {pprint.pprint(q)}')
+    return q
+      
+  def buildTextQuery(self, text):
+    l0 = []
+    q = {'class': 'BooleanQuery',
+         'subQueries': l0
+         }
+    lowerText = text.lower()
     l2 = []
+    
     for field in ('title', 'body', 'key', 'all_users', 'other_text'):
       if field in ('title', 'key'):
         boost = 3.0
@@ -164,8 +190,8 @@ class JIRASpec(UISpec):
                   'parentsFilter': {'class': 'BooleanFieldQuery', 'field': 'parent'},
                   'scoreMode': 'Max',
                   'childHits': {
-                     'maxChildren': 3
-                     }}})
+                    'maxChildren': 3,
+                    'sort': [{'field': 'created', 'reverse': True}]}}})
 
     print(f'query is {pprint.pprint(q)}')
     return q
@@ -215,21 +241,21 @@ class JIRASpec(UISpec):
 
     return d
 
-jiraSpec = JIRASpec()
-jiraSpec.doAutoComplete = True
-jiraSpec.showGridOrList = False
-jiraSpec.indexName = 'github'
-jiraSpec.itemLabel = 'issues'
+githubSpec = GitHubSpec()
+githubSpec.doAutoComplete = True
+githubSpec.showGridOrList = False
+githubSpec.indexName = 'github'
+githubSpec.itemLabel = 'issues'
 
 if False:
   # (field, userLabel, facetField)
-  jiraSpec.groups = (
+  githubSpec.groups = (
     ('assignee', 'assignee', 'assignee'),
     ('facetPriority', 'priority', 'facetPriority'),
     )
 
 # (id, userLabel, field, reverse):
-jiraSpec.sorts = (
+githubSpec.sorts = (
   ('relevanceRecency', 'relevance + recency', 'blendRecencyRelevance', True),
   ('relevance', 'pure relevance', None, False),
   ('oldest', 'oldest', 'created', False),
@@ -243,7 +269,7 @@ jiraSpec.sorts = (
   #('keyNum', 'issue number', 'keyNum', False),
   )
 
-jiraSpec.retrieveFields = (
+githubSpec.retrieveFields = (
   'key',
   'project',
   'updated',
@@ -262,14 +288,14 @@ jiraSpec.retrieveFields = (
   {'field': 'comment_body', 'highlight': 'snippets'},
   )
 
-jiraSpec.highlighter = {
+githubSpec.highlighter = {
   'class': 'UnifiedHighlighter',
   'passageScorer.b': 0.75,
   'maxPassages': 3,
   'maxLength': 1000000}
 
 # (userLabel, fieldName, isHierarchy, sort, doMorePopup)
-jiraSpec.facetFields = (
+githubSpec.facetFields = (
   ('Status', 'status', False, None, False),
   ('Project', 'project', False, None, False),
   ('Issue type', 'issue_or_pr', False, None, False),
@@ -297,10 +323,10 @@ jiraSpec.facetFields = (
   #('Created', 'facetCreated', True, None, False),
   )
 
-jiraSpec.textQueryFields = ['title', 'body']
+githubSpec.textQueryFields = ['title', 'body']
 # nocommit can we do key descending as number...?
-jiraSpec.browseOnlyDefaultSort = 'recentlyUpdated'
-jiraSpec.finish()
+githubSpec.browseOnlyDefaultSort = 'recentlyUpdated'
+githubSpec.finish()
 
 escape = util.escape
 
@@ -747,7 +773,7 @@ def handleSuggest(path, isMike, environ):
 
   index = 'github'
 
-  spec = jiraSpec
+  spec = githubSpec
   
   #print 'suggest: %s' % args
   t0 = time.time()
@@ -862,7 +888,7 @@ def toAgo(seconds):
 
 def renderNavSummary(w, facets, drillDowns):
   w('<b>Filters:</b>&nbsp;')
-  for idx, (userLabel, dim, ign, facetSort, doMorePopup) in enumerate(jiraSpec.facetFields):
+  for idx, (userLabel, dim, ign, facetSort, doMorePopup) in enumerate(githubSpec.facetFields):
     if facets[idx] is None:
       # no facet counts for this dim for this query
       continue
@@ -1063,7 +1089,7 @@ def handleMoreFacets(path, isMike, environ):
 
   index = 'github'
 
-  spec = jiraSpec
+  spec = githubSpec
   
   _l = []
   w = _l.append
@@ -1234,7 +1260,7 @@ def handleQuery(path, isMike, environ):
 
   index = 'github'
 
-  spec = jiraSpec
+  spec = githubSpec
 
   _l = Buffer()
   w = _l.add
@@ -1401,6 +1427,7 @@ def handleQuery(path, isMike, environ):
 
   if text is not None:
     query['query'] = spec.buildTextQuery(text)
+    query['highlightQuery'] = spec.buildHighlightTextQuery(text)
   else:
     query['query'] = spec.buildBrowseOnlyQuery()
     
@@ -1437,6 +1464,10 @@ def handleQuery(path, isMike, environ):
 
   if sort != 'relevance':
     query['sort'] = makeSort(spec, sort)
+    if text is not None and text != '':
+      assert query['query']['subQueries'][1]['query']['class'] == 'ToParentBlockJoinQuery'
+      # also sort text matches in child hits by the same main sort:
+      query['query']['subQueries'][1]['query']['childHits']['sort'] = makeSort(spec, sort)['fields']
 
   if format == 'list':
     groupsPerPage = 2

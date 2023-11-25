@@ -152,7 +152,8 @@ import net.minidev.json.JSONValue;
 
 // nocommit why no double range faceting?
 
-// nocommit remove SearchHandler and replace w/ this impl
+// nocommit remove SearchHandler and replace w/ this impl -- NOTE this is nowhere near complete!  It is a work in progress, trying
+// to switch to a single distributed queue instead of queue-per-node
 
 /** Handles {@code search} using distributed queue. */
 public class Search2Handler extends Handler {

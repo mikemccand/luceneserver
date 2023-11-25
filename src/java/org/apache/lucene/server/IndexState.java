@@ -768,6 +768,14 @@ public class IndexState implements Closeable {
     return o;
   }
 
+  public void closeSuggester(String suggestName) throws IOException {
+    Lookup suggester = suggesters.get(suggestName);
+    if (suggester != null) {
+      ((Closeable) suggester).close();
+      suggesters.remove(suggestName);
+    }
+  }
+
   /** Commit all state and shards. */
   public synchronized long commit() throws IOException {
 

@@ -21,6 +21,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.StringReader;
+import java.nio.file.NoSuchFileException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -404,10 +405,21 @@ public class BuildSuggestHandler extends Handler {
     final String jsonOrig = r.toString();
 
     final String suggestName = r.getString("suggestName");
-    if (!IndexState.isSimpleName(suggestName)) {
+    if (IndexState.isSimpleName(suggestName) == false) {
       r.fail("suggestName", "invalid suggestName \"" + suggestName + "\": must be [a-zA-Z_][a-zA-Z0-9]*");
     }
 
+    if (indexState.suggesters.containsKey(suggestName)) {
+      indexState.closeSuggester(suggestName);
+
+      // nocommit this might be a directory (AnalyzingInfixSuggester)?
+      try {
+        shardState.origIndexDir.deleteFile("suggest." + suggestName);
+      } catch (NoSuchFileException nsfe) {
+        // nocommit i don't like this leniency
+      }
+    }
+        
     final Lookup suggester = getSuggester(indexState, suggestName, r);
 
     Request source = r.getStruct("source");

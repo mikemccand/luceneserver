@@ -5,7 +5,6 @@ import localconstants
 import json
 import datetime
 from datetime import timezone
-from index_github import decode_and_load_one_issue
 
 DB_PATH = localconstants.DB_PATH
 
@@ -49,17 +48,23 @@ def main():
     if k in ('last_update', 'page_upto'):
       continue
 
-    (issue, comments, events, reactions, timeline), full_pr, full_pr_comments, pr_reviews = decode_and_load_one_issue(c2, v)
+    issue, comments, events, reactions, timeline, full_pr, full_pr_comments, pr_reviews = pickle.loads(v)
 
     if issue['number'] == number:
       print(f'\nISSUE:\n{json.dumps(issue, indent=2)}')
-      print(f'\nCOMMENTS:\n{json.dumps(comments, indent=2)}')
-      print(f'\nEVENTS:\n{json.dumps(events, indent=2)}')
-      print(f'\nREACTIONS:\n{json.dumps(reactions, indent=2)}')
-      print(f'\nTIMELINE:\n{json.dumps(timeline, indent=2)}')
+      print(f'\nCOMMENTS (count={len(comments)}):')
+      print_list('comment', comments)
+      print(f'\nEVENTS (count={len(events)}):\n')
+      print_list('event', events)
+      print(f'\nREACTIONS (count={len(reactions)}):')
+      print_list('reaction', reactions)
+      print(f'\nTIMELINE (count={len(timeline)}):')
+      print_list('timeline', timeline)
       print(f'\nFULL_PR:\n{json.dumps(full_pr, indent=2)}')
-      print(f'\nFULL_PR_COMMENTS:\n{json.dumps(full_pr_comments, indent=2)}')
-      print(f'\nPR_REVIEWS:\n{json.dumps(pr_reviews, indent=2)}')
+      print(f'\nFULL_PR_COMMENTS (count={len(full_pr_comments)}):')
+      print_list('full_pr_comments', full_pr_comments)
+      print(f'\nPR_REVIEWS (count={len(full_pr_comments)}):')
+      print_list('pr_reviews', pr_reviews)
 
     if 'pull_request' in issue:
       if 'mergeable_state' in issue and issue['mergeable_state'] == 'unknown':
@@ -82,6 +87,11 @@ def main():
   entries.sort()
   for days_age, count in entries:
       print(f'{days_age} days: {count}')
+
+def print_list(desc, l):
+  
+  for i, ent in enumerate(l):
+    print(f'  {desc} {i}:\n    {json.dumps(ent, indent=4)}')
   
 if __name__ == '__main__':
   main()

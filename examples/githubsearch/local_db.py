@@ -78,14 +78,15 @@ def maybe_load_user(c, login):
   user = http_load_as_json(f'https://api.github.com/users/{login}')
   name = user['name']
   print(f'  --> name: {name}')
-  c.execute('INSERT INTO users (login, pickle) VALUES (?, ?)', (login, pickle.dumps(user)))
+  c.execute('REPLACE INTO users (login, pickle) VALUES (?, ?)', (login, pickle.dumps(user)))
   login_to_name[login] = name
 
   # yes, O(N^2) but N is smallish, and this cost is paid once on initial GitHub crawl
   open('%s/user_names_map.pk' % ROOT_STATE_PATH, 'wb').write(pickle.dumps(login_to_name))
 
-def http_load_as_json(url, do_post=False, token=GITHUB_API_TOKEN):
+def http_load_as_json(url, do_post=False, token=GITHUB_API_TOKEN, handle_pages=True):
   global ratelimit_remaining
+  print(f'    load to json {url} {handle_pages=}')
 
   all_results = None
 
@@ -103,8 +104,6 @@ def http_load_as_json(url, do_post=False, token=GITHUB_API_TOKEN):
       raise RuntimeError(f'got {response.status_code} response loading {url}\n\n {response.text}')
     if not response.headers['Content-Type'].startswith('application/json'):
       raise RuntimeError(f'got {response.headers["Content-Type"]} but expected application/json when loading {url}')
-
-    # print(f'\n{url}\n  response headers: {response.headers}')
 
     # wait due to GitHub API throttling:
     ratelimit_remaining = int(response.headers['X-RateLimit-Remaining'])
@@ -127,10 +126,18 @@ def http_load_as_json(url, do_post=False, token=GITHUB_API_TOKEN):
       else:
         all_results.extend(this_page_results)
 
-    if 'next' in response.links:
+    if 'next' in response.links and handle_pages:
       # this is a paginated response, and we have not reached the end yet:
       url = response.links['next']['url']
+      print(f'      next page: {url}, result count is {len(all_results)}')
     else:
       break
 
-  return all_results
+  if handle_pages:
+    return all_results
+  else:
+    if 'next' in response.links:
+      next_page_url = response.links['next']['url']
+    else:
+      next_page_url = None
+    return all_results, next_page_url
