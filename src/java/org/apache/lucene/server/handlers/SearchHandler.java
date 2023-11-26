@@ -659,8 +659,6 @@ public class SearchHandler extends Handler {
           } else {
             docFieldValues[j] = "";
           }
-
-          System.out.println("  loadFieldValues field=" + fields[j] + " docID=" + docID + " fieldValues=" + Arrays.toString(docFieldValues));
         }
       }
 
@@ -687,7 +685,6 @@ public class SearchHandler extends Handler {
         bi = null;
       }
     } else {
-      System.out.println("USING SENTENCE INSTANCE BI");
       bi = BreakIterator.getSentenceInstance(Locale.ROOT);
     }
     return bi;
@@ -2736,7 +2733,6 @@ public class SearchHandler extends Handler {
             for(GroupDocs<Integer> group : joinGroups.groups) {
               highlightDocIDs[upto++] = group.groupValue.intValue();
               for(ScoreDoc scoreDoc : group.scoreDocs) {
-                System.out.println("HIGHLIGHT: add child doc " + scoreDoc.doc);
                 highlightDocIDs[upto++] = scoreDoc.doc;
               }
             }
@@ -2765,20 +2761,6 @@ public class SearchHandler extends Handler {
           }
           upto++;
         }
-        System.out.println("highlightDocIds=" + Arrays.toString(highlightDocIDs));
-
-        // nocommit
-        /*
-        BooleanQuery.Builder newQuery = new BooleanQuery.Builder();
-        newQuery.add(new TermQuery(new Term("comment_body", "baby")), BooleanClause.Occur.SHOULD);
-        newQuery.add(new TermQuery(new Term("comment_body", "steps")), BooleanClause.Occur.SHOULD);
-        newQuery.add(new TermQuery(new Term("comment_body", "fst")), BooleanClause.Occur.SHOULD);
-        newQuery.add(new TermQuery(new Term("body", "baby")), BooleanClause.Occur.SHOULD);
-        newQuery.add(new TermQuery(new Term("body", "steps")), BooleanClause.Occur.SHOULD);
-        newQuery.add(new TermQuery(new Term("body", "fst")), BooleanClause.Occur.SHOULD);
-        */
-
-        System.out.println("queryOrig=" + queryOrig);
 
         Query queryForHighlights;
         if (r.hasParam("highlightQuery")) {
@@ -2791,9 +2773,6 @@ public class SearchHandler extends Handler {
                                                                 queryForHighlights,
                                                                 highlightDocIDs,
                                                                 maxPassages);
-        for (Map.Entry<String, Object[]> ent : highlights.entrySet()) {
-          System.out.println("GOT HIGHTLIGHTS: " + ent.getKey() + " -> " + Arrays.toString(ent.getValue()));
-        }
       }
       diagnostics.put("highlightTimeMS", (System.nanoTime() - t0)/1000000.);
 
@@ -2946,7 +2925,6 @@ public class SearchHandler extends Handler {
               if (Float.isNaN(hit.score) == false) {
                 o6.put("score", hit.score);
               }
-              System.out.println("FILL FIELDS FOR CHILD HITS highlighter=" + highlighter);
 
               if (fields != null || highlightFields != null) {
                 JSONObject o7 = new JSONObject();

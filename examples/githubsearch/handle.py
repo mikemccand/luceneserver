@@ -113,12 +113,27 @@ class GitHubSpec(UISpec):
                             'query': {'class': 'BooleanFieldQuery',
                                       'field': 'parent'}}]}
 
-  def buildHighlightTextQuery(self, text):
+  def buildHighlightTextQuery(self, text, drill_downs):
+
+    if text is None:
+      text = ''
+      
+    print(f'check {drill_downs=}')
+    for field, value in drill_downs:
+      if field in ('mentioned_users', 'requested_reviewers'):
+        for login in value[0]:
+          print(f'now add text {str(login)}')
+          text += ' ' + str(login)
+
+    if text == '':
+      return None
+    
+    lowerText = text.lower()
+
     l0 = []
     q = {'class': 'BooleanQuery',
          'subQueries': l0
          }
-    lowerText = text.lower()
 
     for field in ('title', 'body', 'comment_body', 'key', 'all_users', 'other_text'):
       if field in ('title', 'key'):
@@ -136,6 +151,7 @@ class GitHubSpec(UISpec):
                            'boost': boost,
                            'field': field,
                            'text': text0}})
+
     print(f'highlightQuery is {pprint.pprint(q)}')
     return q
       
@@ -304,6 +320,10 @@ githubSpec.facetFields = (
   ('Updated', 'updated', False, None, False),
   ('Updated ago', 'updated_ago', False, None, False),
   ('Comment count', 'comment_count', False, None, False),
+  ('Review Requested', 'requested_reviewers', False, None, True),
+  ('Mentioned', 'mentioned_users', False, None, True),
+  ('Reviewed', 'reviewed_users', False, None, True),
+  ('Commented', 'commented_users', False, None, True),
   ('User', 'all_users', False, None, True),
   ('Committed by', 'committed_by', False, None, True),
   ('Last comment user', 'last_contributor', False, None, True),
@@ -1425,9 +1445,12 @@ def handleQuery(path, isMike, environ):
   if text in ('*', '*:*'):
     text = None
 
+  hq = spec.buildHighlightTextQuery(text, drillDowns)
+  if hq is not None:
+    query['highlightQuery'] = hq
+  
   if text is not None:
     query['query'] = spec.buildTextQuery(text)
-    query['highlightQuery'] = spec.buildHighlightTextQuery(text)
   else:
     query['query'] = spec.buildBrowseOnlyQuery()
     

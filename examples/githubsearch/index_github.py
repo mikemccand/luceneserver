@@ -33,6 +33,7 @@ when you run this.
 """
 
 # TODO
+#   - get mentioned field indexed & drill down!
 #   - grr PhraseQuery doesn't work (double quotes)?
 #   - other_text is hidden from user -- not great!  maybe commit_messages / timeline should be true child docs?
 #   - add a comment_other_text and put username/login of person who commented?
@@ -216,6 +217,26 @@ def create_schema(svr):
                          'facet': 'flat',
                          'analyzer': analyzer,
                          'multiValued': True},
+            'mentioned_users': {'type': 'text',
+                         'store': True,
+                         'facet': 'flat',
+                         'analyzer': analyzer,
+                         'multiValued': True},
+            'commented_users': {'type': 'text',
+                                'store': True,
+                                'facet': 'flat',
+                                'analyzer': analyzer,
+                                'multiValued': True},
+            'reviewed_users': {'type': 'text',
+                               'store': True,
+                               'facet': 'flat',
+                               'analyzer': analyzer,
+                               'multiValued': True},
+            'requested_reviewers': {'type': 'text',
+                                    'store': True,
+                                    'facet': 'flat',
+                                    'analyzer': analyzer,
+                                    'multiValued': True},
             'committed_paths': {'type': 'atom',
                                 'search': False,
                                 'multiValued': True,
@@ -831,6 +852,9 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
       if full_pr is not None:
         # for some reason these sometimes differ, e.g. 'FIRST_TIMER' vs 'FIRST_TIME_CONTRIBUTOR'
         author_association = full_pr['author_association']
+
+      doc['requested_reviewers'] = [x['login'] for x in full_pr['requested_reviewers']]
+        
     else:
       doc['issue_or_pr'] = 'Issue'
 
@@ -859,15 +883,38 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
     for event in events:
       updated = max(updated, parse_date_time(event['created_at']))
 
+    mentioned_users = set()
+    commented_users = set()
+    reviewed_users = set()
+    for event in events:
+      what = event['event']
+      if what == 'mentioned':
+        # oddly mentioned happens in both events and timelines:
+        mentioned_users.add(event['actor']['login'])
+    
+    for event in timeline:
+      what = event['event']
+      if what == 'commented':
+        commented_users.add(event['actor']['login'])
+      elif what == 'reviewed':
+        reviewed_users.add(event['user']['login']) 
+      elif what == 'mentioned':
+        # oddly mentioned happens in both events and timelines:
+        mentioned_users.add(event['actor']['login'])
+    doc['commented_users'] = list(commented_users)
+    doc['reviewed_users'] = list(reviewed_users)
+    doc['mentioned_users'] = list(mentioned_users)
+
+
     change_events = set()
 
     for change in events:
       #if event['event'] != 'closed':
         #print(f'event: {json.dumps(event, indent=2)}')
       #print(f'event: {event.actor.login} {event.event} {event.created_at} {event.label} {event.assignee} {event.assigner} {event.review_requester} {event.requested_reviewer} {event.dismissed_review} {getattr(event, "team", None)} {event.milestone} {event.rename} {event.lock_reason}')
-      if event['actor'] is not None:
+      if change['actor'] is not None:
         # TODO: why is this sometimes (rarely: at least #12450) None?
-        add_user(all_users, event['actor'], project, source='events')
+        add_user(all_users, change['actor'], project, source='events')
       change_events.add(change['event'])
 
     # TODO: what really is the difference between events and timeline?
@@ -1326,8 +1373,6 @@ def append_one_suggest_issue(suggest_file, issue, comments, events):
   # curiously, mentions of an issue/PR will not refresh the updated_at for that issue/PR, so we do it manually here:
   for event in events:
     updated = max(updated, parse_date_time(event['created_at']))
-
-  # TODO: comments, timeline too?
 
   # Index project as a context, so we can suggest within project:
   weight = int((updated-MY_EPOCH).total_seconds())
