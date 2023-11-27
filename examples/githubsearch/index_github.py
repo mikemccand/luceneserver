@@ -791,6 +791,12 @@ def to_utc_epoch_seconds(dt):
   else:
     raise RuntimeError(f'datetime {dt} is not timezone aware or is not in UTC')
 
+AUTHOR_ASSOCIATION_MAP = {'NONE': 'None',
+                          'MEMBER': 'Member',
+                          'CONTRIBUTOR': 'Contributor',
+                          'FIRST_TIME_CONTRIBUTOR': 'New contributor',
+                          'FIRST_TIMER': 'New GitHub user'}
+
 def index_docs(svr, issues, printIssue=False, updateSuggest=False):
 
   bulk = server.ChunkedSend(svr, 'bulkUpdateDocuments', 32768)
@@ -851,6 +857,7 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
       #print(f'comments is {json.dumps(comments, indent=2)}')
       if full_pr is not None:
         # for some reason these sometimes differ, e.g. 'FIRST_TIMER' vs 'FIRST_TIME_CONTRIBUTOR'
+        # --> ahh see https://docs.github.com/en/graphql/reference/enums#commentauthorassociation
         author_association = full_pr['author_association']
 
       doc['requested_reviewers'] = [x['login'] for x in full_pr['requested_reviewers']]
@@ -1284,7 +1291,7 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
     # count both normal comments and PR code comments:
     doc['comment_count'] = total_comment_count
 
-    doc['author_association'] = list(author_associations)
+    doc['author_association'] = list([AUTHOR_ASSOCIATION_MAP.get(x, x) for x in author_associations])
 
     # we compute our own updated since GitHub's fails to notice (touch updated) when an issue/PR is referenced/mentioned
     doc['updated'] = to_utc_epoch_seconds(updated)

@@ -313,7 +313,7 @@ githubSpec.highlighter = {
 # (userLabel, fieldName, isHierarchy, sort, doMorePopup)
 githubSpec.facetFields = (
   ('Status', 'status', False, None, False),
-  ('Project', 'project', False, None, False),
+  #('Project', 'project', False, None, False),
   ('Issue type', 'issue_or_pr', False, None, False),
   ('Author relation', 'author_association', False, None, False),
   ('Comment type', 'comment_type', False, None, False),
