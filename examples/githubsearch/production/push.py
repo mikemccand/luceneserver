@@ -59,10 +59,9 @@ sshIdent = ''
 
 print()
 
-# nocommit put back
-if False:
+if True:
   print('Snapshot')
-  run(f'ssh -t {sshIdent} {userHost} "cd {UI_PATH}/production; python3 -u snapshot.py"')
+  run(f'ssh -t {sshIdent} {userHost} "cd {UI_PATH}/production; {localconstants.PYTHON_EXE} -u snapshot.py"')
 
 if doServer:
   serverDistPath = '/l/luceneserver/build/luceneserver-%s-SNAPSHOT.zip' % localconstants.LUCENE_SERVER_VERSION
@@ -81,13 +80,13 @@ else:
   extra = ''
 
 print(f'\nnow restart')
-run(f'ssh -t {sshIdent} {userHost} "cd {UI_PATH}/production; python3 -u restart.py{extra}"')
+run(f'ssh -t {sshIdent} {userHost} "cd {UI_PATH}/production; {localconstants.PYTHON_EXE} -u restart.py{extra}"')
 
 print()
 print('Verify')
 while True:
   try:
-    s = urllib.request.urlopen('http://jirasearch.mikemccandless.com/search.py').read().decode('utf-8')
+    s = urllib.request.urlopen('http://githubsearch.mikemccandless.com/search.py').read().decode('utf-8')
   except:
     print()
     print('Failed to load search.py... will retry:')

@@ -320,6 +320,7 @@ githubSpec.facetFields = (
   ('Updated', 'updated', False, None, False),
   ('Updated ago', 'updated_ago', False, None, False),
   ('Comment count', 'comment_count', False, None, False),
+  ('Reaction count', 'reaction_count', False, None, False),
   ('Review Requested', 'requested_reviewers', False, None, True),
   ('Mentioned', 'mentioned_users', False, None, True),
   ('Reviewed', 'reviewed_users', False, None, True),
@@ -677,7 +678,7 @@ class RenderFacets:
       else:
         newPath = (label,)
 
-      if ddName != 'comment_count':
+      if ddName not in ('reaction_count', 'comment_count'):
         if label == '1':
           label = 'Yes'
         elif label == '0':
@@ -1159,6 +1160,14 @@ def handleMoreFacets(path, isMike, environ):
               break
           else:
             raise RuntimeError(f'failed to find numericRange label {value} for dimension {field}')
+        elif field == 'reaction_count':
+          for d in getReactionCountFacets():
+            if d['label'] == value[0]:
+              l2.append({'field': 'reaction_count',
+                         'numericRange': d})
+              break
+          else:
+            raise RuntimeError(f'failed to find numericRange label {value} for dimension {field}')
         else:
           l2.append({'field': field, 'value': value})
 
@@ -1197,6 +1206,15 @@ def getTimeFacets(now):
     ]
 
 def getCommentCountFacets():
+  return [
+    {'label': '0', 'min': 0, 'max': 0, 'minInclusive': True, 'maxInclusive': True},
+    {'label': '1', 'min': 1, 'max': 1, 'minInclusive': True, 'maxInclusive': True},
+    {'label': '2 - 5', 'min': 2, 'max': 5, 'minInclusive': True, 'maxInclusive': True},
+    {'label': '6 - 10', 'min': 6, 'max': 10, 'minInclusive': True, 'maxInclusive': True},
+    {'label': '10 - 20', 'min': 10, 'max': 20, 'minInclusive': True, 'maxInclusive': True},
+    {'label': '> 20', 'min': 20, 'max': 100000000000, 'minInclusive': True, 'maxInclusive': True}]
+
+def getReactionCountFacets():
   return [
     {'label': '0', 'min': 0, 'max': 0, 'minInclusive': True, 'maxInclusive': True},
     {'label': '1', 'min': 1, 'max': 1, 'minInclusive': True, 'maxInclusive': True},
@@ -1531,6 +1549,8 @@ def handleQuery(path, isMike, environ):
       d = {'dim': 'updated_ago', 'numericRanges': getOldTimeFacets(now)}
     elif dim == 'comment_count':
       d = {'dim': 'comment_count', 'numericRanges': getCommentCountFacets()}
+    elif dim == 'reaction_count':
+      d = {'dim': 'reaction_count', 'numericRanges': getReactionCountFacets()}
     else:      
       d = {'dim': dim, 'topN': topN}
     l.append(d)
@@ -1590,10 +1610,18 @@ def handleQuery(path, isMike, environ):
               break
           else:
             raise RuntimeError(f'failed to find numericRange label {value} for dimension {field}')
+        elif field == 'reaction_count':
+          for d in getReactionCountFacets():
+            if d['label'] == value[0]:
+              l2.append({'field': 'reaction_count',
+                         'numericRange': d})
+              break
+          else:
+            raise RuntimeError(f'failed to find numericRange label {value} for dimension {field}')
         else:
           l2.append({'field': field, 'value': value})
 
-      if field not in ('updated', 'updated_ago', 'comment_count') and not spec.facetByID[field][0]:
+      if field not in ('updated', 'updated_ago', 'comment_count', 'reaction_count') and not spec.facetByID[field][0]:
         ddExtraMap[field] = len(l)
         l.append({'dim': field, 'labels': values[0]})
                   

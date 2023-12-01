@@ -33,20 +33,26 @@ when you run this.
 """
 
 # TODO
-#   - get mentioned field indexed & drill down!
+#   - don't allow multi-select on some facet fields e.g. Update / ago
+#   - commit metadata to check
+#     - find changes entries that appear illegaly under more than one release
+#     - missing : in issues
+#     - issues/pr are closed after change is merged
+#     - if backported to 9.x, milestone says so
+#     - entry is in right section of changes
+#     - changes.txt are consistent main and 9.9
+#     - how to keep track of branch head commit?  derive 9.x and main branch commits?
+#     - confirm there is a changes entry when a commit references a PR
+#     - confirm PRs were backported
+#   - cutover git_history.txt -> REST commits API
 #   - grr PhraseQuery doesn't work (double quotes)?
 #   - other_text is hidden from user -- not great!  maybe commit_messages / timeline should be true child docs?
 #   - add a comment_other_text and put username/login of person who commented?
-#   - attr: PR has force pushes?
-#   - highlight not working in sub-docs (comments) when I search for FST
-#   - how come no PRs in the first N pages of a fresh load!?
 #   - hmm suggeter shoudl weight exact match highest!  suggest for 1245 (no space in the end) is missing that one in top N!
 #     - grr also: space after a term should change the suggestions!  this used to work?
-#   - huh does the issues search API also return PRs?  hope so!
 #   - fixup load all users logic
 #   - prod
 #     - get prod tools working again
-#     - get letsencrypt cert
 #   - upgrade AL -- just build a new lightsail instance
 #   - fix username situation
 #      - allow search by login name and display name
@@ -57,7 +63,6 @@ when you run this.
 #   - launch as beta publicly, get feedback
 #   - hmm is periodic "git pull" not working in nrt mode?  only seemed to work on restart?
 #   - move this to examples/githubsearch; restore jirasearch to work w/ Jira
-#   - upgrade luceneserver to latest lucene
 #   - somehow tie/present display name for users login
 #   - should we link/associate PRs that related to issues?
 #   - re-run full gibhub -> localdb, removing these separate joined tables!
@@ -66,8 +71,6 @@ when you run this.
 #   - add property "awaiting approval to run steps" boolean field?
 #   - GRRR the load_issue and load_pr APIs give more info than the list issue/pr!?
 #     - and mergeability is delayed computed in the BG eventgual consistency -- must periodcially resweep the open PRs?
-#   - does timeline show who approved the run steps?
-#   - get pr state in there -- cancelled, merged, draft, open
 #   - index some cool PR attrs
 #     - merged by?
 #     - author_association: first time contributor, contributor, member
@@ -78,19 +81,14 @@ when you run this.
 #     - draft
 #     - merged x closed?
 #     - etc.
-#   - index this silly "waiting for approval to run something"
 #   - how to map Jira username to GH login?
 #   - add attrs
 #     - watched_by (user) / has_watchers?
-#     - is_mentioned (user) / has_mentions?
 #   - should i track uers's email too, and use that to resolve the commit event in timelines?
 #   - can/should I also search individual commits?
 #     - which committers commit other people's PRs often?
-#   - how to get display name for users
 #   - how to get attachments info!?
 #   - ooh can we use blame API?  https://docs.gitlab.com/ee/api/repository_files.html
-#   - separate out tool to incrementally update the sqllite DB, from NRT indexing?  but share its code, or maybe just return list of issues updated
-#   - pull out mentions / @calls
 #   - hmm: fix suggest to build jira AND github
 #   - separate user login vs display name more consistently
 #   - parse legacy jira attachments comment, but also new github issue attachments
@@ -255,7 +253,9 @@ def create_schema(svr):
                               'search': True},
             'reaction_count': {'type': 'int',
                                'sort': True,
-                               'store': True},
+                               'store': True,
+                               'facet': 'numericRange',
+                               'search': True},
             'vote_count': {'type': 'int',
                            'sort': True,
                            'store': True},
