@@ -33,7 +33,13 @@ when you run this.
 """
 
 # TODO
+#   - make github indexing a true service like jirasearch
+#   - get nrt.log monitoring working again!
+#   - get monitor notifications working again
 #   - don't allow multi-select on some facet fields e.g. Update / ago
+#   - hmm NRT indexing broken?  #12508 failed to close nor update comments
+#   - mike S: so I would like one (saved filter/s) where every issue assigned to me, I opened, I'm mentioned, etc.
+#   - default to Open status
 #   - commit metadata to check
 #     - find changes entries that appear illegaly under more than one release
 #     - missing : in issues
