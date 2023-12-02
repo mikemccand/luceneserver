@@ -37,7 +37,7 @@ from threading import Thread
 from socketserver import ThreadingMixIn
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import time
-import imp
+import importlib
 import wsgiref.simple_server
 import util
 import search
@@ -143,7 +143,7 @@ def application(environ, startResponse):
     t = os.path.getmtime('handle.py')
     if t > lastImportTime:
       print('Reload handle.py')
-      handle = imp.reload(handle)
+      handle = importlib.reload(handle)
       lastImportTime = t
 
   if environ['PATH_INFO'] == '/search.py':

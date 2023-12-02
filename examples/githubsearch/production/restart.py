@@ -109,7 +109,7 @@ else:
 print()
 print('Start new Indexer')
 os.chdir('..')
-run(f'nohup {localconstants.PYTHON_EXE} -u index_github.py -server localhost:{PORT} -nrt{extra} > {localconstants.STATE_LOG_DIR} 2>&1 &')
+run(f'nohup {localconstants.PYTHON_EXE} -u index_github.py -server localhost:{PORT} -nrt{extra} > {localconstants.STATE_LOG_DIR}/nrt.log 2>&1 &')
 
 print()
 print('Wait 5 seconds')

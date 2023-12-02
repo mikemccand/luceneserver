@@ -48,31 +48,32 @@ else:
     else:
       raise RuntimeError('unknown arg %s' % arg)
 
-userHost = 'changingbits@web504.webfaction.com'
+#userHost = 'changingbits@web504.webfaction.com'
+userHost = 'ec2-user@jirasearch.mikemccandless.com'
 #userHost = 'mike@10.17.4.12'
 sshIdent = ''
 #sshIdent = '-i /home/mike/.ssh/aws_changingbits.pem'
 
 print()
 print('Snapshot')
-run('ssh -t %s %s "cd src/ui/production; python3 -u snapshot.py"' % (sshIdent, userHost))
+run('ssh -t %s %s "cd src/jira-ui/production; python3 -u snapshot.py"' % (sshIdent, userHost))
 
 if doServer:
   serverDistPath = '/l/luceneserver/build/luceneserver-%s.zip' % localconstants.LUCENE_SERVER_VERSION
   print()
   print('Copy %s' % serverDistPath)
-  run('scp %s %s %s:src/ui' % (sshIdent, serverDistPath, userHost))
-  run('ssh %s %s "cd src/ui; rm -rf luceneserver; unzip luceneserver-%s.zip; mv luceneserver-%s luceneserver; rm luceneserver-%s.zip"' % (sshIdent, userHost, localconstants.LUCENE_SERVER_VERSION, localconstants.LUCENE_SERVER_VERSION, localconstants.LUCENE_SERVER_VERSION))
+  run('scp %s %s %s:src/jira-ui' % (sshIdent, serverDistPath, userHost))
+  run('ssh %s %s "cd src/jira-ui; rm -rf luceneserver; unzip luceneserver-%s.zip; mv luceneserver-%s luceneserver; rm luceneserver-%s.zip"' % (sshIdent, userHost, localconstants.LUCENE_SERVER_VERSION, localconstants.LUCENE_SERVER_VERSION, localconstants.LUCENE_SERVER_VERSION))
 
 if doUI:
   print('Push UI/indexing scripts')
-  run('scp %s -r ../gitHistory.py ../handle.py ../indexJira.py ../Latin-dont-break-issues.rbbi ../server.py ../moreFacets.py ../search.py ../static ../production ../suggest.py ../util.py %s:src/ui' % (sshIdent, userHost))
+  run('scp %s -r ../gitHistory.py ../handle.py ../indexJira.py ../Latin-dont-break-issues.rbbi ../server.py ../moreFacets.py ../search.py ../static ../production ../suggest.py ../util.py %s:src/jira-ui' % (sshIdent, userHost))
 
 if doReindex:
   extra = ' -reindex'
 else:
   extra = ''
-run('ssh -t %s %s "cd src/ui/production; python3 -u restart.py%s"' % (sshIdent, userHost, extra))
+run('ssh -t %s %s "cd src/jira-ui/production; python3 -u restart.py%s"' % (sshIdent, userHost, extra))
 
 print()
 print('Verify')

@@ -52,7 +52,8 @@ else:
       raise RuntimeError('unknown arg %s' % arg)
 
 #userHost = 'changingbits@web504.webfaction.com'
-userHost = 'ec2-user@githubsearch.mikemccandless.com'
+userHost = f'ec2-user@{localconstants.INSTANCE_PRIVATE_IP}'
+#userHost = 'ec2-user@githubsearch.mikemccandless.com'
 #userHost = 'mike@10.17.4.12'
 sshIdent = ''
 #sshIdent = '-i /home/mike/.ssh/aws_changingbits.pem'
@@ -68,11 +69,11 @@ if doServer:
   print()
   print(f'copy {serverDistPath}"')
   run(f'scp {sshIdent} {serverDistPath} {userHost}:{UI_PATH}')
-  run(f'ssh {sshIdent} {userHost} "cd {UI_PATH}; rm -f luceneserver; unzip luceneserver-{localconstants.LUCENE_SERVER_VERSION}-SNAPSHOT.zip; ln -s luceneserver-{localconstants.LUCENE_SERVER_VERSION}-SNAPSHOT luceneserver; rm luceneserver-{localconstants.LUCENE_SERVER_VERSION}-SNAPSHOT.zip"')
+  run(f'ssh {sshIdent} {userHost} "cd {UI_PATH}; rm -rf luceneserver; unzip luceneserver-{localconstants.LUCENE_SERVER_VERSION}-SNAPSHOT.zip; ln -s luceneserver-{localconstants.LUCENE_SERVER_VERSION}-SNAPSHOT luceneserver; rm luceneserver-{localconstants.LUCENE_SERVER_VERSION}-SNAPSHOT.zip"')
 
 if doUI:
   print('Push UI/indexing scripts')
-  run(f'scp {sshIdent} -r ../gitHistory.py ../handle.py ../index_github.py ../Latin-dont-break-issues.rbbi ../server.py ../moreFacets.py ../search.py ../static ../production ../suggest.py ../local_db.py ../util.py ../direct_load_all_github_issues.py ../update_from_github.py {userHost}:{UI_PATH}')
+  run(f'scp {sshIdent} -r ../status.py ../gitHistory.py ../handle.py ../index_github.py ../Latin-dont-break-issues.rbbi ../server.py ../moreFacets.py ../search.py ../static ../production ../suggest.py ../local_db.py ../util.py ../direct_load_all_github_issues.py ../update_from_github.py {userHost}:{UI_PATH}')
 
 if doReindex:
   extra = ' -reindex'

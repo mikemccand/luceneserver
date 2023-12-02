@@ -33,6 +33,9 @@ when you run this.
 """
 
 # TODO
+#   - GRR what firewall is sometimes blocking ssh/scp?
+#   - GRR how to get status.py to run in one interpreter only?
+#   - get push.py working; use git to move the UI sources
 #   - make github indexing a true service like jirasearch
 #   - get nrt.log monitoring working again!
 #   - get monitor notifications working again

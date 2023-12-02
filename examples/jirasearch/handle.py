@@ -246,6 +246,7 @@ jiraSpec.retrieveFields = (
   'key',
   'updated',
   'created',
+  'project',
   {'field': 'allUsers', 'highlight': 'whole'},
   'status',
   'author',
@@ -256,6 +257,7 @@ jiraSpec.retrieveFields = (
    'commitURL',
    {'field': 'summary', 'highlight': 'whole'},
    {'field': 'description', 'highlight': 'snippets'},
+   {'field': 'body', 'highlight': 'snippets'},
   )
 
 jiraSpec.highlighter = {
@@ -268,13 +270,7 @@ jiraSpec.highlighter = {
 jiraSpec.facetFields = (
   ('Status', 'status', False, None, False),
   ('Project', 'project', False, None, False),
-  ('Issue type', 'issue_or_pr', False, None, False),
-  ('Author relation', 'author_association', False, None, False),
-  ('Comment type', 'comment_type', False, None, False),
   ('Updated', 'updated', False, None, False),
-  ('Issue type', 'issue_or_pr', False, None, False),
-  ('Author relation', 'author_association', False, None, False),
-  ('Comment type', 'comment_type', False, None, False),
   ('Updated ago', 'updatedAgo', False, None, False),
   ('User', 'allUsers', False, None, True),
   ('Committed by', 'committedBy', False, None, True),
@@ -910,21 +906,21 @@ def renderJiraHits(w, text, groups, userDrillDowns):
     else:
       skey = '<s>%s</s>' % key
 
-    issue_url = f'http://github.com/apache/{project}/issues/{key_orig}'
+    issue_url = f'http://github.com/apache/{project}/issues/{keyOrig}'
 
-     w('<tr><td><br><a href="http://issues.apache.org/jira/browse/%s"><font size=+2>%s: %s</font></a></td></tr>' % \
+    w('<tr><td><br><a href="http://issues.apache.org/jira/browse/%s"><font size=+2>%s: %s</font></a></td></tr>' % \
        (keyOrig, skey, fixHilite(fields['summary'])))
 
-    print(f'{key=} updated={fields["updated"]} vs {now_utc=} delta={now_utc - fields["updated"]}')
+    # print(f'{key=} updated={fields["updated"]} vs {now_utc=} delta={now_utc - fields["updated"]}')
 
-     w('<tr><td><em><font size=-1>%s ago&nbsp;&nbsp;%d comments&nbsp;&nbsp;%d votes&nbsp;&nbsp;%d watches&nbsp;&nbsp;%s</em></font></td></tr>' % \
+    w('<tr><td><em><font size=-1>%s ago&nbsp;&nbsp;%d comments&nbsp;&nbsp;%d votes&nbsp;&nbsp;%d watches&nbsp;&nbsp;%s</em></font></td></tr>' % \
        (toAgo(now-fields['updated']),
         fields['commentCount'],
         fields['voteCount'],
         fields['watchCount'],
         fixHilite(sortByUser(fields['allUsers'], userDrillDowns), 'allUsers')))
     w('<tr><td>')
-    s = fix_hilite(fields.get('body', ''))
+    s = fixHilite(fields.get('body', ''))
     issueURL = 'http://issues.apache.org/jira/browse/%s' % key
     w('<a class="commentsnippet" href="%s">%s</a>' % (issueURL, s))
     w('</td></tr>')
