@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import io
+import os
 import gzip
 import traceback
 import sys
@@ -48,13 +49,11 @@ def application(environ, start_response):
       http_status = f'500 {status_github_actions[0]} checked {age:.2f} seconds ago'
   headers = []
   bytes = http_status.encode('utf-8')
-  print(f'bytes is {bytes}')
   headers.append(('Content-Length', str(len(bytes))))
   start_response(http_status, headers)
   return [bytes]
 
 def check_github_actions_status():
-
   last_zero_count_time = time.time()
   
   while True:
@@ -63,6 +62,7 @@ def check_github_actions_status():
       now = time.time()
       status_github_actions[1] = now
       # TODO: need timeout
+      print(f'NOW CHECK GH ACTIONS STATUS {os.getpid()}')
       with urllib.request.urlopen('https://github.com/apache/lucene/actions?query=is%3Aaction_required') as response:
         html = response.read().decode('utf-8')
       m = re.search(r'<strong>(\d+) workflow run results</strong>', html)
@@ -84,11 +84,13 @@ def check_github_actions_status():
     except:
       status_github_actions[0] = f'FAILED: exception {sys.exception()}'
 
+    print(f'status is {status_github_actions=}')
     time.sleep(10)
 
 github_actions_status_thread = threading.Thread(target=check_github_actions_status)
 github_actions_status_thread.daemon = True
 github_actions_status_thread.start()
+print('NOW START STATUS THREAD')
 
 if __name__ == '__main__':
     while True:

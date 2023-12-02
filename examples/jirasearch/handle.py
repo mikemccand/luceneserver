@@ -36,8 +36,7 @@ import http.cookies
 Handles incoming queries for the search UI.
 """
 
-# nocommit
-TRACE = True
+TRACE = localconstants.TRACE
 
 if not localconstants.IS_DEV:
   TRACE = False

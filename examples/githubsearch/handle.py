@@ -42,8 +42,7 @@ import status
 Handles incoming queries for the search UI.
 """
 
-# nocommit
-TRACE = True
+TRACE = localconstants.TRACE
 
 if not localconstants.IS_DEV:
   TRACE = False
@@ -123,11 +122,11 @@ class GitHubSpec(UISpec):
     if text is None:
       text = ''
       
-    print(f'check {drill_downs=}')
+    #print(f'check {drill_downs=}')
     for field, value in drill_downs:
       if field in ('mentioned_users', 'requested_reviewers'):
         for login in value[0]:
-          print(f'now add text {str(login)}')
+          #print(f'now add text {str(login)}')
           text += ' ' + str(login)
 
     if text == '':
@@ -157,7 +156,7 @@ class GitHubSpec(UISpec):
                            'field': field,
                            'text': text0}})
 
-    print(f'highlightQuery is {pprint.pprint(q)}')
+    #print(f'highlightQuery is {pprint.pprint(q)}')
     return q
       
   def buildTextQuery(self, text):
@@ -214,7 +213,7 @@ class GitHubSpec(UISpec):
                     'maxChildren': 3,
                     'sort': [{'field': 'created', 'reverse': True}]}}})
 
-    print(f'query is {pprint.pprint(q)}')
+    #print(f'query is {pprint.pprint(q)}')
     return q
 
   def dateToString(self, dt):
@@ -965,7 +964,7 @@ def render_hits(w, text, groups, userDrillDowns):
       key = '<b>#%s</b>' % key
     else:
       key = '#' + key
-    print(f'{key}: {fields["status"]}')
+    #print(f'{key}: {fields["status"]}')
     
     if fields['status'] in ('Reopend', 'Open'):
       skey = key
@@ -976,7 +975,7 @@ def render_hits(w, text, groups, userDrillDowns):
 
     w(f'<tr><td><br><a href="{issue_url}"><font size=+2>{skey}: {fix_hilite(fields["title"])}</font></a></td></tr>')
 
-    print(f'{key=} updated={fields["updated"]} vs {now_utc=} delta={now_utc - fields["updated"]}')
+    #print(f'{key=} updated={fields["updated"]} vs {now_utc=} delta={now_utc - fields["updated"]}')
 
     w(f'<tr><td><em><font size=-1>{toAgo(now_utc - fields["updated"])} ago&nbsp;&nbsp;' +
       f'{fields["comment_count"]} comments&nbsp;&nbsp;' +
