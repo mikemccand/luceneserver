@@ -21,32 +21,56 @@ import sys
 sys.path.insert(0, '/home/ec2-user/src/github-ui')
 import util
 import handle
+import time
 
 import time
 import re
 import urllib.request
+import urllib.parse
 import threading
 import sys
 
 # assume we start up OK
 status_github_actions = ['OK', time.time()]
 
+def get_nrt_log_status(site):
+  age_sec = time.time() - os.path.getmtime(f'/home/ec2-user/state/{site}/logs/nrt.log')
+  if age_sec >= 60:
+    http_status = f'500 jira-nrt log age is {age_sec:.2f} seconds'
+  else:
+    http_status = f'200 OK jira-nrt log age is {age_sec:.2f} seconds'
+  return http_status
+
 # Entry point in production:
 def application(environ, start_response):
 
   qs = environ['QUERY_STRING']
-    
-  age = time.time() - status_github_actions[1]
 
-  if age > 15:
-    # background status thread died!
-    http_status = f'500 Thread died {age:.2f} seconds ago'
+  args = urllib.parse.parse_qs(qs)
+  if 'what' in args:
+    what = args['what'][0]
   else:
-    # background thread still running, but what is status?
-    if status_github_actions[0].startswith('OK'):
-      http_status = f'200 {status_github_actions[0]} checked {age:.2f} seconds ago'
+    what = 'github-actions'
+
+  if what == 'github-actions':
+    age = time.time() - status_github_actions[1]
+
+    if age > 15:
+      # background status thread died!
+      http_status = f'500 Thread died {age:.2f} seconds ago'
     else:
-      http_status = f'500 {status_github_actions[0]} checked {age:.2f} seconds ago'
+      # background thread still running, but what is status?
+      if status_github_actions[0].startswith('OK'):
+        http_status = f'200 OK {status_github_actions[0]} checked {age:.2f} seconds ago'
+      else:
+        http_status = f'500 {status_github_actions[0]} checked {age:.2f} seconds ago'
+  elif what == 'jira-nrt':
+    http_status = get_nrt_log_status('jira')
+  elif what == 'github-nrt':
+    http_status = get_nrt_log_status('github')
+  else:
+    http_status = f'500 unknown status what={what}'
+        
   headers = []
   bytes = http_status.encode('utf-8')
   headers.append(('Content-Length', str(len(bytes))))

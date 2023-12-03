@@ -52,7 +52,7 @@ else:
       raise RuntimeError('unknown arg %s' % arg)
 
 #userHost = 'changingbits@web504.webfaction.com'
-userHost = f'ec2-user@{localconstants.INSTANCE_PRIVATE_IP}'
+userHost = f'ec2-user@{localconstants.PRODUCTION_INSTANCE_IP}'
 #userHost = 'ec2-user@githubsearch.mikemccandless.com'
 #userHost = 'mike@10.17.4.12'
 sshIdent = ''
@@ -62,26 +62,29 @@ print()
 
 if True:
   print('Snapshot')
-  run(f'ssh -t {sshIdent} {userHost} "cd {UI_PATH}/production; {localconstants.PYTHON_EXE} -u snapshot.py"')
+  run(f'ssh {sshIdent} {userHost} "cd {UI_PATH}/production; {localconstants.PYTHON_EXE} -u snapshot.py"')
 
 if doServer:
   serverDistPath = '/l/luceneserver/build/luceneserver-%s-SNAPSHOT.zip' % localconstants.LUCENE_SERVER_VERSION
   print()
   print(f'copy {serverDistPath}"')
   run(f'scp {sshIdent} {serverDistPath} {userHost}:{UI_PATH}')
-  run(f'ssh {sshIdent} {userHost} "cd {UI_PATH}; rm -rf luceneserver; unzip luceneserver-{localconstants.LUCENE_SERVER_VERSION}-SNAPSHOT.zip; ln -s luceneserver-{localconstants.LUCENE_SERVER_VERSION}-SNAPSHOT luceneserver; rm luceneserver-{localconstants.LUCENE_SERVER_VERSION}-SNAPSHOT.zip"')
+  run(f'ssh {sshIdent} {userHost} "cd {UI_PATH}; rm -rf luceneserver; unzip luceneserver-{localconstants.LUCENE_SERVER_VERSION}-SNAPSHOT.zip; mv luceneserver-{localconstants.LUCENE_SERVER_VERSION}-SNAPSHOT luceneserver; rm luceneserver-{localconstants.LUCENE_SERVER_VERSION}-SNAPSHOT.zip"')
 
 if doUI:
   print('Push UI/indexing scripts')
-  run(f'scp {sshIdent} -r ../status.py ../gitHistory.py ../handle.py ../index_github.py ../Latin-dont-break-issues.rbbi ../server.py ../moreFacets.py ../search.py ../static ../production ../suggest.py ../local_db.py ../util.py ../direct_load_all_github_issues.py ../update_from_github.py {userHost}:{UI_PATH}')
+  #run(f'scp {sshIdent} -r  {userHost}:{UI_PATH}')
+  run(f'tar czvf - ../gitHistory.py ../handle.py ../index_github.py ../Latin-dont-break-issues.rbbi ../server.py ../moreFacets.py ../search.py ../static ../production ../suggest.py ../local_db.py ../util.py ../direct_load_all_github_issues.py ../update_from_github.py | ssh {sshIdent} {userHost} "cd {UI_PATH}; tar xzv"')
 
+  run(f'scp {sshIdent} ../status.py {userHost}:/var/www/status/html')
+  
 if doReindex:
   extra = ' -reindex'
 else:
   extra = ''
 
 print(f'\nnow restart')
-run(f'ssh -t {sshIdent} {userHost} "cd {UI_PATH}/production; {localconstants.PYTHON_EXE} -u restart.py{extra}"')
+run(f'ssh {sshIdent} {userHost} "cd {UI_PATH}/production; {localconstants.PYTHON_EXE} -u restart.py{extra}"')
 
 print()
 print('Verify')

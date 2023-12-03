@@ -551,14 +551,12 @@ def nrt_index_forever(svr):
     print(f'\n{datetime.datetime.now()}: nrt index')
     issue_numbers_refreshed = refresh_latest_issues(db)
     print(f'  {len(issue_numbers_refreshed)} issues to reindex: {issue_numbers_refreshed}')
-
-    index_start_time_sec = time.time()
-    index_docs(svr, specific_issues(issue_numbers_refreshed), printIssue=True, updateSuggest=True)
-    print(f'  {(time.time() - index_start_time_sec):.1f} sec to index')
-
-    total_issue_count = c.execute('SELECT COUNT(*) FROM issues').fetchone()[0]
-
-    print(f'  loaded and indexed {len(issue_numbers_refreshed)} issues; {total_issue_count} issues in DB')
+    if len(issue_numbers_refreshed) > 0:
+      index_start_time_sec = time.time()
+      index_docs(svr, specific_issues(issue_numbers_refreshed), printIssue=True, updateSuggest=True)
+      print(f'  {(time.time() - index_start_time_sec):.1f} sec to index')
+      total_issue_count = c.execute('SELECT COUNT(*) FROM issues').fetchone()[0]
+      print(f'  loaded and indexed {len(issue_numbers_refreshed)} issues; {total_issue_count} issues in DB')
 
     # Check for git commits every  minute:
     if time.time() - lastGITBuild > 60 and any_updates_since_git:
@@ -576,8 +574,9 @@ def nrt_index_forever(svr):
       # merge new git history into our in-memory version:
       mergeIssueCommits(issueToCommitPaths, newIssueToCommitPaths)
       print('  update from git commits...')
-      index_docs(svr, specific_issues(issues_to_index), printIssue=True)
-      print('  done update from git commits...')
+      if len(issues_to_index) > 0:
+        index_docs(svr, specific_issues(issues_to_index), printIssue=True)
+        print('  done update from git commits...')
       any_updates_since_git = False
 
     # Commit once per day, so if server goes down we only need to

@@ -43,7 +43,6 @@ import util
 import search
 import suggest
 import moreFacets
-import status
 
 sys.path.insert(0, '/home/changingbits/src/ui')
 import handle
@@ -153,8 +152,6 @@ def application(environ, startResponse):
     return suggest.application(environ, startResponse)
   elif environ['PATH_INFO'] == '/moreFacets.py':
     return moreFacets.application(environ, startResponse)
-  elif environ['PATH_INFO'] == '/status.py':
-    return status.application(environ, startResponse)
   else:
     # Serve static file:
     headers = []

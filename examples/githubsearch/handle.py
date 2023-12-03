@@ -35,7 +35,6 @@ import re
 import localconstants
 import local_db
 import util
-import status
 
 
 """
@@ -964,7 +963,7 @@ def render_hits(w, text, groups, userDrillDowns):
       key = '<b>#%s</b>' % key
     else:
       key = '#' + key
-    #print(f'{key}: {fields["status"]}')
+    # print(f'{key}: {fields["status"]}')
     
     if fields['status'] in ('Reopend', 'Open'):
       skey = key
@@ -975,7 +974,7 @@ def render_hits(w, text, groups, userDrillDowns):
 
     w(f'<tr><td><br><a href="{issue_url}"><font size=+2>{skey}: {fix_hilite(fields["title"])}</font></a></td></tr>')
 
-    #print(f'{key=} updated={fields["updated"]} vs {now_utc=} delta={now_utc - fields["updated"]}')
+    # print(f'{key=} updated={fields["updated"]} vs {now_utc=} delta={now_utc - fields["updated"]}')
 
     w(f'<tr><td><em><font size=-1>{toAgo(now_utc - fields["updated"])} ago&nbsp;&nbsp;' +
       f'{fields["comment_count"]} comments&nbsp;&nbsp;' +
