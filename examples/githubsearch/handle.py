@@ -1297,7 +1297,8 @@ def handleQuery(path, isMike, environ):
     args = urllib.parse.parse_qs(path[i+1:])
     path = path[:i]
   else:
-    args = {}
+    # by default show open isssues/PRs
+    args = {'dd': ['status:Open']}
 
   index = 'github'
 

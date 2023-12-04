@@ -33,16 +33,14 @@ when you run this.
 """
 
 # TODO
-#   - how come certbot does not auto-renew?
-#   - build new lightsail box: fixes scp stupidity?
-#   - GRR what firewall is sometimes blocking ssh/scp?
-#   - GRR how to get status.py to run in one interpreter only?
-#   - get push.py working; use git to move the UI sources
-#   - make github indexing a true service like jirasearch
-#   - get nrt.log monitoring working again!
-#   - get monitor notifications working again
-#   - don't allow multi-select on some facet fields e.g. Update / ago
+#   - merge the production scripts -- no need for separate copies for jira/github
 #   - hmm NRT indexing broken?  #12508 failed to close nor update comments
+#   - how come certbot does not auto-renew?
+#   - use git to move the UI sources?
+#   - make github indexing a true service like jirasearch
+#   - shut down old the-the
+#     - migrate indexing services / server service
+#   - don't allow multi-select on some facet fields e.g. Update / ago
 #   - mike S: so I would like one (saved filter/s) where every issue assigned to me, I opened, I'm mentioned, etc.
 #   - default to Open status
 #   - commit metadata to check

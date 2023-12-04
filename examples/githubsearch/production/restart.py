@@ -23,73 +23,76 @@ import signal
 sys.path.insert(0, '..')
 import localconstants
 
+PORT = localconstants.SERVER_PORT
+
 """
 Production script to restart Lucene server and the UI.
 """
 
 doReindex = '-reindex' in sys.argv
+doServer = '-server' in sys.argv
 
 def run(cmd):
   if os.system(cmd):
     raise RuntimeError('%s failed' % cmd)
 
-print()
-print('Kill current runServer process')
+if doServer:
+  print()
+  print('Kill current runServer process')
 
-# kill runServer wrapper:
-found = False
-for line in os.popen('ps auxww | grep runServer.py | grep -v grep | grep -v /bin/sh').readlines():
-  pid = line.strip().split()[1]
-  print('  kill server pid %s: %s' % (pid, line.strip()))
-  if found:
-    raise RuntimeError('found two pids!')
-  try:
-    run('kill -9 %d' % int(pid))
-  except:
-    print('FAILED:')
-    traceback.print_exc()
-  found = True
+  # kill runServer wrapper:
+  found = False
+  for line in os.popen('ps auxww | grep runServer.py | grep -v grep | grep -v /bin/sh').readlines():
+    pid = line.strip().split()[1]
+    print('  kill server pid %s: %s' % (pid, line.strip()))
+    if found:
+      raise RuntimeError('found two pids!')
+    try:
+      run('kill -9 %d' % int(pid))
+    except:
+      print('FAILED:')
+      traceback.print_exc()
+    found = True
 
-if not found:
-  raise RuntimeError('could not find existing runServer.py process')
+  if not found:
+    raise RuntimeError('could not find existing runServer.py process')
 
-print()
-print('Kill current java server process')
+  print()
+  print('Kill current java server process')
 
-# kill java process
-PORT = 7887
-found = False
-for line in os.popen('ps auxww | grep java | grep server.Server | grep "ipPort localhost:%s" | grep -v grep | grep -v /bin/sh' % PORT).readlines():
-  pid = line.strip().split()[1]
-  print('  kill server pid %s: %s' % (pid, line.strip()))
-  if found:
-    raise RuntimeError('found two pids!')
-  try:
-    run('kill -9 %d' % int(pid))
-  except:
-    print('FAILED:')
-    traceback.print_exc()
-  found = True
+  # kill java process
+  found = False
+  for line in os.popen('ps auxww | grep java | grep server.Server | grep "ipPort localhost:%s" | grep -v grep | grep -v /bin/sh' % PORT).readlines():
+    pid = line.strip().split()[1]
+    print('  kill server pid %s: %s' % (pid, line.strip()))
+    if found:
+      raise RuntimeError('found two pids!')
+    try:
+      run('kill -9 %d' % int(pid))
+    except:
+      print('FAILED:')
+      traceback.print_exc()
+    found = True
 
-if not found:
-  raise RuntimeError('could not find existing java server.Server process')
+  if not found:
+    raise RuntimeError('could not find existing java server.Server process')
 
-print()
-print('Start new java server process')
+  print()
+  print('Start new java server process')
 
-run(f'nohup {localconstants.PYTHON_EXE} -u runServer.py > {localconstants.GLOBAL_LOG_DIR}/luceneserver.log 2>&1 &')
+  run(f'nohup {localconstants.PYTHON_EXE} -u runServer.py > {localconstants.GLOBAL_LOG_DIR}/luceneserver.log 2>&1 &')
 
-# Wait until server is really ready:
-while True:
-  s = open('%s/luceneserver.log' % localconstants.GLOBAL_LOG_DIR, 'rb').read()
-  if s.find(('listening on').encode('utf-8')) != -1:
-    break
-  time.sleep(1.0)
+  # Wait until server is really ready:
+  while True:
+    s = open('%s/luceneserver.log' % localconstants.GLOBAL_LOG_DIR, 'rb').read()
+    if s.find(('listening on').encode('utf-8')) != -1:
+      break
+    time.sleep(1.0)
 
-print()
-print('Restart Apache httpd')
+  print()
+  print('Restart Apache httpd')
 
-run('sudo apachectl restart')
+  run('sudo apachectl restart')
 
 print()
 print('Kill current Indexer')

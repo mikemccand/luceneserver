@@ -73,6 +73,11 @@ if doReindex:
   extra = ' -reindex'
 else:
   extra = ''
+
+if doServer:
+  extra += ' -server'
+  
+print(f'\nnow restart: {extra}')
 run('ssh -t %s %s "cd src/jira-ui/production; python3 -u restart.py%s"' % (sshIdent, userHost, extra))
 
 print()

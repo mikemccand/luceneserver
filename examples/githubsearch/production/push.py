@@ -58,6 +58,8 @@ userHost = f'ec2-user@{localconstants.PRODUCTION_INSTANCE_IP}'
 sshIdent = ''
 #sshIdent = '-i /home/mike/.ssh/aws_changingbits.pem'
 
+print(f'{doUI=} {doServer=} {doReindex=}')
+
 print()
 
 if True:
@@ -83,7 +85,10 @@ if doReindex:
 else:
   extra = ''
 
-print(f'\nnow restart')
+if doServer:
+  extra += ' -server'
+
+print(f'\nnow restart: {extra}')
 run(f'ssh {sshIdent} {userHost} "cd {UI_PATH}/production; {localconstants.PYTHON_EXE} -u restart.py{extra}"')
 
 print()
