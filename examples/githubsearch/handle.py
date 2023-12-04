@@ -579,7 +579,7 @@ def _fix_hilite(s, groupDDField=None, doNonBreakingSpace=False):
 def render_saved_searches(w, saved_searches):
   w('\n<tr><td>')
   for name, args_string in saved_searches.items():
-    w(f'<a href="/search.py?{args_string}">{name}</a>')
+    w(f'<a href="/search.py?{args_string}">{name.replace(" ", "&nbsp;")}</a>')
     w(f'&nbsp;&nbsp;[<a href="javascript:g(\'ssd\', \'{name}\')"<b><font color=red>x</font></b></a>]')
     w('<br>')
   w('[<a data-toggle="modal" role="button" data-target="#save_search"><i>Save this search</i></a>]<br><br>')
