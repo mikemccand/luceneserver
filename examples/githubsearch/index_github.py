@@ -33,6 +33,10 @@ when you run this.
 """
 
 # TODO
+#   - saved searches
+#     - fix the fucked up looking UI when you click "Save this search"
+#     - set focus into text box when you click "Save this search"
+#     - ability to delete previously saved searches (can always delete cookie in your local browser or go incognito))
 #   - merge the production scripts -- no need for separate copies for jira/github
 #   - hmm NRT indexing broken?  #12508 failed to close nor update comments
 #   - how come certbot does not auto-renew?

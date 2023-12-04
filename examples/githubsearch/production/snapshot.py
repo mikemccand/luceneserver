@@ -30,9 +30,9 @@ dt = datetime.datetime.now().date()
 upto = 0
 while True:
   if upto == 0:
-    fileName = '../github-ui.%04d%02d%02d.tar.bz2' % (dt.year, dt.month, dt.day)
+    fileName = '../snapshots/github-ui.%04d%02d%02d.tar.bz2' % (dt.year, dt.month, dt.day)
   else:
-    fileName = '../github-ui.%04d%02d%02d-%d.tar.bz2' % (dt.year, dt.month, dt.day, upto)
+    fileName = '../snapshots/github-ui.%04d%02d%02d-%d.tar.bz2' % (dt.year, dt.month, dt.day, upto)
   if not os.path.exists(fileName):
     print('snapshot to %s cwd=%s' % (fileName, os.getcwd()))
     run('tar cjf %s github-ui' % fileName)

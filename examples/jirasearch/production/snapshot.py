@@ -30,11 +30,11 @@ dt = datetime.datetime.now().date()
 upto = 0
 while True:
   if upto == 0:
-    fileName = '../jira-ui.%04d%02d%02d.tar.bz2' % (dt.year, dt.month, dt.day)
+    fileName = '../snapshots/jira-ui.%04d%02d%02d.tar.bz2' % (dt.year, dt.month, dt.day)
   else:
-    fileName = '../jira-ui.%04d%02d%02d-%d.tar.bz2' % (dt.year, dt.month, dt.day, upto)
+    fileName = '../snapshots/jira-ui.%04d%02d%02d-%d.tar.bz2' % (dt.year, dt.month, dt.day, upto)
   if not os.path.exists(fileName):
-    print('snapshot to ../%s' % fileName)
+    print('snapshot to %s cwd=%s' % (fileName, os.getcwd()))
     run('tar cjf %s jira-ui' % fileName)
     break
   upto += 1

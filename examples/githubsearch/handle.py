@@ -13,24 +13,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pprint
-import math
-import urllib.request, urllib.error, urllib.parse
-import sys
-import traceback
-import re
-import time
-import urllib.parse
-import types
-import json
-import string
+from http.cookies import SimpleCookie
+import codecs
 import copy
-import threading
-import random
 import datetime
 import http.cookies
-import urllib.request
+import json
+import math
+import pickle
+import pprint
+import random
 import re
+import re
+import string
+import sys
+import threading
+import time
+import traceback
+import types
+import urllib.parse
+import urllib.request
+import urllib.request, urllib.error, urllib.parse
 
 import localconstants
 import local_db
@@ -573,6 +576,30 @@ def _fix_hilite(s, groupDDField=None, doNonBreakingSpace=False):
   else:
     return escape(s)
 
+def render_saved_searches(w, saved_searches):
+  w('\n<tr><td>')
+  for name, args_string in saved_searches.items():
+    w(f'<a href="/search.py?{args_string}">{name}</a>')
+    w(f'&nbsp;&nbsp;[<a href="javascript:g(\'ssd\', \'{name}\')"<b><font color=red>x</font></b></a>]')
+    w('<br>')
+  w('[<a data-toggle="modal" role="button" data-target="#save_search"><i>Save this search</i></a>]<br><br>')
+  w('<div id="save_search" class="modal hide fade in">')
+  w('<div class="modal-header">')
+  w('\n<h3 id="myModalLabel">Save Current Search</h3>')
+  w('</div>')
+  w('<div class="modal-body">')
+  w('<form action="/foobar" onsubmit="return false;">')
+  w('\n<b>Name:</b>')
+  w('<input type="text" name="search_name" value="">')
+  w('<button class="btn" aria-hidden="true" onClick="g(\'ss\', document.forms[0].search_name.value); return false;">Save</button>')
+  w('</form>')
+  w('</div>')
+  w('\n<div class="modal-footer">')
+  w('<button class="btn" data-dismiss="modal" aria-hidden="true">Cancel</button>')
+  w('</div>')
+  w('</div>')
+  w('</td></tr>\n')
+
 class RenderFacets:
 
   def __init__(self, w, spec, drillDowns, facets, treeFacetMap, ddExtraMap, moreFacetsURL):
@@ -1091,7 +1118,7 @@ def renderCamHits(w, hits):
 def renderGroupHeader(w, group, groupDDField, hitsPerGroup):
   w('<tr><td>&nbsp;</td></tr>')
   count = group['totalHits']
-  w('<tr><td colspan=4 width=100%% bgcolor="#dddddd"><font size=+1>%s</font> (1-%d of %d <a class="facet" href="javascript:document.forms[0].group.value=\'None\';g(\'dds\', \'%s\', \'%s\')">See all</a>)</td></tr>' % \
+  w('<tr><td colspan=4 width=100%% bgcolor="#dddddd"><font size=+1>%s</font> (1-%d of %d <a class="facet" href="javascript:document.forms[1].group.value=\'None\';g(\'dds\', \'%s\', \'%s\')">See all</a>)</td></tr>' % \
     (escape(group['groupValue']),
      min(count, hitsPerGroup),
      count,
@@ -1286,16 +1313,26 @@ def handleQuery(path, isMike, environ):
   send = util.ServerClient().send
   #printTokens(send)
 
+  if 'HTTP_COOKIE' in environ:
+    cookies = SimpleCookie(environ['HTTP_COOKIE'])
+  else:
+    cookies = SimpleCookie()
+
+  if 'SavedSearches' in cookies:
+    # hairy!!
+    saved_searches = pickle.loads(codecs.decode(cookies['SavedSearches'].value.encode('ascii'), 'base64'))
+  else:
+    saved_searches = {}
+
   t0 = time.time()
 
   # TODO: do "full browse" UI if no search yet
 
-  origPath = path
-  
-  i = path.find('?')
-  if i != -1:
-    args = urllib.parse.parse_qs(path[i+1:])
-    path = path[:i]
+  path = origPath = environ['PATH_INFO']
+
+  query_string = environ.get('QUERY_STRING')
+  if query_string is not None and len(query_string) > 0:
+    args = urllib.parse.parse_qs(query_string)
   else:
     # by default show open isssues/PRs
     args = {'dd': ['status:Open']}
@@ -1436,25 +1473,39 @@ def handleQuery(path, isMike, environ):
       # Drill up
       field = args['a1'][0]
       drillDowns = [x for x in drillDowns if x[0] != field]
+    elif command == 'ss':
+      # Save this search
+
+      args2 = copy.copy(args)
+
+      # clean up a bit:
+      for rm_key in 'chg', 'a1', 'a2', 'id', 'searcher', 'page', 'format', 'newText':
+        if rm_key in args2:
+          del args2[rm_key]
+
+      saved_search_name = args['a1'][0]
+
+      # NOTE: might replace existing one, that's OK -- let user replace:
+      saved_searches[saved_search_name] = urllib.parse.urlencode(args2, doseq=True)
+
+    elif command == 'ssd':
+      # delete saved search
+      del saved_searches[args['a1'][0]]
   else:
     command = None
     field = None
 
   if command != 'du' or field != 'project':
-    cookie = environ.get('HTTP_COOKIE')
-    if cookie is not None:
-      c = http.cookies.SimpleCookie(cookie)
-      c = c.get('lastProject')
-      if c is not None:
-        lastProject = c.value
-        if len(lastProject) > 0:
-          # Insert lastProject via cookie, if current query didn't drill-down on project yet:
-          for field, values in drillDowns:
-            if field == 'project':
-              break
-          else:
-            util.log('add lastProject=%s from cookie' % lastProject)
-            drillDowns.append(('project', [(x,) for x in lastProject.split(',')]))
+    if 'lastProject' in cookies:
+      lastProject = cookies.get('lastProject').value
+      if len(lastProject) > 0:
+        # Insert lastProject via cookie, if current query didn't drill-down on project yet:
+        for field, values in drillDowns:
+          if field == 'project':
+            break
+        else:
+          util.log('add lastProject=%s from cookie' % lastProject)
+          drillDowns.append(('project', [(x,) for x in lastProject.split(',')]))
 
   if groupBy is not None:
     groupDDField = spec.groupByID[groupBy][1]
@@ -1732,7 +1783,7 @@ def handleQuery(path, isMike, environ):
           source: function(request, response) {
             var type = "infix";
             /*
-            if (document.forms[0].infixSuggest.checked) {
+            if (document.forms[1].infixSuggest.checked) {
               type = "infix";
             } else {
               type = "prefix";
@@ -1824,34 +1875,34 @@ def handleQuery(path, isMike, environ):
   w('  }\n')
   
   w('  function g(chg, a1, a2) {\n')
-  w('    document.forms[0].chg.value = chg;\n')
-  w('    document.forms[0].a1.value = a1;\n')
-  w('    document.forms[0].a2.value = a2;\n')
-  w('    document.forms[0].submit();\n')
+  w('    document.forms[1].chg.value = chg;\n')
+  w('    document.forms[1].a1.value = a1;\n')
+  w('    document.forms[1].a2.value = a2;\n')
+  w('    document.forms[1].submit();\n')
   w('  }\n')
 
   w('  function setGrouping(group) {\n')
-  w('    document.forms[0].page.value=0;\n')
-  w('    document.forms[0].group.value=group;\n')
-  w('    document.forms[0].submit();\n')
+  w('    document.forms[1].page.value=0;\n')
+  w('    document.forms[1].group.value=group;\n')
+  w('    document.forms[1].submit();\n')
   w('  }\n')
 
   w('  function setGroupSort(sort) {\n')
-  w('    document.forms[0].page.value=0;\n')
-  w('    document.forms[0].groupSort.value=sort;\n')
-  w('    document.forms[0].submit();\n')
+  w('    document.forms[1].page.value=0;\n')
+  w('    document.forms[1].groupSort.value=sort;\n')
+  w('    document.forms[1].submit();\n')
   w('  }\n')
   
   w('  function setSort(sort) {\n')
-  w('    document.forms[0].page.value=0;\n')
-  w('    document.forms[0].sort.value=sort;\n')
-  w('    document.forms[0].submit();\n')
+  w('    document.forms[1].page.value=0;\n')
+  w('    document.forms[1].sort.value=sort;\n')
+  w('    document.forms[1].submit();\n')
   w('  }\n')
 
   w('  function setFormat(format) {\n')
-  w('    document.forms[0].page.value=0;\n')
-  w('    document.forms[0].format.value=format;\n')
-  w('    document.forms[0].submit();\n')
+  w('    document.forms[1].page.value=0;\n')
+  w('    document.forms[1].format.value=format;\n')
+  w('    document.forms[1].submit();\n')
   w('  }\n')
 
   w('</script>')
@@ -1893,6 +1944,8 @@ def handleQuery(path, isMike, environ):
     #print 'field %s, values %s' % (field, values)
     args.append('dd=%s' % urllib.parse.quote('%s:%s' % (field, facetValuesToString([facetPathToString(x) for x in values]))))
 
+  render_saved_searches(w, saved_searches)
+  
   f = RenderFacets(w, spec, drillDowns, facets, treeFacetMap, ddExtraMap, '/moreFacets.py?%s' % '&'.join(args))
   for idx, (userLabel, dim, ign, facetSort, doMorePopup) in enumerate(spec.facetFields):
     if userLabel is None:
@@ -1938,8 +1991,8 @@ def handleQuery(path, isMike, environ):
   w('<ul class="nav">')
   w('<li>')
   w('<input autocomplete=off id=textid class="span4" placeholder="Search" type=text name=newText value="%s">\n' % escape(text))
-  #w('<input type=submit value="Search" onclick="javascript:document.forms[0].text.value = document.forms[0].newText.value;document.forms[0].chg.value=\'new\';">\n')
-  w('<button type="submit" class="btn" onclick="javascript:document.forms[0].text.value = document.forms[0].newText.value;document.forms[0].chg.value=\'new\';">Search</button>')
+  #w('<input type=submit value="Search" onclick="javascript:document.forms[1].text.value = document.forms[1].newText.value;document.forms[1].chg.value=\'new\';">\n')
+  w('<button type="submit" class="btn" onclick="javascript:document.forms[1].text.value = document.forms[1].newText.value;document.forms[1].chg.value=\'new\';">Search</button>')
   w('</li>')
 
   if False and spec.doAutoComplete:
@@ -1959,7 +2012,7 @@ def handleQuery(path, isMike, environ):
   lastPage = int(math.ceil(float(totalHits)/perPage))
 
   if False:
-    w('<select name="sort" onchange="javascript:document.forms[0].page.value=0;javascript:document.forms[0].submit()">')
+    w('<select name="sort" onchange="javascript:document.forms[1].page.value=0;javascript:document.forms[1].submit()">')
     for key, val, ign, ign in spec.sorts:
       if text == '' and key == 'relevance':
         continue
@@ -1992,7 +2045,7 @@ def handleQuery(path, isMike, environ):
     
   if spec.groups is not None:
     if False:
-      w('<select name="group" onchange="javascript:document.forms[0].page.value=0;javascript:document.forms[0].submit()">')
+      w('<select name="group" onchange="javascript:document.forms[1].page.value=0;javascript:document.forms[1].submit()">')
       for key, label, facetField in ((None, 'No grouping', None),) + spec.groups:
         if key == groupBy:
           s = ' selected'
@@ -2038,7 +2091,7 @@ def handleQuery(path, isMike, environ):
 
   if groupBy is not None:
     if False:
-      w('<select name="groupSort" onchange="javascript:document.forms[0].page.value=0;javascript:document.forms[0].submit()">')
+      w('<select name="groupSort" onchange="javascript:document.forms[1].page.value=0;javascript:document.forms[1].submit()">')
       for key, label, field, reverse in spec.sorts:
         if text == '' and key == 'relevance':
           continue
@@ -2141,12 +2194,15 @@ def handleQuery(path, isMike, environ):
   util.log(timeDetails)
 
   headers = []
-  c = http.cookies.SimpleCookie()
   if project is not None:
-    c['lastProject'] = project
+    cookies['lastProject'] = project
   else:
-    c['lastProject'] = ''
-  lines = str(c)
-  headers.append(('Set-Cookie', str(c)[11:].strip()))
+    cookies['lastProject'] = ''
+
+  cookies['SavedSearches'] = codecs.encode(pickle.dumps(saved_searches), 'base64').decode('ascii')
+
+  # TODO: good grief there must be a cleaner way!?
+  for s in cookies.output().splitlines():
+    headers.append(tuple([x.strip() for x in s.split(':', 1)]))
 
   return ''.join(_l.l).replace('$$msec$$', details), headers
