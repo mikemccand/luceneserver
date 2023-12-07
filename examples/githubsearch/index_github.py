@@ -33,7 +33,11 @@ when you run this.
 """
 
 # TODO
+#   - is sub doc sorting broken?  search for "fst" fails to show most recent comments in #12688
+#   - MIKE S idea: single facet "Me", and under there is "mentioned", "review requested", "touched the issue", "assigned", and "All"
 #   - saved searches
+#     - switch to "local storage", "browser local" instead of cookies?
+#     - hmm always show some, like "new PRs no response"
 #     - fix the fucked up looking UI when you click "Save this search"
 #     - set focus into text box when you click "Save this search"
 #   - merge the production scripts -- no need for separate copies for jira/github

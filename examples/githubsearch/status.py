@@ -36,9 +36,9 @@ status_github_actions = ['OK', time.time()]
 def get_nrt_log_status(site):
   age_sec = time.time() - os.path.getmtime(f'/home/ec2-user/state/{site}/logs/nrt.log')
   if age_sec >= 60:
-    http_status = f'500 jira-nrt log age is {age_sec:.2f} seconds'
+    http_status = f'500 {site}-nrt log age is {age_sec:.2f} seconds'
   else:
-    http_status = f'200 OK jira-nrt log age is {age_sec:.2f} seconds'
+    http_status = f'200 OK {site}-nrt log age is {age_sec:.2f} seconds'
   return http_status
 
 # Entry point in production:
