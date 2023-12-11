@@ -33,6 +33,7 @@ when you run this.
 """
 
 # TODO
+#   - grrr debug search "guaranteed continuous" --> does not find/higlight 12699?
 #   - is sub doc sorting broken?  search for "fst" fails to show most recent comments in #12688
 #   - MIKE S idea: single facet "Me", and under there is "mentioned", "review requested", "touched the issue", "assigned", and "All"
 #   - saved searches

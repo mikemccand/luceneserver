@@ -90,15 +90,34 @@ def http_load_as_json(url, do_post=False, token=GITHUB_API_TOKEN, handle_pages=T
 
   all_results = None
 
+  # for each page
   while True:
+
     headers = {
         'Authorization': f'Bearer {token}',
         'Accept': 'application/vnd.github.full+json',
         'X-GitHub-Api-Version': '2022-11-28'}
-    if do_post:
-      response = requests.post(url, headers=headers)
-    else:
-      response = requests.get(url, headers=headers)
+
+    # for each retry
+    retry_count = 0
+    
+    while True:
+      try:
+        if do_post:
+          response = requests.post(url, headers=headers)
+        else:
+          response = requests.get(url, headers=headers)
+      except Exception as e:
+        if retry_count < 5:
+          sleep_time_sec = math.pow(2, retry_count)
+          print(f'request failed: url={url} headers={headers} exception={e} retry_count={retry_count}; will after pausing for {sleep_time_sec} seconds')
+          time.sleep(sleep_time_sec)
+          retry_count += 1
+        else:
+          print(f'request failed: url={url} headers={headers} exception={e} retry_count={retry_count}; giving up!')
+          raise
+      else:
+        break
 
     if response.status_code != 200:
       raise RuntimeError(f'got {response.status_code} response loading {url}\n\n {response.text}')
