@@ -33,14 +33,6 @@ when you run this.
 """
 
 # TODO
-#   - grrr debug search "guaranteed continuous" --> does not find/higlight 12699?
-#   - is sub doc sorting broken?  search for "fst" fails to show most recent comments in #12688
-#   - MIKE S idea: single facet "Me", and under there is "mentioned", "review requested", "touched the issue", "assigned", and "All"
-#   - saved searches
-#     - switch to "local storage", "browser local" instead of cookies?
-#     - hmm always show some, like "new PRs no response"
-#     - fix the fucked up looking UI when you click "Save this search"
-#     - set focus into text box when you click "Save this search"
 #   - merge the production scripts -- no need for separate copies for jira/github
 #   - hmm NRT indexing broken?  #12508 failed to close nor update comments
 #   - how come certbot does not auto-renew?
@@ -111,6 +103,10 @@ when you run this.
 #   - parse legacy jira attachments comment, but also new github issue attachments
 #   - add
 #     - has votes / vote count facet
+
+# we require something between 3.9 and 3.11 else parsing ISO 8601 datetime strings from github fails:
+if sys.version_info.major != 3 or sys.version_info.minor < 11:
+  raise RuntimeError(f'please run with at least python 3.11; got {sys.version}')
 
 # all_projects = ('Infrastructure', 'Tika', 'Solr', 'Lucene')
 all_projects = ('lucene',)

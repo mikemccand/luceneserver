@@ -84,6 +84,16 @@ def maybe_load_user(c, login):
   # yes, O(N^2) but N is smallish, and this cost is paid once on initial GitHub crawl
   open('%s/user_names_map.pk' % ROOT_STATE_PATH, 'wb').write(pickle.dumps(login_to_name))
 
+def maybe_retry(retry_count, message):
+  if retry_count < 5:
+    sleep_time_sec = math.pow(2, retry_count)
+    print(f'request failed: {message} retry_count={retry_count}; will retry after pausing for {sleep_time_sec} seconds')
+    time.sleep(sleep_time_sec)
+    return retry_count + 1
+  else:
+    raise RuntimeError(f'{message}; too many retries, giving up')
+  
+
 def http_load_as_json(url, do_post=False, token=GITHUB_API_TOKEN, handle_pages=True):
   global ratelimit_remaining
   print(f'    load to json {url} {handle_pages=}')
@@ -108,21 +118,17 @@ def http_load_as_json(url, do_post=False, token=GITHUB_API_TOKEN, handle_pages=T
         else:
           response = requests.get(url, headers=headers)
       except Exception as e:
-        if retry_count < 5:
-          sleep_time_sec = math.pow(2, retry_count)
-          print(f'request failed: url={url} headers={headers} exception={e} retry_count={retry_count}; will after pausing for {sleep_time_sec} seconds')
-          time.sleep(sleep_time_sec)
-          retry_count += 1
-        else:
-          print(f'request failed: url={url} headers={headers} exception={e} retry_count={retry_count}; giving up!')
-          raise
+        retry_count = maybe_retry(retry_count, f'request failed: url={url} headers={headers} exception={e} retry_count={retry_count}')
       else:
         break
 
-    if response.status_code != 200:
-      raise RuntimeError(f'got {response.status_code} response loading {url}\n\n {response.text}')
-    if not response.headers['Content-Type'].startswith('application/json'):
-      raise RuntimeError(f'got {response.headers["Content-Type"]} but expected application/json when loading {url}')
+      if response.status_code != 200:
+        retry_count = maybe_retry(retry_count, f'got {response.status_code} response loading {url}\n\n {response.text}')
+        continue
+
+      if not response.headers['Content-Type'].startswith('application/json'):
+        retry_count = maybe_retry(retry_count, f'got {response.headers["Content-Type"]} but expected application/json when loading {url}')
+        continue
 
     # wait due to GitHub API throttling:
     ratelimit_remaining = int(response.headers['X-RateLimit-Remaining'])
