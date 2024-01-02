@@ -60,10 +60,14 @@ def get(read_only=False):
   global db
   global db_readonly
 
-  # nocommit -- hmm what if same process opens both?  index_github does so!
   if not read_only:
+    if db_readonly is not None:
+      raise RuntimeError('cannot open non-read-only DB after first opening read-only DB')
     if db is None:
       db = sqlite3.connect(DB_PATH)
+    return db
+  elif db is not None:
+    # if read-only requested, and we already have read/write opened, return it.  else we get "db is locked" errors:
     return db
   else:
     if db_readonly is None:
