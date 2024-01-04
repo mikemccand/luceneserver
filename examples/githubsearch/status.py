@@ -70,6 +70,8 @@ def application(environ, start_response):
     http_status = get_nrt_log_status('github')
   else:
     http_status = f'500 unknown status what={what}'
+
+  print(f'top status {what=} {http_status=}')
         
   headers = []
   bytes = http_status.encode('utf-8')
