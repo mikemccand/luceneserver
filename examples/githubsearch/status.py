@@ -100,8 +100,9 @@ def check_github_actions_status():
           # yay
           last_zero_count_time = now
           status_github_actions[0] = 'OK'
-        elif now - last_zero_count_time > 30:
-          # the auto-approver bot waits ~10-20 seconds between checking
+        elif now - last_zero_count_time > 300:
+          # the auto-approver bot waits ~10-20 seconds between checking, but maybe several approvals show up at once, and
+          # they seem to come in pairs anyways
           status_github_actions[0] = f'STALE {(now - last_zero_count_time):.2f} sec since no approvals'
         else:
           status_github_actions[0] = f'OK: {(now - last_zero_count_time):.2f} sec since no approvals'
