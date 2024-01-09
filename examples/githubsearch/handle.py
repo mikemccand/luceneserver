@@ -1948,7 +1948,21 @@ def handleQuery(path, isMike, environ):
     #print 'field %s, values %s' % (field, values)
     args.append('dd=%s' % urllib.parse.quote('%s:%s' % (field, facetValuesToString([facetPathToString(x) for x in values]))))
 
+  # minimal args for link to search:
+  min_args = {}
+  if text != '':
+    min_args['text'] = text
+  if sort != 'relevanceRecency':
+    min_args['sort'] = sort
+  if len(drillDowns) > 0:
+    min_args['dd'] = []
+    for field, values in drillDowns:
+      min_args['dd'].append('%s:%s' % (field, facetValuesToString([facetPathToString(x) for x in values])))
+    
+  min_search_url = f'{environ["wsgi.url_scheme"]}://{environ["HTTP_HOST"]}/search.py?{urllib.parse.urlencode(min_args, doseq=True)}'
+
   render_saved_searches(w, saved_searches)
+  
   
   f = RenderFacets(w, spec, drillDowns, facets, treeFacetMap, ddExtraMap, '/moreFacets.py?%s' % '&'.join(args))
   for idx, (userLabel, dim, ign, facetSort, doMorePopup) in enumerate(spec.facetFields):
@@ -1991,18 +2005,6 @@ def handleQuery(path, isMike, environ):
   for field, values in drillDowns:
     w('<input type=hidden name="dd" value="%s:%s">' % (field, facetValuesToString([facetPathToString(x) for x in values])))
 
-  # minimal args for link to search:
-  min_args = {}
-  if text != '':
-    min_args['text'] = text
-  if sort != 'relevanceRecency':
-    min_args['sort'] = sort
-  if len(drillDowns) > 0:
-    min_args['dd'] = []
-    for field, values in drillDowns:
-      min_args['dd'].append('%s:%s' % (field, facetValuesToString([facetPathToString(x) for x in values])))
-    
-  min_search_url = f'{environ["wsgi.url_scheme"]}://{environ["HTTP_HOST"]}/search.py?{urllib.parse.urlencode(min_args, doseq=True)}'
   w('<ul class="nav">')
   w('<li>')
   w('<input autocomplete=off id=textid class="span4" placeholder="Search" type=text name=newText value="%s">\n' % escape(text))
@@ -2090,6 +2092,8 @@ def handleQuery(path, isMike, environ):
       w('</ul>')
       w('</li>')
 
+  w(f'<li><span style="float: left; padding: 10px 15px 10px; position: relative">[<a href="{min_search_url}"><i>link to this search</i></a>]</span></li>')
+
   if False:
     w('''<ul class="nav">
     <li class="dropdown">
@@ -2133,8 +2137,6 @@ def handleQuery(path, isMike, environ):
   ''')
 
     w('</script>')
-
-  w(f'<div class="container">[<a class="dropdown-toggle" data-toggle="dropdown" href="{min_search_url}">Link to this search</a>]</div>')
 
   if groupBy is not None:
     if False:
