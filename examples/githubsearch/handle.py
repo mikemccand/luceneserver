@@ -35,6 +35,8 @@ import urllib.parse
 import urllib.request
 import urllib.request, urllib.error, urllib.parse
 
+
+
 import localconstants
 import local_db
 import util
@@ -1986,10 +1988,21 @@ def handleQuery(path, isMike, environ):
   id = makeID()
   util.log('id %s' % id)
   w('<input type=hidden name=id value=%s>' % id)
-  if len(drillDowns) > 0:
-    for field, values in drillDowns:
-      w('<input type=hidden name="dd" value="%s:%s">' % (field, facetValuesToString([facetPathToString(x) for x in values])))
+  for field, values in drillDowns:
+    w('<input type=hidden name="dd" value="%s:%s">' % (field, facetValuesToString([facetPathToString(x) for x in values])))
 
+  # minimal args for link to search:
+  min_args = {}
+  if text != '':
+    min_args['text'] = text
+  if sort != 'relevanceRecency':
+    min_args['sort'] = sort
+  if len(drillDowns) > 0:
+    min_args['dd'] = []
+    for field, values in drillDowns:
+      min_args['dd'].append('%s:%s' % (field, facetValuesToString([facetPathToString(x) for x in values])))
+    
+  min_search_url = f'{environ["wsgi.url_scheme"]}://{environ["HTTP_HOST"]}/search.py?{urllib.parse.urlencode(min_args, doseq=True)}'
   w('<ul class="nav">')
   w('<li>')
   w('<input autocomplete=off id=textid class="span4" placeholder="Search" type=text name=newText value="%s">\n' % escape(text))
@@ -2089,7 +2102,10 @@ def handleQuery(path, isMike, environ):
         <li><a href="#">foobar</a></li>
       </ul>
     </li>
-  </ul>''')    
+  </ul>''')
+
+  # w(f'<dev align=center>[<a href="{min_search_url}">Link to this search</a>]</div>')
+  w(f'<dev align=center>[<a href="javascript:navigator.clipboard.writeText("hello");">Link to this search</a>]</div>')
 
   if groupBy is not None:
     if False:

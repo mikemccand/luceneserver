@@ -1,4 +1,5 @@
 import sqlite3
+import traceback
 import requests
 import json
 import time
@@ -60,7 +61,11 @@ def get(read_only=False):
   global db
   global db_readonly
 
-  if not read_only:
+  print(f'now get DB {read_only=}')
+  traceback.print_stack()
+
+  # nocommit maybe nuke the whole concept of read-only?  i don't think i can open DB from two processes even if second one is read-only=true, or if both are?
+  if True or not read_only:
     if db_readonly is not None:
       raise RuntimeError('cannot open non-read-only DB after first opening read-only DB')
     if db is None:
@@ -90,7 +95,7 @@ def maybe_load_user(c, login):
 
 def maybe_retry(retry_count, message):
   if retry_count < 5:
-    sleep_time_sec = math.pow(2, retry_count)
+    sleep_time_sec = 2 ** retry_count
     print(f'request failed: {message} retry_count={retry_count}; will retry after pausing for {sleep_time_sec} seconds')
     time.sleep(sleep_time_sec)
     return retry_count + 1
