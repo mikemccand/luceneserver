@@ -2104,8 +2104,37 @@ def handleQuery(path, isMike, environ):
     </li>
   </ul>''')
 
-  # w(f'<dev align=center>[<a href="{min_search_url}">Link to this search</a>]</div>')
-  w(f'<dev align=center>[<a href="javascript:navigator.clipboard.writeText("hello");">Link to this search</a>]</div>')
+  if False:
+    w('<script language=JavaScript>\n')
+
+    w('''
+  if (Navigator.clipboard) {
+    console.log('Clipboard API available');
+  }
+
+  if (Navigator.clipboard.writeText) {
+    console.log('Can copy text to clipboard');
+  }
+
+  function setClipboard(text) {
+    const type = "text/plain";
+    const blob = new Blob([text], { type });
+    const data = [new navigator.ClipboardItem({ [type]: blob })];
+
+    navigator.clipboard.write(data).then(
+      () => {
+        alert("Link copied!");
+      },
+      () => {
+        alert("Link copy failed");
+      },
+    );
+  }
+  ''')
+
+    w('</script>')
+
+  w(f'<div class="container">[<a class="dropdown-toggle" data-toggle="dropdown" href="{min_search_url}">Link to this search</a>]</div>')
 
   if groupBy is not None:
     if False:

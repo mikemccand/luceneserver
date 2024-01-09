@@ -55,7 +55,7 @@ def application(environ, start_response):
   if what == 'github-actions':
     age = time.time() - status_github_actions[1]
 
-    if age > 15:
+    if age > 120:
       # background status thread died!
       http_status = f'500 Thread died {age:.2f} seconds ago'
     else:
@@ -112,7 +112,7 @@ def check_github_actions_status():
       status_github_actions[0] = f'FAILED: exception {sys.exception()}'
 
     print(f'status is {status_github_actions=}')
-    time.sleep(10)
+    time.sleep(30)
 
 github_actions_status_thread = threading.Thread(target=check_github_actions_status)
 github_actions_status_thread.daemon = True
