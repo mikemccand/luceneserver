@@ -128,6 +128,7 @@ def http_load_as_json(url, do_post=False, token=GITHUB_API_TOKEN, handle_pages=T
           response = requests.get(url, headers=headers)
       except Exception as e:
         retry_count = maybe_retry(retry_count, f'request failed: url={url} headers={headers} exception={e} retry_count={retry_count}')
+        continue
       else:
         break
 
