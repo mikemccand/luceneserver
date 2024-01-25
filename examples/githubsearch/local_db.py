@@ -141,14 +141,19 @@ def http_load_as_json(url, do_post=False, token=GITHUB_API_TOKEN, handle_pages=T
         continue
 
     # wait due to GitHub API throttling:
-    ratelimit_remaining = int(response.headers['X-RateLimit-Remaining'])
-    if ratelimit_remaining < 10:
-      reset_at = int(response.headers['X-RateLimit-Reset'])
-      wait_seconds = reset_at - time.time() + 5
-      if wait_seconds > 0:
-        db.commit()
-        print(f'Now wait due to throttling ({ratelimit_remaining} requests remaining (reset at {reset_at}; wait for {wait_seconds} seconds)')
-        time.sleep(wait_seconds)
+    try:
+        s = response.headers['X-RateLimit-Remaining']
+    except KeyError:
+        pass
+    else:
+        ratelimit_remaining = int(s)
+        if ratelimit_remaining < 10:
+          reset_at = int(response.headers['X-RateLimit-Reset'])
+          wait_seconds = reset_at - time.time() + 5
+          if wait_seconds > 0:
+            db.commit()
+            print(f'Now wait due to throttling ({ratelimit_remaining} requests remaining (reset at {reset_at}; wait for {wait_seconds} seconds)')
+            time.sleep(wait_seconds)
 
     this_page_results = json.loads(response.text)
     
