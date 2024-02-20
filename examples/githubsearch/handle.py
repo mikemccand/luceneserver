@@ -2260,10 +2260,11 @@ def handleQuery(path, isMike, environ):
   util.log(timeDetails)
 
   headers = []
-  if project is not None:
-    cookies['lastProject'] = project
-  else:
-    cookies['lastProject'] = ''
+  if False:
+    if project is not None:
+      cookies['lastProject'] = project
+    else:
+      cookies['lastProject'] = ''
 
   cookies['SavedSearches'] = codecs.encode(pickle.dumps(saved_searches), 'base64').decode('ascii')
 
