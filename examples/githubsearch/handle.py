@@ -352,6 +352,10 @@ githubSpec.facetFields = (
   #('Created', 'facetCreated', True, None, False),
   )
 
+reverse_facet_fields = {}
+for tup in githubSpec.facetFields:
+  reverse_facet_fields[tup[1]] = tup[0]
+  
 githubSpec.textQueryFields = ['title', 'body']
 # nocommit can we do key descending as number...?
 githubSpec.browseOnlyDefaultSort = 'recentlyUpdated'
@@ -1688,6 +1692,18 @@ def handleQuery(path, isMike, environ):
 
   query['facets'] = l
 
+  title_list = []
+  if text is not None and len(text) > 0:
+    title_list.append(text)
+    
+  for field, values in drillDowns:
+    print(f'{field} {values}')
+    title_list.append(f'{reverse_facet_fields.get(field, field)}={",".join(values[0])}')
+  if len(title_list) == 0:
+    title_list = ['All Lucene issues/PRs']
+
+  html_title = 'Lucene: ' + ' '.join(title_list)
+
   if spec.highlighter is not None:
     query['highlighter'] = spec.highlighter
 
@@ -1732,6 +1748,7 @@ def handleQuery(path, isMike, environ):
   w('<!DOCTYPE html>')
   w('<html lang="en">')
   w('<head>')
+  w(f'<title>{util.escape(html_title)}</title>')
   w('<meta name="viewport" content="width=device-width, initial-scale=1.0">')
   w('<meta charset="utf-8"/>')
   w('<link rel="stylesheet" href="bootstrap/css/bootstrap-responsive.min.css" media="screen"/>')
