@@ -202,6 +202,29 @@ public class TestHighlight extends ServerBaseTestCase {
     }
   }
 
+  public void testHighlightQueryWithHit() throws Exception {
+    deleteAllDocs();
+
+    long gen = addDocument("{fields: {authors: ['Dr. Seuss', 'Bob Smith', 'Seuss is Fun.  Some extra content.']}}");
+    JSONObject result = send("search", "{queryText: 'authors:seuss', retrieveFields: [{field: authors, highlight: snippets, maxPassages: 1}], " +
+                             "highlightQuery: {class: TermQuery, field: authors, term: seuss}, " +
+                             "searcher: {indexGen: " + gen + "}}");
+    assertEquals(1, getInt(result, "hits.length"));
+    assertEquals(1, getInt(result, "hits[0].fields.authors.length"));
+    assertEquals("<b>Seuss</b> Bob Smith <b>Seuss</b> is Fun.  ", renderSingleHighlight(getArray(result, "hits[0].fields.authors[0].parts")));
+  }
+
+  // #26: do not throw exception if highlightQuery is provided and there are no hits!
+  public void testHighlightQueryNoHits() throws Exception {
+    deleteAllDocs();
+
+    long gen = addDocument("{fields: {authors: ['Dr. Seuss', 'Bob Smith', 'Seuss is Fun.  Some extra content.']}}");
+    JSONObject result = send("search", "{queryText: 'authors:foobar', retrieveFields: [{field: authors}], " +
+                             "highlightQuery: {class: TermQuery, field: authors, term: seuss}, " +
+                             "searcher: {indexGen: " + gen + "}}");
+    assertEquals(0, getInt(result, "hits.length"));
+  }
+
   // nocommit fixme
   /*
   public void testNonDefaultOffsetGap() throws Exception {

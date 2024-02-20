@@ -2773,7 +2773,11 @@ public class SearchHandler extends Handler {
                                                                 queryForHighlights,
                                                                 highlightDocIDs,
                                                                 maxPassages);
+      } else {
+        // #26: so we consume the parameter even if there are no hits
+        r.clearParam("highlightQuery");
       }
+      
       diagnostics.put("highlightTimeMS", (System.nanoTime() - t0)/1000000.);
 
       t0 = System.nanoTime();

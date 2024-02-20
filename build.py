@@ -353,18 +353,16 @@ def compileChangedSources(srcPath, destPath, classPath):
         classFileName = 'build/classes/%s.class' % ('%s/%s' % (root, fileName))[4:-5]
         if not os.path.exists(classFileName) or os.path.getmtime(classFileName) < os.path.getmtime('%s/%s' % (root, fileName)):
           changedSources.append('%s/%s' % (root, fileName))
+          print(f'{fileName} {classFileName}')
 
   if len(changedSources) > 0:
     cmd = ['javac', '-Xmaxerrs', '10000', '-d', destPath]
     cmd.append('-cp')
     cmd.append(':'.join(classPath))
     cmd.extend(changedSources)
-    if False:
-      print('compile sources:')
-      for fileName in changedSources:
-        print('  %s' % fileName)
-    else:
-      print('compile %d sources' % len(changedSources))
+    print(f'compile {len(changedSources)} sources:')
+    for fileName in changedSources:
+      print('  %s' % fileName)
     run(' '.join(cmd))
 
 def getCompileClassPath():
