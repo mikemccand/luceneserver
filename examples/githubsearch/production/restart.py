@@ -83,10 +83,12 @@ if doServer:
   run(f'nohup {localconstants.PYTHON_EXE} -u runServer.py > {localconstants.GLOBAL_LOG_DIR}/luceneserver.log 2>&1 &')
 
   # Wait until server is really ready:
+  server_log_file = f'{localconstants.GLOBAL_LOG_DIR}/luceneserver.log'
   while True:
-    s = open('%s/luceneserver.log' % localconstants.GLOBAL_LOG_DIR, 'rb').read()
-    if s.find(('listening on').encode('utf-8')) != -1:
-      break
+    if os.path.exists(server_log_file):
+      s = open(server_log_file, 'rb').read()
+      if s.find(('listening on').encode('utf-8')) != -1:
+        break
     time.sleep(1.0)
 
   print()
