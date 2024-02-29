@@ -626,6 +626,8 @@ def build_full_suggest(svr):
           add_user(all_users, x, project, key, source='assignees')
 
       for change in timeline:
+        if change is None:
+          continue
         print(f'tl: {change["event"]}')
 
       for change in events:
@@ -912,6 +914,8 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
         mentioned_users.add(event['actor']['login'])
     
     for event in timeline:
+      if event is None:
+        continue
       what = event['event']
       if what == 'commented':
         commented_users.add(event['actor']['login'])
@@ -940,6 +944,8 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
 
     commit_messages = []
     for change in timeline:
+      if change is None:
+        continue
       if 'actor' in change:
         if change['actor'] is not None:
           # TODO: why does this happen (rarely: 12450)?
