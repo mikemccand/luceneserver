@@ -140,12 +140,12 @@ def http_load_as_json(url, do_post=False, token=GITHUB_API_TOKEN, handle_pages=T
         retry_count = maybe_retry(retry_count, f'got {response.headers["Content-Type"]} but expected application/json when loading {url}')
         continue
 
-    # wait due to GitHub API throttling:
-    try:
+      # wait due to GitHub API throttling:
+      try:
         s = response.headers['X-RateLimit-Remaining']
-    except KeyError:
+      except KeyError:
         pass
-    else:
+      else:
         ratelimit_remaining = int(s)
         if ratelimit_remaining < 10:
           reset_at = int(response.headers['X-RateLimit-Reset'])
@@ -155,7 +155,12 @@ def http_load_as_json(url, do_post=False, token=GITHUB_API_TOKEN, handle_pages=T
             print(f'Now wait due to throttling ({ratelimit_remaining} requests remaining (reset at {reset_at}; wait for {wait_seconds} seconds)')
             time.sleep(wait_seconds)
 
-    this_page_results = json.loads(response.text)
+      try:
+        this_page_results = json.loads(response.text)
+      except:
+        print(f'failed to parse respone as JSON:\n{response.headers}\n{response.text}; retry')
+        retry_count = maybe_retry(retry_count, f'failed to parse json: {response.text}')
+        continue
     
     if all_results is None:
       # maybe only one page, or all results fit into page 1
