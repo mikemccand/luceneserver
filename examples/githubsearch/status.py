@@ -58,8 +58,9 @@ def check_one_benchy_page(page_name, expected_chart_count):
       dt = datetime.datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
       age = now - dt
       # 24 hours plus how long benchy takes to run (12 hours should be plenty for that)
-      if age > datetime.timedelta(hours=36):
-        raise RuntimeError(f'indexing chart is {age} old, more than the expected {too_old}')
+      max_age = datetime.timedelta(hours=36)
+      if age > max_age:
+        raise RuntimeError(f'{page_name} chart is {age} old, more than the expected {max_age}')
       max_age = max(max_age, age)
       count += 1
   return max_age, count
