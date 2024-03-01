@@ -129,8 +129,6 @@ def http_load_as_json(url, do_post=False, token=GITHUB_API_TOKEN, handle_pages=T
       except Exception as e:
         retry_count = maybe_retry(retry_count, f'request failed: url={url} headers={headers} exception={e} retry_count={retry_count}')
         continue
-      else:
-        break
 
       if response.status_code != 200:
         retry_count = maybe_retry(retry_count, f'got {response.status_code} response loading {url}\n\n {response.text}')
@@ -161,6 +159,8 @@ def http_load_as_json(url, do_post=False, token=GITHUB_API_TOKEN, handle_pages=T
         print(f'failed to parse respone as JSON:\n{response.headers}\n{response.text}; retry')
         retry_count = maybe_retry(retry_count, f'failed to parse json: {response.text}')
         continue
+      else:
+        break
     
     if all_results is None:
       # maybe only one page, or all results fit into page 1
