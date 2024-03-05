@@ -1239,6 +1239,7 @@ def getTimeFacets(now):
     {'label': 'Past 3 days', 'min': now-3*24*3600, 'max': now, 'minInclusive': True, 'maxInclusive': True},
     {'label': 'Past week', 'min': now-7*24*3600, 'max': now, 'minInclusive': True, 'maxInclusive': True},
     {'label': 'Past month', 'min': int(now-30.5*24*3600), 'max': now, 'minInclusive': True, 'maxInclusive': True},
+    {'label': 'Past 3 months', 'min': int(now-3*30.5*24*3600), 'max': now, 'minInclusive': True, 'maxInclusive': True},
     {'label': 'Past 6 months', 'min': int(now-6*30.5*24*3600), 'max': now, 'minInclusive': True, 'maxInclusive': True},
     {'label': 'Past year', 'min': int(now-365*24*3600), 'max': now, 'minInclusive': True, 'maxInclusive': True},
     ]
