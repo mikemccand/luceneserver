@@ -288,8 +288,10 @@ def create_schema(svr):
                        'multiValued': True,
                        'facet': 'flat'},
             'created': {'type': 'long',
+                        'sort': True,
                         'store': True,
-                        'sort': True},
+                        'search': True,
+                        'facet': 'numericRange'},
             'closed': {'type': 'long',
                        'store': True,
                        'sort': True},
@@ -298,9 +300,6 @@ def create_schema(svr):
                         'store': True,
                         'search': True,
                         'facet': 'numericRange'},
-            'facet_created': {'type': 'atom',
-                              'search': False,
-                              'facet': 'hierarchy'},
             'updated_ago': {'type': 'long',
                             'sort': True,
                             'store': True,
@@ -985,7 +984,7 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
 
     # TODO this polish should be at search render time, not here?
     state = issue['state']
-    print(f'raw state={state}')
+    #print(f'raw state={state}')
     if state == 'open':
       state = 'Open'
     elif state == 'closed':
@@ -995,7 +994,7 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
       state_reason = issue['state_reason']
       if state_reason != 'completed':
         state = state_reason
-        print(f'{state_reason=}')
+        #print(f'{state_reason=}')
     doc['status'] = state
 
     if False:
@@ -1056,7 +1055,7 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
     else:
       s = reporter['name']
     if s is not None:
-      print(f'reporter -> {s}')
+      # print(f'reporter -> {s}')
       doc['reporter'] = s
 
     doc['has_reactions'] = doc.get('reaction_count', 0) > 0
@@ -1136,7 +1135,7 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
     # TODO: merged_at?
 
     if issue['created_at'] is not None:
-      print(f'{issue["created_at"]}')
+      # print(f'{issue["created_at"]}')
       doc['created'] = to_utc_epoch_seconds(parse_date_time(issue['created_at']))
     if issue['closed_at'] is not None:
       doc['closed'] = to_utc_epoch_seconds(parse_date_time(issue['closed_at']))
@@ -1154,7 +1153,7 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
         label = x
       else:
         label = x['name']
-      print(f'  label: {label}')
+      #print(f'  label: {label}')
       if label.startswith('type:'):
         if 'issue_type' in doc:
           print(f'more than one issue_type?  {doc["issue_type"]} and {label[5:]}')
@@ -1218,7 +1217,7 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
         if False:
           # each comment has an array of reactions:
           for reaction in list(comment_reactions[i]):
-            print(f'  comment reaction: {reaction.user} {reaction.content} {reaction.created_at}')
+            #print(f'  comment reaction: {reaction.user} {reaction.content} {reaction.created_at}')
             add_user(all_users, reaction.user, project)
 
         subDoc = {}
@@ -1278,7 +1277,7 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
 
         subDoc['comment_body'] = clean_github_markdown(number, body)
         comments_text.append(subDoc['comment_body'])
-        print(f'  comment: {subDoc["comment_body"]}')
+        #print(f'  comment: {subDoc["comment_body"]}')
 
         subDoc['comment_id'] = comment['id']
         # Disregard the bulk-update after X.Y release:
@@ -1302,9 +1301,6 @@ def index_docs(svr, issues, printIssue=False, updateSuggest=False):
     # sort by descending creation date (newest first):
     subDocs.sort(key=lambda x: x['fields']['created'])
     subDocs.reverse()
-
-    if number == 12180:
-      print(f'XXX\n{number} {is_pr}\n  issue: {issue}\n  events: {events}\n  comments: {comments}\n  index_comments: {index_comments=}\n  {pr_comments=}\n  {pr_reviews=}\n  {comments=}\n  {subDocs=}')
 
     # count both normal comments and PR code comments:
     doc['comment_count'] = total_comment_count

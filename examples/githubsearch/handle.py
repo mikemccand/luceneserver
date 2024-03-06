@@ -325,6 +325,7 @@ githubSpec.facetFields = (
   ('Issue type', 'issue_or_pr', False, None, False),
   ('Author relation', 'author_association', False, None, False),
   ('Comment type', 'comment_type', False, None, False),
+  ('Created', 'created', False, None, False),
   ('Updated', 'updated', False, None, False),
   ('Updated ago', 'updated_ago', False, None, False),
   ('Comment count', 'comment_count', False, None, False),
@@ -1171,7 +1172,7 @@ def handleMoreFacets(path, isMike, environ):
     l2 = []
     for field, values in drillDowns:
       for value in values:
-        if field == 'updated':
+        if field in ('updated', 'created'):
           # nocommit should use the 'now' as of when the query had started!
           for d in getTimeFacets(now):
             if d['label'] == value[0]:
@@ -1211,6 +1212,7 @@ def handleMoreFacets(path, isMike, environ):
 
   query['facets'] = [{'dim': dim, 'topN': MAX_INT}]
   query['facets'].append({'dim': 'updated', 'numericRanges': getTimeFacets(now)})
+  query['facets'].append({'dim': 'created', 'numericRanges': getTimeFacets(now)})
   query['facets'].append({'dim': 'comment_count', 'numericRanges': getCommentCountFacets()})
 
   if TRACE:
@@ -1607,7 +1609,7 @@ def handleQuery(path, isMike, environ):
       topN = MAX_INT
     else:
       topN = 7
-    if dim == 'updated':
+    if dim in ('updated', 'created'):
       d = {'dim': dim, 'numericRanges': getTimeFacets(now)}
     elif dim == 'updated_ago':
       d = {'dim': 'updated_ago', 'numericRanges': getOldTimeFacets(now)}
@@ -1649,7 +1651,7 @@ def handleQuery(path, isMike, environ):
     for field, values in drillDowns:
       for value in values:
         # TODO: factor out this identical code w/ handleMoreFacets!!
-        if field == 'updated':
+        if field in ('updated', 'created'):
           # nocommit should use the 'now' as of when the query had started!
           for d in getTimeFacets(now):
             if d['label'] == value[0]:
@@ -1685,7 +1687,7 @@ def handleQuery(path, isMike, environ):
         else:
           l2.append({'field': field, 'value': value})
 
-      if field not in ('updated', 'updated_ago', 'comment_count', 'reaction_count') and not spec.facetByID[field][0]:
+      if field not in ('updated', 'created', 'updated_ago', 'comment_count', 'reaction_count') and not spec.facetByID[field][0]:
         ddExtraMap[field] = len(l)
         l.append({'dim': field, 'labels': values[0]})
                   
