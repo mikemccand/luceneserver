@@ -123,9 +123,9 @@ def http_load_as_json(url, do_post=False, token=GITHUB_API_TOKEN, handle_pages=T
     while True:
       try:
         if do_post:
-          response = requests.post(url, headers=headers)
+          response = requests.post(url, headers=headers, timeout=30)
         else:
-          response = requests.get(url, headers=headers)
+          response = requests.get(url, headers=headers, timeout=30)
       except Exception as e:
         retry_count = maybe_retry(retry_count, f'request failed: url={url} headers={headers} exception={e} retry_count={retry_count}')
         continue
