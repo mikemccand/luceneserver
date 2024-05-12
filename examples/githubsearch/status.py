@@ -13,27 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
 import os
-import gzip
-import traceback
 import sys
 sys.path.insert(0, '/home/ec2-user/src/github-ui')
-import util
-import handle
 import time
 
-import time
 import re
 import urllib.request
 import urllib.parse
 import threading
-import sys
 import datetime
+import submit
+
+TESLAMATE_STATE_FILE = submit.TESLAMATE_STATE_FILE
 
 # assume we start up OK
 status_github_actions = ['OK', time.time()]
 status_lucene_benchmarks = ['OK', time.time()]
+
+# this is updated by submit.py
+status_teslamate = ['UNKNOWN', time.time()]
 
 def get_nrt_log_status(site):
   age_sec = time.time() - os.path.getmtime(f'/home/ec2-user/state/{site}/logs/nrt.log')
@@ -111,7 +110,7 @@ def application(environ, start_response):
   elif what == 'lucene-benchmarks':
     age = time.time() - status_lucene_benchmarks[1]
 
-    if age > 660:
+    if age > 60:
       # background status thread died!
       http_status = f'500 Thread died {age:.2f} seconds ago'
     else:
@@ -120,13 +119,28 @@ def application(environ, start_response):
         http_status = f'200 OK {status_lucene_benchmarks[0]} checked {age:.2f} seconds ago'
       else:
         http_status = f'500 {status_lucene_benchmarks[0]} checked {age:.2f} seconds ago'
+  elif what == 'teslamate':
+
+    mod_time = os.path.getmtime(TESLAMATE_STATE_FILE)
+    age = time.time() - mod_time
+    if age > 60:
+      # updater died!
+      http_status = f'500 updater died {age=}'
+    else:
+      state = open(TESLAMATE_STATE_FILE, 'r').read()
+      # updater still running, but what is status?
+      if state.startswith('OK'):
+        http_status = f'200 OK {state} checked {age:.2f} seconds ago'
+      else:
+        http_status = f'500 {state} checked {age:.2f} seconds ago'
+    
   else:
-    http_status = f'500 unknown status what={what}; must be one of: github-actions, lucene-benchmarks, jira-nrt, github-nrt'
+    http_status = f'500 unknown status what={what}; must be one of: github-actions, lucene-benchmarks, jira-nrt, github-nrt, teslamate'
 
   print(f'top status {what=} {http_status=}')
         
-  headers = []
   bytes = http_status.encode('utf-8')
+  headers = []
   headers.append(('Content-Length', str(len(bytes))))
   start_response(http_status, headers)
   return [bytes]
