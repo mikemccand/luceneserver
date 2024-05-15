@@ -154,7 +154,7 @@ def application(environ, start_response):
       body = state
       
   else:
-    http_status = f'500 unknown status what={what}; must be one of: github-actions, lucene-benchmarks, jira-nrt, github-nrt, teslamate'
+    http_status = f'500 unknown status what={what}; must be one of: github-actions, lucene-benchmarks, jira-nrt, github-nrt, teslamate, homedoormotion'
 
   print(f'top status {what=} {http_status=}')
 
