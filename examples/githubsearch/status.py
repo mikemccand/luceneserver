@@ -26,13 +26,11 @@ import datetime
 import submit
 
 TESLAMATE_STATE_FILE = submit.TESLAMATE_STATE_FILE
+HOME_DOOR_MOTION_STATE_FILE = submit.HOME_DOOR_MOTION_STATE_FILE
 
 # assume we start up OK
 status_github_actions = ['OK', time.time()]
 status_lucene_benchmarks = ['OK', time.time()]
-
-# this is updated by submit.py
-status_teslamate = ['UNKNOWN', time.time()]
 
 def get_nrt_log_status(site):
   age_sec = time.time() - os.path.getmtime(f'/home/ec2-user/state/{site}/logs/nrt.log')
@@ -91,6 +89,8 @@ def application(environ, start_response):
   else:
     what = 'github-actions'
 
+  body = None
+
   if what == 'github-actions':
     age = time.time() - status_github_actions[1]
 
@@ -133,13 +133,35 @@ def application(environ, start_response):
         http_status = f'200 OK {state} checked {age:.2f} seconds ago'
       else:
         http_status = f'500 {state} checked {age:.2f} seconds ago'
-    
+  elif what == 'homedoormotion':
+
+    mod_time = os.path.getmtime(HOME_DOOR_MOTION_STATE_FILE)
+    age = time.time() - mod_time
+    if age > 60:
+      # updater died!
+      http_status = f'500 updater died {age=}'
+    else:
+      state = open(HOME_DOOR_MOTION_STATE_FILE, 'r').read()
+
+      state_lines = state.splitlines()
+      
+      # updater still running, but what is status?
+      if state_lines[0].startswith('OK'):
+        http_status = f'200 OK {state_lines[0]} checked {age:.2f} seconds ago'
+      else:
+        http_status = f'500 {state_lines[0]} checked {age:.2f} seconds ago'
+
+      body = state
+      
   else:
     http_status = f'500 unknown status what={what}; must be one of: github-actions, lucene-benchmarks, jira-nrt, github-nrt, teslamate'
 
   print(f'top status {what=} {http_status=}')
-        
-  bytes = http_status.encode('utf-8')
+
+  if body is None:
+    bytes = http_status.encode('utf-8')
+  else:
+    bytes = body.encode('utf-8')
   headers = []
   headers.append(('Content-Length', str(len(bytes))))
   start_response(http_status, headers)
