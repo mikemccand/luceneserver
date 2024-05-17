@@ -72,9 +72,12 @@ def check_all_benchy():
                                ('lucenebench/sparseResults', 16),
                                ('lucenebench/checkIndexTime', 1),
                                ('lucenebench/github_pr_counts', 1)):
-    
+
+    t0 = time.time()
+    print(f'now check {name}, expected_count={expected_count}')
     max_age, count = check_one_benchy_page(name, expected_count)
     ages.append(f'{max_age.total_seconds()/3600:.2f}')
+    print(f'  took {time.time()-t0:.2f} sec; age {max_age.total_seconds():.2f} sec')
     total_count += count
   return ', '.join(ages), total_count
 
@@ -110,7 +113,7 @@ def application(environ, start_response):
   elif what == 'lucene-benchmarks':
     age = time.time() - status_lucene_benchmarks[1]
 
-    if age > 60:
+    if age > 900:
       # background status thread died!
       http_status = f'500 Thread died {age:.2f} seconds ago'
     else:
